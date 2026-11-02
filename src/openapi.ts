@@ -1346,6 +1346,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/github": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getGitHubConnection"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/github/connect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["beginGitHubConnection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/github/installations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["connectGitHubInstallation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/github/installations/{installationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["disconnectGitHubInstallation"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/me/export": {
         parameters: {
             query?: never;
@@ -3366,6 +3430,21 @@ export interface components {
              */
             delivery: "sent" | "email_not_configured";
         };
+        GitHubConnection: {
+            available: boolean;
+            installations: components["schemas"]["GitHubInstallation"][];
+        };
+        GitHubInstallation: {
+            installationId: number;
+            /** @description The GitHub user or organization the App is installed on. */
+            account: string;
+            /** @description User or Organization. */
+            accountType: string;
+            connectedAt: string;
+        };
+        GitHubConnectStart: {
+            url: string;
+        };
         AccountExport: {
             exportedAt: string;
             account: {
@@ -3916,6 +3995,8 @@ export interface components {
             routesPerSandbox: number | null;
             /** @description Whether a sandbox can be forked into a new sandbox with a copy of what it holds. */
             forks: boolean;
+            /** @description Whether GitHub Actions jobs can run on sandboxes: an organization connects GitHub (GET /v1/github), and a job that asks for runs-on: agental-<size> runs on one of its sandboxes. */
+            runsOn: boolean;
             /** @description Whether a sandbox can be logged in to over SSH. Where it can, PUT /v1/sandboxes/{id}/ssh turns it on and answers with the address and port to connect to, and POST /v1/sandboxes/{id}/ssh/keys lets a public key in. */
             ssh: boolean;
             /** @description Whether a sandbox can be given a desktop: a screen in its machine that programs open windows on, an agent reads and clicks on, and a person watches in a browser. Where it can, PUT /v1/sandboxes/{id}/desktop turns it on and answers with the address to watch it at. */
@@ -10910,6 +10991,178 @@ export interface operations {
             };
             /** @description invite_closed: the invite was revoked, has expired, or was accepted by someone else. */
             410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getGitHubConnection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Whether GitHub can be connected here, and the installations of the App connected to the organization. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GitHubConnection"];
+                };
+            };
+            /** @description session_required, or forbidden: only an owner or an admin of the organization. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    beginGitHubConnection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Where to send the browser: GitHub's page that installs the App, with a state good for 30 minutes for this person and organization. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GitHubConnectStart"];
+                };
+            };
+            /** @description session_required, or forbidden: only an owner or an admin of the organization. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description github_not_available: runs-on, or the App's sign-in, is not set up on this deployment. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    connectGitHubInstallation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @description installation_id, as GitHub sent the browser back with it. */
+                    installationId: number;
+                    /** @description code, the person's GitHub sign-in, as GitHub sent the browser back with it. */
+                    code: string;
+                    /** @description state, as POST /v1/github/connect gave it and GitHub sent it back. */
+                    state: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The installation is the organization's. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GitHubInstallation"];
+                };
+            };
+            /** @description github_state_invalid: the state is not one given to this person, it ran out, or it was used. github_code_invalid: GitHub did not take the sign-in. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description session_required, or forbidden: only an owner or an admin. github_installation_unreachable: GitHub says the person who signed in does not reach that installation. github_not_admin: they reach it, but are not the account it is on, or an admin of that GitHub organization. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description github_not_available, or installation_taken: it is connected to another organization. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description github_unavailable: GitHub did not answer. Connect again in a minute. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    disconnectGitHubInstallation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                installationId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description It is not the organization's any more: its jobs are not run here. The App stays installed on GitHub until it is uninstalled there. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description session_required, or forbidden: only an owner or an admin of the organization. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description not_found: no such installation is connected to the organization. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
