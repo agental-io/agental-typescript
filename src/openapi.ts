@@ -4958,7 +4958,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description running_limit_reached: the account runs as many sandboxes as its plan's runningUnits allows. burst_fee_too_high: the start would cost more in burst fees than the Agental-Max-Burst-Fee header allows. burst_budget_reached: the burst fee would take this month's fees past the account's budget. burst_in_free_month: the start would cost a burst fee, which the free month does not pay. box_share_reached: the account's running sandboxes already take half of the CPU threads or memory of the server it would run on; one account is not given more of a server than that. feeMicros says what the start would have cost; retryAfterSeconds and the Retry-After header say when it would cost nothing. Nothing was created. */
+            /** @description running_limit_reached: the account runs as many sandboxes as its plan's runningUnits allows. burst_fee_too_high: the start would cost more in burst fees than the Agental-Max-Burst-Fee header allows. burst_budget_reached: the burst fee would take this month's fees past the account's budget. burst_in_free_month: the start would cost a burst fee, which the free month does not pay. feeMicros says what the start would have cost; retryAfterSeconds and the Retry-After header say when it would cost nothing. Nothing was created. */
             429: {
                 headers: {
                     [name: string]: unknown;
@@ -5228,7 +5228,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description running_limit_reached: the account runs as many sandboxes as its plan's runningUnits allows. burst_fee_too_high: the start would cost more in burst fees than the Agental-Max-Burst-Fee header allows. burst_budget_reached: the burst fee would take this month's fees past the account's budget. burst_in_free_month: the start would cost a burst fee, which the free month does not pay. box_share_reached: the account's running sandboxes already take half of the CPU threads or memory of the server it would run on; one account is not given more of a server than that. feeMicros says what the start would have cost; retryAfterSeconds and the Retry-After header say when it would cost nothing. It is left stopped. */
+            /** @description running_limit_reached: the account runs as many sandboxes as its plan's runningUnits allows. burst_fee_too_high: the start would cost more in burst fees than the Agental-Max-Burst-Fee header allows. burst_budget_reached: the burst fee would take this month's fees past the account's budget. burst_in_free_month: the start would cost a burst fee, which the free month does not pay. feeMicros says what the start would have cost; retryAfterSeconds and the Retry-After header say when it would cost nothing. It is left stopped. */
             429: {
                 headers: {
                     [name: string]: unknown;
@@ -5859,7 +5859,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description running_limit_reached: the account runs as many sandboxes as its plan's runningUnits allows. burst_fee_too_high: the start would cost more in burst fees than the Agental-Max-Burst-Fee header allows. burst_budget_reached: the burst fee would take this month's fees past the account's budget. burst_in_free_month: the start would cost a burst fee, which the free month does not pay. box_share_reached: the account's running sandboxes already take half of the CPU threads or memory of the server it would run on; one account is not given more of a server than that. feeMicros says what the start would have cost; retryAfterSeconds and the Retry-After header say when it would cost nothing. It is left stopped. */
+            /** @description running_limit_reached: the account runs as many sandboxes as its plan's runningUnits allows. burst_fee_too_high: the start would cost more in burst fees than the Agental-Max-Burst-Fee header allows. burst_budget_reached: the burst fee would take this month's fees past the account's budget. burst_in_free_month: the start would cost a burst fee, which the free month does not pay. feeMicros says what the start would have cost; retryAfterSeconds and the Retry-After header say when it would cost nothing. It is left stopped. */
             429: {
                 headers: {
                     [name: string]: unknown;
@@ -5920,7 +5920,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description The sandbox was not running, and bringing it back on is a start. running_limit_reached: the account runs as many sandboxes as its plan's runningUnits allows. burst_fee_too_high: the start would cost more in burst fees than the Agental-Max-Burst-Fee header allows. burst_budget_reached: the burst fee would take this month's fees past the account's budget. burst_in_free_month: the start would cost a burst fee, which the free month does not pay. box_share_reached: the account's running sandboxes already take half of the CPU threads or memory of the server it would run on; one account is not given more of a server than that. feeMicros says what the start would have cost; retryAfterSeconds and the Retry-After header say when it would cost nothing. It is left as it was. */
+            /** @description The sandbox was not running, and bringing it back on is a start. running_limit_reached: the account runs as many sandboxes as its plan's runningUnits allows. burst_fee_too_high: the start would cost more in burst fees than the Agental-Max-Burst-Fee header allows. burst_budget_reached: the burst fee would take this month's fees past the account's budget. burst_in_free_month: the start would cost a burst fee, which the free month does not pay. feeMicros says what the start would have cost; retryAfterSeconds and the Retry-After header say when it would cost nothing. It is left as it was. */
             429: {
                 headers: {
                     [name: string]: unknown;
@@ -6034,7 +6034,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description running_limit_reached: the account runs as many sandboxes as its plan's runningUnits allows. burst_fee_too_high: the start would cost more in burst fees than the Agental-Max-Burst-Fee header allows. burst_budget_reached: the burst fee would take this month's fees past the account's budget. burst_in_free_month: the start would cost a burst fee, which the free month does not pay. box_share_reached: the account's running sandboxes already take half of the CPU threads or memory of the server it would run on; one account is not given more of a server than that. feeMicros says what the start would have cost; retryAfterSeconds and the Retry-After header say when it would cost nothing. Nothing was forked. */
+            /** @description running_limit_reached: the account runs as many sandboxes as its plan's runningUnits allows. burst_fee_too_high: the start would cost more in burst fees than the Agental-Max-Burst-Fee header allows. burst_budget_reached: the burst fee would take this month's fees past the account's budget. burst_in_free_month: the start would cost a burst fee, which the free month does not pay. feeMicros says what the start would have cost; retryAfterSeconds and the Retry-After header say when it would cost nothing. Nothing was forked. */
             429: {
                 headers: {
                     [name: string]: unknown;
