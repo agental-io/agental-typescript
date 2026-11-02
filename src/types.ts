@@ -91,6 +91,10 @@ export type DataRetention = Schemas["DataRetention"];
 export type AccountExport = Schemas["AccountExport"];
 /** What your collector answered one empty export. */
 export type TelemetryTest = Schemas["TelemetryTest"];
+/** A repository's runs-on pool: how many sandboxes of each size it keeps, the template they are made on, and the ones it has. */
+export type RunsOnRepository = Schemas["RunsOnRepository"];
+/** Each repository's runs-on pool, and the size a pool keeps where none was set. */
+export type RunsOnRepositories = Schemas["RunsOnRepositories"];
 export type Policy = Schemas["Policy"];
 /** What is sold: the hourly price of each size, the monthly plans in tiers, the top-ups and their bonus, storage and the free month. */
 export type Prices = Omit<Schemas["Prices"], "tiers" | "volumeDiscount"> & { tiers: Plan[] };

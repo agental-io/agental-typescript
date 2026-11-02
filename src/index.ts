@@ -69,6 +69,8 @@ export type {
   DataRetention,
   AccountExport,
   TelemetryTest,
+  RunsOnRepository,
+  RunsOnRepositories,
   TemplateApplied,
   TemplateInfo,
   TemplateNetwork,

@@ -31,6 +31,8 @@ import type {
   TeamRole,
   Telemetry,
   TelemetryTest,
+  RunsOnRepository,
+  RunsOnRepositories,
   Usage,
   Webhook,
 } from "./types.js";
@@ -438,6 +440,30 @@ export class Agental {
   }
 
   /**
+   * GitHub Actions jobs on sandboxes: each repository's pool, how many sandboxes of each size it
+   * keeps and the template they are made on. available is false where jobs do not run on
+   * sandboxes here. GitHub itself is connected in the console.
+   */
+  async runsOnRepositories(): Promise<RunsOnRepositories> {
+    return (await this.http.json<RunsOnRepositories>({ method: "GET", path: "/v1/runs-on/repositories", replay: true })).body;
+  }
+
+  /**
+   * Sets a repository's pool, given as owner/name: poolMax, 1 to 50 sandboxes of each size, and
+   * templateId, one of your templates, each null for the default and left out to keep what was set.
+   * The template is used only where GitHub says the repository is private and runs no workflows
+   * from fork pull requests.
+   */
+  async setRunsOnRepository(repository: string, settings: { poolMax?: number | null; templateId?: string | null }): Promise<RunsOnRepository> {
+    return (await this.http.json<RunsOnRepository>({ method: "PUT", path: `/v1/runs-on/repositories/${repoPath(repository)}`, body: settings, replay: true })).body;
+  }
+
+  /** Puts a repository's pool back to the defaults. Its sandboxes are kept. When it has no settings it throws an ApiError with the status 404. */
+  async resetRunsOnRepository(repository: string): Promise<void> {
+    await this.http.send({ method: "DELETE", path: `/v1/runs-on/repositories/${repoPath(repository)}` });
+  }
+
+  /**
    * How long your sandboxes' history is kept: the output of their commands, their agent
    * conversations and their events. keepDays is 1, 7, 30 or 90, or null to keep it until the
    * sandbox is deleted; 30 until you choose. retained lists what is kept for periods agental sets.
@@ -500,4 +526,13 @@ export class Agental {
   async exportAccount(): Promise<AccountExport> {
     return (await this.http.json<AccountExport>({ method: "GET", path: "/v1/me/export", replay: true })).body;
   }
+}
+
+/** owner/name as a path: each part encoded, the slash between them kept. */
+function repoPath(repository: string): string {
+  const [owner, name, ...rest] = repository.split("/");
+  if (!owner || !name || rest.length > 0) {
+    throw new TypeError(`A repository is owner/name, as acme/app, and not ${JSON.stringify(repository)}.`);
+  }
+  return `${encodeURIComponent(owner)}/${encodeURIComponent(name)}`;
 }

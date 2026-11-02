@@ -1346,6 +1346,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/runs-on/repositories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listRunsOnRepositories"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/runs-on/repositories/{owner}/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["setRunsOnRepository"];
+        post?: never;
+        delete: operations["resetRunsOnRepository"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/github": {
         parameters: {
             query?: never;
@@ -3429,6 +3461,27 @@ export interface components {
              * @enum {string}
              */
             delivery: "sent" | "email_not_configured";
+        };
+        RunsOnRepositories: {
+            /** @description Whether GitHub Actions jobs run on sandboxes here. False: nothing is listed, and settings cannot be set. */
+            available: boolean;
+            defaultPoolMax: number | null;
+            repositories: components["schemas"]["RunsOnRepository"][];
+        };
+        RunsOnRepository: {
+            /** @description owner/name, in lower case. */
+            repository: string;
+            /** @description The most sandboxes of each size its pool keeps. Null: the deployment's, defaultPoolMax. */
+            poolMax: number | null;
+            /** @description The template its pool sandboxes are made on, where the repository is private and runs no workflows from fork pull requests. Null: the organization's empty runs-on template, which every other pool and a fork's own sandbox get. */
+            templateId: string | null;
+            sandboxes: {
+                sandboxId: string;
+                name: string;
+                size: string;
+                /** @description Whether a job holds it now. */
+                busy: boolean;
+            }[];
         };
         GitHubConnection: {
             available: boolean;
@@ -11000,6 +11053,142 @@ export interface operations {
             };
             /** @description invite_closed: the invite was revoked, has expired, or was accepted by someone else. */
             410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listRunsOnRepositories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The repositories the organization has CI pool settings for, or a pool of sandboxes, with the deployment's pool size for those it has not set. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunsOnRepositories"];
+                };
+            };
+        };
+    };
+    setRunsOnRepository: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                owner: string;
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @description 1 to 50 sandboxes of each size. Null: the deployment's. Left out: as it was. */
+                    poolMax?: number | null;
+                    /** @description One of the organization's templates. Null: the empty runs-on template. Left out: as it was. */
+                    templateId?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Set. A pool keeps the sandboxes it has: a smaller pool makes no more, and a new template is for sandboxes made from now on. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunsOnRepository"];
+                };
+            };
+            /** @description invalid_request: not owner/name, or a pool size out of range. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description role_required: only an owner or an admin of the team. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description not_found: no such template of the organization's. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description runs_on_unavailable: GitHub Actions jobs do not run on sandboxes here. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    resetRunsOnRepository: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                owner: string;
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The repository's pool is back to the deployment's settings. Its sandboxes are kept. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description role_required: only an owner or an admin of the team. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description not_found: the repository has no settings. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description runs_on_unavailable: GitHub Actions jobs do not run on sandboxes here. */
+            501: {
                 headers: {
                     [name: string]: unknown;
                 };
