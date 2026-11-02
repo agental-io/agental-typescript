@@ -3441,6 +3441,15 @@ export interface components {
             /** @description User or Organization. */
             accountType: string;
             connectedAt: string;
+            /**
+             * @description Whether the App may use all the account's repositories or those chosen. Null where GitHub did not say.
+             * @enum {string|null}
+             */
+            repositorySelection: "all" | "selected" | null;
+            /** @description The repositories the App may use, by full name. Null where GitHub did not say. */
+            repositories: string[] | null;
+            /** @description Where on GitHub the repositories it may use are changed, or the App uninstalled. */
+            manageUrl: string;
         };
         GitHubConnectStart: {
             url: string;
