@@ -17,7 +17,7 @@
     "node": ">=20.16"
   },
   "bin": {
-    "agental": "./dist/cli.js"
+    "agental": "bin/agental.js"
   },
   "exports": {
     ".": {
@@ -28,6 +28,7 @@
   },
   "types": "./dist/index.d.ts",
   "files": [
+    "bin",
     "dist",
     "README.md",
     "LICENSE"
