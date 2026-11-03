@@ -3518,8 +3518,10 @@ export interface components {
             command: string;
             /** @description How often it runs, as 15m, 1h or 1d, counted from when it was made. Null when cron says. */
             every: string | null;
-            /** @description When it runs, as a five-field cron expression in timeZone. Null when every says. */
+            /** @description When it runs, as a five-field cron expression in timeZone. Null when every or at says. */
             cron: string | null;
+            /** @description The one time it runs, for a schedule that runs once. After it, nextRunAt is null and the schedule and its run are kept until deleted. Null for one that runs again and again. */
+            at: string | null;
             timeZone: string;
             timeoutMs: number;
             /** @enum {string} */
@@ -3528,8 +3530,10 @@ export interface components {
             /** @enum {string} */
             overlap: "skip" | "replace" | "parallel";
             enabled: boolean;
-            /** @description When it next runs. Null while it is paused. */
+            /** @description When it next runs. Null while it is paused, and for one that ran once. */
             nextRunAt: string | null;
+            /** @description Why it paused itself: after 10 runs one after another failed. Null for one paused by hand, or running. */
+            pausedReason: string | null;
             lastRun: components["schemas"]["ScheduleRun"] | null;
             createdAt: string;
             updatedAt: string;
@@ -3579,10 +3583,15 @@ export interface components {
              */
             every?: string | null;
             /**
-             * @description When, as five cron fields: minute, hour, day of the month, month, day of the week, with no two runs less than 5 minutes apart. Give this or every.
+             * @description When, as five cron fields: minute, hour, day of the month, month, day of the week, with no two runs less than 5 minutes apart. Give this, every or at.
              * @example 0 7 * * 1-5
              */
             cron?: string | null;
+            /**
+             * @description Once, at this date and time, up to a year away: an agent's follow-up, such as a check at 09:00. Give this, every or cron.
+             * @example 2026-11-04T09:00:00Z
+             */
+            at?: string | null;
             /**
              * @description The time zone cron is read in, as Europe/Sofia. Defaults to UTC.
              * @example Europe/Sofia
@@ -3622,10 +3631,15 @@ export interface components {
              */
             every?: string | null;
             /**
-             * @description When, as five cron fields: minute, hour, day of the month, month, day of the week, with no two runs less than 5 minutes apart. Give this or every.
+             * @description When, as five cron fields: minute, hour, day of the month, month, day of the week, with no two runs less than 5 minutes apart. Give this, every or at.
              * @example 0 7 * * 1-5
              */
             cron?: string | null;
+            /**
+             * @description Once, at this date and time, up to a year away: an agent's follow-up, such as a check at 09:00. Give this, every or cron.
+             * @example 2026-11-04T09:00:00Z
+             */
+            at?: string | null;
             /**
              * @description The time zone cron is read in, as Europe/Sofia. Defaults to UTC.
              * @example Europe/Sofia

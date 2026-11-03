@@ -619,8 +619,8 @@ export class Schedules {
   }
 
   /**
-   * Makes a schedule: what it runs, through sh -c, and every ("15m", "1h", "1d") or cron
-   * ("0 7 * * 1-5", in timeZone). A run gets 600000 ms unless timeoutMs says, up to six hours.
+   * Makes a schedule: what it runs, through sh -c, and every ("15m", "1h", "1d"), cron
+   * ("0 7 * * 1-5", in timeZone), or at, once ("2026-11-04T09:00:00Z"). A run gets 600000 ms unless timeoutMs says, up to six hours.
    * One that may start the sandbox needs a key that may start and stop it; ifStopped "skip"
    * runs only while it runs.
    */
