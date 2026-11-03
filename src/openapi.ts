@@ -10670,7 +10670,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description How long the account keeps its sandboxes' history: the output of their commands, their agent conversations and their events. A deleted sandbox's history is deleted with it, whatever is set: its events a day later. */
+            /** @description How long the account keeps its sandboxes' history: the output of their commands, their agent conversations, their events and the runs of their schedules, of which each schedule keeps its newest 10 however old. A deleted sandbox's history is deleted with it, whatever is set, its schedules too: its events a day later. */
             200: {
                 headers: {
                     [name: string]: unknown;
