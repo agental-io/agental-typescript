@@ -5,7 +5,7 @@ export type { AgentalOptions } from "./http.js";
 export { Browser, Commands, Desktop, Email, Files, Sandbox, Ssh } from "./sandbox.js";
 export { Secrets, Template, Templates } from "./template.js";
 export type { TemplateChanges } from "./template.js";
-export type { BurstOptions, CommandLine, CreateOptions, DesktopButton, ExecEvent, ExecOptions, SandboxChanges, ScreenshotOptions, SendEmailOptions, StartOptions, WaitOptions } from "./sandbox.js";
+export type { BurstOptions, CommandLine, CreateOptions, DesktopButton, ExecEvent, ExecOptions, SandboxChanges, ScreenshotOptions, SendEmailOptions, StartOptions, StopOptions, WaitOptions } from "./sandbox.js";
 export type {
   AccountEmail,
   ApiKey,

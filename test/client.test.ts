@@ -64,6 +64,8 @@ function sandbox(changes: Partial<SandboxInfo> = {}): SandboxInfo {
     archived: false,
     archivedAt: null,
     migratedAt: null,
+    memoryKept: false,
+    memoryLost: null,
     network: { outbound: "open", allow: [] },
     tags: [],
     metadata: {},
@@ -249,6 +251,21 @@ test("a command is a list as given, or a line of shell, and is never sent twice"
   await assert.rejects(box.exec("make"), (error: unknown) => error instanceof ProxyError && error.status === 502);
   await assert.rejects(box.exec("make"), ConnectionError);
   assert.equal(sent.length, 6);
+});
+
+test("a stop sends no body, and keepMemory when it is asked for, and the sandbox says whether its memory was kept", async () => {
+  const { agental, sent } = scripted(
+    json(200, sandbox()),
+    json(200, sandbox({ status: "stopped", memoryKept: false })),
+    json(200, sandbox({ status: "stopped", memoryKept: true })),
+  );
+  const box = await agental.sandboxes.get("sbx_0123456789abcdef");
+  await box.stop();
+  assert.deepEqual([sent[1]?.method, sent[1]?.path, sent[1]?.body], ["POST", "/v1/sandboxes/sbx_0123456789abcdef/stop", undefined]);
+  assert.equal(box.info.memoryKept, false);
+  await box.stop({ keepMemory: true });
+  assert.deepEqual([sent[2]?.method, sent[2]?.path, sent[2]?.body], ["POST", "/v1/sandboxes/sbx_0123456789abcdef/stop", { keepMemory: true }]);
+  assert.equal(box.info.memoryKept, true);
 });
 
 test("a request the API turned away as it restarted is sent again, a command too, as nothing was done with it", async () => {

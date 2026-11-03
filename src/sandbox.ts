@@ -155,6 +155,16 @@ export interface WaitOptions {
   timeoutMs?: number;
 }
 
+/** How to stop a sandbox. */
+export interface StopOptions {
+  /**
+   * Keep its memory as well as its disk, at 10% of the running price, so that start() puts
+   * back every process as it was. The stop answers once the memory is written, about a
+   * second for each 110 MB the sandbox uses. info.memoryKept says whether it was.
+   */
+  keepMemory?: boolean;
+}
+
 /** How to start a sandbox: whether to wait until it runs, and what its burst may cost. */
 export interface StartOptions extends WaitOptions, BurstOptions {}
 
@@ -872,9 +882,14 @@ export class Sandbox {
     throw new ConnectionError("The stream ended before the command said what it exited with. It may still be running.");
   }
 
-  /** Stops it. The disk is kept, with everything on it, at 5% of the running price where that is charged. What was running is not. */
-  async stop(): Promise<this> {
-    this.info = (await this.http.json<SandboxInfo>({ method: "POST", path: `${this.path}/stop`, replay: true })).body;
+  /**
+   * Stops it. The disk is kept, with everything on it, at 5% of the running price where that
+   * is charged. What was running is not, unless keepMemory: then start() puts it back, and
+   * info.memoryLost says why when it could not.
+   */
+  async stop(options: StopOptions = {}): Promise<this> {
+    const body = options.keepMemory ? { keepMemory: true } : undefined;
+    this.info = (await this.http.json<SandboxInfo>({ method: "POST", path: `${this.path}/stop`, ...(body ? { body } : {}), replay: true })).body;
     return this;
   }
 

@@ -89,6 +89,7 @@ await sandbox.files.readBytes("logo.png");
 
 ```ts
 await sandbox.stop(); // the disk is kept, what was running is not, and it costs 5% of the running price
+await sandbox.stop({ keepMemory: true }); // or keep its memory too, at 10%: start() puts back every process as it was
 await sandbox.start(); // waits until it is running, also when it has to be brought back from storage
 
 const copy = await sandbox.fork(); // a new sandbox with the same disk

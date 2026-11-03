@@ -2721,6 +2721,10 @@ export interface components {
             archivedAt: string | null;
             /** @description When the service last stopped the sandbox, while it was running, to move it to another server. It was stopped, moved and started again, so its disk is as it was and what was running in it then is gone: start that again. It is set also when the move could not be made and the sandbox was started again where it was. Null if it never happened. A move of a sandbox that was already stopped does not set it, and neither does a move of one while it runs, which stops nothing. */
             migratedAt: string | null;
+            /** @description True while it is stopped with its memory kept, by POST /v1/sandboxes/{id}/stop with keepMemory: a start puts back every process as it was, and its clock is set again. It costs 10% of its running price meanwhile, and is not archived. A snapshot put back while it is stopped lets the memory go. False whenever it is not stopped. */
+            memoryKept: boolean;
+            /** @description Why the memory its last stop kept was not put back by its last start, which started it from its disk: as after an upgrade of the server it is on, which the memory cannot be put back across. Null when it was put back, or none was kept. */
+            memoryLost: string | null;
             network: components["schemas"]["SandboxNetwork"];
             /**
              * @description Its template's tags and its own, each once: the template's first. A change to its template's tags shows here at once. GET /v1/sandboxes?tag= finds sandboxes by them.
@@ -4065,6 +4069,8 @@ export interface components {
             desktop: boolean;
             /** @description Whether a sandbox's browser can be driven from outside it, over the Chrome DevTools Protocol: by Playwright, Puppeteer, browser-use or Stagehand on your own computer. Where it can, PUT /v1/sandboxes/{id}/browser starts Chrome in the sandbox and answers with the address to connect to. */
             browser: boolean;
+            /** @description Whether a sandbox can be stopped with its memory kept: POST /v1/sandboxes/{id}/stop with keepMemory, after which a start puts back every process as it was. A stopped sandbox that keeps its memory costs 10% of its running price, and 5% without. */
+            keepMemory: boolean;
             /** @description Whether a stopped sandbox can be archived: its machine kept in storage until it is started again. An archived sandbox is still stopped and loses nothing, and a start of it answers 202 and takes longer. */
             archiving: boolean;
             /** @description Seconds a sandbox stays stopped before it is archived without being asked. Null when that does not happen. */
@@ -4131,6 +4137,8 @@ export interface components {
                 listPriceMicrosPerHour: number;
                 /** @description What an hour of it stopped costs, with its disk kept: 5% of listPriceMicrosPerHour. */
                 stoppedMicrosPerHour: number;
+                /** @description What an hour of it stopped with its memory kept costs, its disk kept too: 10% of listPriceMicrosPerHour. */
+                stoppedWithMemoryMicrosPerHour: number;
                 /** @enum {string} */
                 currency: "usd";
                 /** @enum {string} */
@@ -4260,6 +4268,11 @@ export interface components {
                  */
                 stoppedPercent: number;
                 /**
+                 * @description What a sandbox stopped with its memory kept costs, as a share of its running price. Each size's is in plans[].stoppedWithMemoryMicrosPerHour.
+                 * @example 10
+                 */
+                stoppedWithMemoryPercent: number;
+                /**
                  * @description How many of an account's snapshots cost nothing: its oldest ones.
                  * @example 10
                  */
@@ -4366,7 +4379,7 @@ export interface components {
             };
             /** @description The part of usedMicros that is mail: 500 a message, received or sent, which is $0.50 a thousand. */
             mailMicros: number;
-            /** @description The part of usedMicros that is stopped sandboxes, at 5% of their running price. */
+            /** @description The part of usedMicros that is stopped sandboxes, at 5% of their running price, or 10% while one keeps its memory. */
             stoppedMicros: number;
             /** @description The part of usedMicros that is snapshots past the free ones. */
             snapshotMicros: number;
@@ -5467,9 +5480,16 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @description Keep its memory as well as its disk, so that a start puts back every process as it was: shells, servers, a browser and what is in /dev/shm. Writing the memory takes about a second for each 110 MB the sandbox uses, two minutes for a large one that is full, and the sandbox runs and is metered as running until it is written. Stopped so, it costs 10% of its running price, and 5% without. GET /v1/policy says whether it is offered as keepMemory. */
+                    keepMemory?: boolean;
+                };
+            };
+        };
         responses: {
-            /** @description Sandbox is stopped. The filesystem is kept. Processes are gone. */
+            /** @description Sandbox is stopped. The filesystem is kept. Processes are gone, unless keepMemory was asked for and memoryKept is true. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -5507,6 +5527,15 @@ export interface operations {
             };
             /** @description The compute host rejected stop. */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description keepMemory was asked for, and sandboxes are not stopped with their memory kept here: GET /v1/policy says so as keepMemory. */
+            501: {
                 headers: {
                     [name: string]: unknown;
                 };
