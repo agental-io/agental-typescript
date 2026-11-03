@@ -3530,7 +3530,7 @@ export interface components {
             /** @enum {string} */
             overlap: "skip" | "replace" | "parallel";
             enabled: boolean;
-            /** @description When it next runs. Null while it is paused, and for one that ran once. */
+            /** @description When it next runs. Null while it is paused, and for one that ran once. A cron's or a one-off's is its time and the schedule's own delay of up to a minute, the same each time, so that the schedules due at one time do not all start their sandboxes at once. */
             nextRunAt: string | null;
             /** @description Why it paused itself: after 10 runs one after another failed. Null for one paused by hand, or running. */
             pausedReason: string | null;
