@@ -9612,7 +9612,7 @@ export interface operations {
                 since?: string;
                 /** @description Count running time up to this moment. Now when omitted, and never later than now. */
                 until?: string;
-                /** @description Only the sandboxes these API keys made: one key id, or several separated by commas, at most 100, with `console` for those made in the console. The total, `stopped`, `mail`, `sandboxes`, `days` and `hours` are narrowed to them, and `snapshots`, which are the account's, is zero; `keys` stays the whole account's. */
+                /** @description Only the sandboxes these API keys made: one key id, or several separated by commas, at most 100, with `console` for those made in the console and `runs-on` for those GitHub Actions jobs ran on. The total, `stopped`, `mail`, `sandboxes`, `days` and `hours` are narrowed to them, and `snapshots`, which are the account's, is zero; `keys` stays the whole account's. */
                 apiKeyId?: string;
             };
             header?: never;
