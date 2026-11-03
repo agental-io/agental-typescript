@@ -1234,6 +1234,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/sandboxes/{id}/schedules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listSchedules"];
+        put?: never;
+        post: operations["createSchedule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sandboxes/{id}/schedules/{scheduleId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getSchedule"];
+        put?: never;
+        post?: never;
+        delete: operations["deleteSchedule"];
+        options?: never;
+        head?: never;
+        patch: operations["updateSchedule"];
+        trace?: never;
+    };
+    "/v1/sandboxes/{id}/schedules/{scheduleId}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["runSchedule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sandboxes/{id}/schedules/{scheduleId}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listScheduleRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/organizations/{id}": {
         parameters: {
             query?: never;
@@ -3428,6 +3492,145 @@ export interface components {
                 what: string;
                 kept: string;
             }[];
+        };
+        Schedule: {
+            /** @example sch_0123456789abcdef */
+            id: string;
+            sandboxId: string;
+            name: string;
+            /** @description What it runs, through sh -c. */
+            command: string;
+            /** @description How often it runs, as 15m, 1h or 1d, counted from when it was made. Null when cron says. */
+            every: string | null;
+            /** @description When it runs, as a five-field cron expression in timeZone. Null when every says. */
+            cron: string | null;
+            timeZone: string;
+            timeoutMs: number;
+            /** @enum {string} */
+            ifStopped: "start" | "skip";
+            keepMemory: boolean;
+            /** @enum {string} */
+            overlap: "skip" | "replace" | "parallel";
+            enabled: boolean;
+            /** @description When it next runs. Null while it is paused. */
+            nextRunAt: string | null;
+            lastRun: components["schemas"]["ScheduleRun"];
+            createdAt: string;
+            updatedAt: string;
+        };
+        ScheduleRun: {
+            /** @example run_0123456789abcdef */
+            id: string;
+            scheduleId: string;
+            sandboxId: string;
+            /** @description When it came due. */
+            dueAt: string;
+            /** @description When its command began. Null for one that did not run. */
+            startedAt: string | null;
+            finishedAt: string | null;
+            /**
+             * @description running; succeeded, failed or timed_out, as its command ended; replaced, by a later run of the same schedule; skipped, because the sandbox was stopped and the schedule runs only while it runs, or the last run was still going; missed, because it could not be made on time; could_not_start, because the sandbox could not be started; interrupted, because the API restarted while it ran.
+             * @enum {string}
+             */
+            outcome: "running" | "succeeded" | "failed" | "timed_out" | "replaced" | "skipped" | "missed" | "could_not_start" | "interrupted";
+            /** @description Why it ended as it did, in words, where that is not plain from the outcome. */
+            reason: string | null;
+            exitCode: number | null;
+            /** @description Its command, whose output GET /v1/sandboxes/{id}/commands/{commandId} gives. */
+            commandId: string | null;
+            /** @description Whether this run started its sandbox, which was stopped. */
+            startedSandbox: boolean;
+            /**
+             * @description How this run stopped the sandbox it started: keeping its disk, or its memory too. Null when it did not stop it.
+             * @enum {string|null}
+             */
+            stoppedSandbox: "disk" | "memory" | null;
+        } | null;
+        CreateSchedule: {
+            /**
+             * @description Lower-case letters, digits and dashes, unique on the sandbox. Left out, schedule-1, schedule-2 and so on.
+             * @example scrape-prices
+             */
+            name?: string;
+            /**
+             * @description What to run, through sh -c, with the sandbox's variables and files as any command has them.
+             * @example python scrape.py
+             */
+            command: string;
+            /**
+             * @description How often: a number and m, h or d, from 1m to 31d. Give this or cron.
+             * @example 1h
+             */
+            every?: string | null;
+            /**
+             * @description When, as five cron fields: minute, hour, day of the month, month, day of the week. Give this or every.
+             * @example 0 7 * * 1-5
+             */
+            cron?: string | null;
+            /**
+             * @description The time zone cron is read in, as Europe/Sofia. Defaults to UTC.
+             * @example Europe/Sofia
+             */
+            timeZone?: string;
+            /** @description How long a run may take before it is given up, with exit code 124. Defaults to 600000, at most 21600000. */
+            timeoutMs?: number;
+            /**
+             * @description What a run does when the sandbox is stopped. start, the default: start it, run, and stop it again after, unless someone else started using it meanwhile. skip: the run is skipped. start needs a key that may start and stop the sandbox.
+             * @enum {string}
+             */
+            ifStopped?: "start" | "skip";
+            /** @description Whether a run that started the sandbox stops it with its memory kept, at the stopped price with memory. Defaults to false: its disk alone. A sandbox that was stopped with its memory is stopped so again whatever this says. */
+            keepMemory?: boolean;
+            /**
+             * @description What a run does when the last run of this schedule is still going. skip, the default: it is skipped. replace: the last one is killed. parallel: both run.
+             * @enum {string}
+             */
+            overlap?: "skip" | "replace" | "parallel";
+            /** @description False pauses it. Defaults to true. */
+            enabled?: boolean;
+        };
+        UpdateSchedule: {
+            /**
+             * @description Lower-case letters, digits and dashes, unique on the sandbox. Left out, schedule-1, schedule-2 and so on.
+             * @example scrape-prices
+             */
+            name?: string;
+            /**
+             * @description What to run, through sh -c, with the sandbox's variables and files as any command has them.
+             * @example python scrape.py
+             */
+            command?: string;
+            /**
+             * @description How often: a number and m, h or d, from 1m to 31d. Give this or cron.
+             * @example 1h
+             */
+            every?: string | null;
+            /**
+             * @description When, as five cron fields: minute, hour, day of the month, month, day of the week. Give this or every.
+             * @example 0 7 * * 1-5
+             */
+            cron?: string | null;
+            /**
+             * @description The time zone cron is read in, as Europe/Sofia. Defaults to UTC.
+             * @example Europe/Sofia
+             */
+            timeZone?: string;
+            /** @description How long a run may take before it is given up, with exit code 124. Defaults to 600000, at most 21600000. */
+            timeoutMs?: number;
+            /**
+             * @description What a run does when the sandbox is stopped. start, the default: start it, run, and stop it again after, unless someone else started using it meanwhile. skip: the run is skipped. start needs a key that may start and stop the sandbox.
+             * @enum {string}
+             */
+            ifStopped?: "start" | "skip";
+            /** @description Whether a run that started the sandbox stops it with its memory kept, at the stopped price with memory. Defaults to false: its disk alone. A sandbox that was stopped with its memory is stopped so again whatever this says. */
+            keepMemory?: boolean;
+            /**
+             * @description What a run does when the last run of this schedule is still going. skip, the default: it is skipped. replace: the last one is killed. parallel: both run.
+             * @enum {string}
+             */
+            overlap?: "skip" | "replace" | "parallel";
+            /** @description False pauses it. Defaults to true. */
+            enabled?: boolean;
         };
         Team: {
             id: string;
@@ -10572,6 +10775,366 @@ export interface operations {
             };
             /** @description github_not_connected. */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listSchedules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The sandbox's schedules, oldest first, each with its last run. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        schedules: components["schemas"]["Schedule"][];
+                    };
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    createSchedule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSchedule"];
+            };
+        };
+        responses: {
+            /** @description Made. It first runs at nextRunAt. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schedule"];
+                };
+            };
+            /** @description invalid_request: neither every nor cron, both, or one that is not right; an unknown time zone; or a cron that names no time. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description key_action_forbidden: a schedule that starts its sandbox, made with a key that may not start and stop it. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description name_taken, or too_many_schedules: a sandbox has 20 at most. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getSchedule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                scheduleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The schedule, with its last run. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schedule"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deleteSchedule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                scheduleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted, with its runs. A run under way goes on to its end. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    updateSchedule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                scheduleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateSchedule"];
+            };
+        };
+        responses: {
+            /** @description Changed. What was left out is as it was. A change of when it runs, or a resume, sets its next run from now. A run under way goes on as it began. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schedule"];
+                };
+            };
+            /** @description invalid_request: as for a new one. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description key_action_forbidden: as for a new one. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description name_taken. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    runSchedule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                scheduleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A run, made now by the schedule's own rules, whether or not it is paused. Its next run does not move. Read how it ends with GET .../runs. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScheduleRun"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description key_action_forbidden: a schedule that starts its sandbox, run with a key that may not start and stop it. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listScheduleRuns: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+                scheduleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Its runs, the latest first: 100 unless limit says, at most 500. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        runs: components["schemas"]["ScheduleRun"][];
+                    };
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
