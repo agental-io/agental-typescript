@@ -74,6 +74,22 @@ const now = await sandbox.commands.get(started.id);
 
 For work that must outlast ten minutes, start it in the background inside the machine: `sandbox.exec("nohup npm run dev > dev.log 2>&1 < /dev/null &")`.
 
+## On a schedule
+
+```ts
+const tick = await sandbox.schedules.create({ name: "scrape", command: "python scrape.py", every: "1h" });
+await sandbox.schedules.create({ command: "./digest.sh", cron: "0 7 * * 1-5", timeZone: "Europe/Sofia" });
+
+await sandbox.schedules.run(tick.id); // one run now
+const runs = await sandbox.schedules.runs(tick.id); // the latest first: outcome, exitCode, commandId
+await sandbox.schedules.update(tick.id, { enabled: false }); // paused
+```
+
+- When a run finds the sandbox stopped, it starts it, runs, and stops it again when the command ends, keeping its disk: you pay for the minutes it runs. `keepMemory: true` keeps its memory too. `ifStopped: "skip"` runs only while it runs.
+- A sandbox someone started again, sent a command or moved the stop of meanwhile is left running.
+- While a run still goes, the next is skipped. `overlap: "replace"` stops it instead, `"parallel"` runs both.
+- A run gets 10 minutes unless `timeoutMs` says, up to six hours. One that could not be made on time is `missed`, and never made up later.
+
 ## Files
 
 Paths are relative to the work folder, `/opt/agental`. A file can be up to 10 MB.

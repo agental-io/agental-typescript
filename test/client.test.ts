@@ -1803,3 +1803,52 @@ test("a team's members and invites are read and changed through organizations, i
   await agental.organizations.revokeInvite("inv_1");
   assert.deepEqual([sent[9]?.method, sent[9]?.path], ["DELETE", "/v1/invites/inv_1"]);
 });
+
+test("a sandbox's schedules are listed, made, read, changed, run, their runs read, and deleted, each by the call the API has for it", async () => {
+  const run = { id: "run_1", scheduleId: "sch_1", sandboxId: "sbx_0123456789abcdef", dueAt: "2026-11-03T16:00:00.000Z", startedAt: null, finishedAt: null, outcome: "running", reason: null, exitCode: null, commandId: null, startedSandbox: false, stoppedSandbox: null } as const;
+  const schedule = {
+    id: "sch_1",
+    sandboxId: "sbx_0123456789abcdef",
+    name: "scrape",
+    command: "python scrape.py",
+    every: "1h",
+    cron: null,
+    timeZone: "UTC",
+    timeoutMs: 600000,
+    ifStopped: "start",
+    keepMemory: false,
+    overlap: "skip",
+    enabled: true,
+    nextRunAt: "2026-11-03T17:00:00.000Z",
+    lastRun: null,
+    createdAt: "2026-11-03T16:00:00.000Z",
+    updatedAt: "2026-11-03T16:00:00.000Z",
+  } as const;
+  const { agental, sent } = scripted(
+    json(200, sandbox()),
+    json(200, { schedules: [schedule] }),
+    json(201, schedule),
+    json(200, schedule),
+    json(200, { ...schedule, enabled: false, nextRunAt: null }),
+    json(202, run),
+    json(200, { runs: [run] }),
+    new Response(null, { status: 204 }),
+  );
+  const box = await agental.sandboxes.get("sbx_0123456789abcdef");
+  const base = "/v1/sandboxes/sbx_0123456789abcdef/schedules";
+
+  assert.equal((await box.schedules.list())[0]?.id, "sch_1");
+  assert.deepEqual([sent[1]?.method, sent[1]?.path], ["GET", base]);
+  assert.equal((await box.schedules.create({ name: "scrape", command: "python scrape.py", every: "1h" })).every, "1h");
+  assert.deepEqual([sent[2]?.method, sent[2]?.path, sent[2]?.body], ["POST", base, { name: "scrape", command: "python scrape.py", every: "1h" }]);
+  assert.equal((await box.schedules.get("sch_1")).name, "scrape");
+  assert.deepEqual([sent[3]?.method, sent[3]?.path], ["GET", `${base}/sch_1`]);
+  assert.equal((await box.schedules.update("sch_1", { enabled: false })).nextRunAt, null);
+  assert.deepEqual([sent[4]?.method, sent[4]?.path, sent[4]?.body], ["PATCH", `${base}/sch_1`, { enabled: false }]);
+  assert.equal((await box.schedules.run("sch_1")).outcome, "running");
+  assert.deepEqual([sent[5]?.method, sent[5]?.path], ["POST", `${base}/sch_1/run`]);
+  assert.equal((await box.schedules.runs("sch_1", { limit: 5 }))[0]?.id, "run_1");
+  assert.deepEqual([sent[6]?.method, sent[6]?.path], ["GET", `${base}/sch_1/runs?limit=5`]);
+  await box.schedules.delete("sch_1");
+  assert.deepEqual([sent[7]?.method, sent[7]?.path], ["DELETE", `${base}/sch_1`]);
+});

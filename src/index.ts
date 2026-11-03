@@ -2,7 +2,7 @@ export { Agental } from "./client.js";
 export { AgentalError, ApiError, ConnectionError, ProxyError, TimeoutError } from "./errors.js";
 export type { BurstRefusalCode } from "./errors.js";
 export type { AgentalOptions } from "./http.js";
-export { Browser, Commands, Desktop, Email, Files, Sandbox, Ssh } from "./sandbox.js";
+export { Browser, Commands, Desktop, Email, Files, Sandbox, Schedules, Ssh } from "./sandbox.js";
 export { Secrets, Template, Templates } from "./template.js";
 export type { TemplateChanges } from "./template.js";
 export type { BurstOptions, CommandLine, CreateOptions, DesktopButton, ExecEvent, ExecOptions, SandboxChanges, ScreenshotOptions, SendEmailOptions, StartOptions, StopOptions, WaitOptions } from "./sandbox.js";
@@ -22,6 +22,7 @@ export type {
   AutoReload,
   Checkout,
   Command,
+  CreateSchedule,
   CreateApiKey,
   CreatedApiKey,
   DesktopLink,
@@ -56,6 +57,8 @@ export type {
   SandboxStatus,
   SandboxTemplate,
   SandboxUsage,
+  Schedule,
+  ScheduleRun,
   SecretVariable,
   SendEmail,
   SetAutoStop,
@@ -63,6 +66,7 @@ export type {
   Snapshot,
   SshKey,
   SshState,
+  UpdateSchedule,
   Team,
   TeamRole,
   Telemetry,

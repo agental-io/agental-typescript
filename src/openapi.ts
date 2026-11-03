@@ -3514,7 +3514,7 @@ export interface components {
             enabled: boolean;
             /** @description When it next runs. Null while it is paused. */
             nextRunAt: string | null;
-            lastRun: components["schemas"]["ScheduleRun"];
+            lastRun: components["schemas"]["ScheduleRun"] | null;
             createdAt: string;
             updatedAt: string;
         };
@@ -3545,7 +3545,7 @@ export interface components {
              * @enum {string|null}
              */
             stoppedSandbox: "disk" | "memory" | null;
-        } | null;
+        };
         CreateSchedule: {
             /**
              * @description Lower-case letters, digits and dashes, unique on the sandbox. Left out, schedule-1, schedule-2 and so on.

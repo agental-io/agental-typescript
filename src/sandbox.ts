@@ -3,6 +3,10 @@ import { sleep, tagSegment, type Http } from "./http.js";
 import { Secrets, type Template } from "./template.js";
 import type {
   BrowserState,
+  CreateSchedule,
+  Schedule,
+  ScheduleRun,
+  UpdateSchedule,
   SshKey,
   SshState,
   Command,
@@ -598,6 +602,60 @@ export class Commands {
 }
 
 /**
+ * Commands the sandbox runs on a schedule: every so many minutes, hours or days, or as a cron
+ * expression says in a time zone. The API keeps them, so a run that finds the sandbox stopped
+ * starts it, by default, and stops it again when the command ends, keeping its disk. A run
+ * that started it leaves it running if someone else began to use it meanwhile.
+ */
+export class Schedules {
+  constructor(
+    private readonly http: Http,
+    private readonly path: string,
+  ) {}
+
+  /** The sandbox's schedules, oldest first, each with its last run. */
+  async list(): Promise<Schedule[]> {
+    return (await this.http.json<{ schedules: Schedule[] }>({ method: "GET", path: this.path, replay: true })).body.schedules;
+  }
+
+  /**
+   * Makes a schedule: what it runs, through sh -c, and every ("15m", "1h", "1d") or cron
+   * ("0 7 * * 1-5", in timeZone). A run gets 600000 ms unless timeoutMs says, up to six hours.
+   * One that may start the sandbox needs a key that may start and stop it; ifStopped "skip"
+   * runs only while it runs.
+   */
+  async create(schedule: CreateSchedule): Promise<Schedule> {
+    return (await this.http.json<Schedule>({ method: "POST", path: this.path, body: schedule })).body;
+  }
+
+  /** A schedule, with its next run and its last. */
+  async get(scheduleId: string): Promise<Schedule> {
+    return (await this.http.json<Schedule>({ method: "GET", path: `${this.path}/${encodeURIComponent(scheduleId)}`, replay: true })).body;
+  }
+
+  /** Changes a schedule. What is left out is as it was; enabled false pauses it. */
+  async update(scheduleId: string, changes: UpdateSchedule): Promise<Schedule> {
+    return (await this.http.json<Schedule>({ method: "PATCH", path: `${this.path}/${encodeURIComponent(scheduleId)}`, body: changes, replay: true })).body;
+  }
+
+  /** Deletes a schedule and its runs. A run under way goes on to its end. */
+  async delete(scheduleId: string): Promise<void> {
+    await this.http.send({ method: "DELETE", path: `${this.path}/${encodeURIComponent(scheduleId)}`, replay: true });
+  }
+
+  /** Makes a run now, by the schedule's own rules, paused or not, and answers as it begins. Its next run does not move. */
+  async run(scheduleId: string): Promise<ScheduleRun> {
+    return (await this.http.json<ScheduleRun>({ method: "POST", path: `${this.path}/${encodeURIComponent(scheduleId)}/run` })).body;
+  }
+
+  /** Its runs, the latest first: 100 unless limit says, at most 500. */
+  async runs(scheduleId: string, options: { limit?: number } = {}): Promise<ScheduleRun[]> {
+    const query = options.limit === undefined ? "" : `?limit=${options.limit}`;
+    return (await this.http.json<{ runs: ScheduleRun[] }>({ method: "GET", path: `${this.path}/${encodeURIComponent(scheduleId)}/runs${query}`, replay: true })).body.runs;
+  }
+}
+
+/**
  * A sandbox's mail. Any name before the @ of its domain reaches it, once mail is turned on.
  * Messages are kept for 7 days and are read here whether the sandbox is running, stopped
  * or archived: none of it enters the machine. What a message says was written by whoever
@@ -689,6 +747,7 @@ export class Email {
 export class Sandbox {
   readonly files: Files;
   readonly commands: Commands;
+  readonly schedules: Schedules;
   readonly email: Email;
   readonly desktop: Desktop;
   readonly browser: Browser;
@@ -715,6 +774,7 @@ export class Sandbox {
     this.path = `/v1/sandboxes/${encodeURIComponent(info.id)}`;
     this.files = new Files(http, `${this.path}/files`);
     this.commands = new Commands(http, `${this.path}/commands`);
+    this.schedules = new Schedules(http, `${this.path}/schedules`);
     this.email = new Email(http, `${this.path}/email`);
     this.desktop = new Desktop(http, `${this.path}/desktop`);
     this.browser = new Browser(http, `${this.path}/browser`);

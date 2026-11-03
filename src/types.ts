@@ -34,6 +34,14 @@ export type Size = SandboxInfo["size"];
 export type ExecResult = Schemas["ExecResult"];
 /** A command left running in the background, and its output so far. */
 export type Command = Schemas["Command"];
+/** A command a sandbox runs on a schedule, with its last run. */
+export type Schedule = Schemas["Schedule"];
+/** One run of a schedule: when it was due, how it ended, and whether it started and stopped its sandbox. */
+export type ScheduleRun = Schemas["ScheduleRun"];
+/** What a new schedule is: what it runs, and every or cron. */
+export type CreateSchedule = Schemas["CreateSchedule"];
+/** What to change in a schedule. What is left out is as it was. */
+export type UpdateSchedule = Schemas["UpdateSchedule"];
 export type Snapshot = Schemas["Snapshot"];
 /** A port of a sandbox, and the address it is reached at. */
 export type HostRoute = Schemas["HostRoute"];
