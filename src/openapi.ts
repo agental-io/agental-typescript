@@ -3574,12 +3574,12 @@ export interface components {
              */
             command: string;
             /**
-             * @description How often: a number and m, h or d, from 1m to 31d. Give this or cron.
+             * @description How often: a number and m, h or d, from 5m to 31d. Give this or cron. What has to run more often is better left running in the sandbox.
              * @example 1h
              */
             every?: string | null;
             /**
-             * @description When, as five cron fields: minute, hour, day of the month, month, day of the week. Give this or every.
+             * @description When, as five cron fields: minute, hour, day of the month, month, day of the week, with no two runs less than 5 minutes apart. Give this or every.
              * @example 0 7 * * 1-5
              */
             cron?: string | null;
@@ -3617,12 +3617,12 @@ export interface components {
              */
             command?: string;
             /**
-             * @description How often: a number and m, h or d, from 1m to 31d. Give this or cron.
+             * @description How often: a number and m, h or d, from 5m to 31d. Give this or cron. What has to run more often is better left running in the sandbox.
              * @example 1h
              */
             every?: string | null;
             /**
-             * @description When, as five cron fields: minute, hour, day of the month, month, day of the week. Give this or every.
+             * @description When, as five cron fields: minute, hour, day of the month, month, day of the week, with no two runs less than 5 minutes apart. Give this or every.
              * @example 0 7 * * 1-5
              */
             cron?: string | null;
