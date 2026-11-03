@@ -10040,7 +10040,7 @@ export interface operations {
                      */
                     url: string;
                     /**
-                     * @description What to send: sandbox.created, sandbox.started, sandbox.stopped, sandbox.archived, sandbox.error, sandbox.moved, sandbox.deleted, sandbox.auto_stop_set, sandbox.labels_changed and prompt.created, or * for all of them, which is what is sent when this is left out. Each event has the same id in every webhook it is sent to, and in the log record a collector set with PUT /v1/telemetry is sent.
+                     * @description What to send: sandbox.created, sandbox.started, sandbox.stopped, sandbox.archived, sandbox.error, sandbox.moved, sandbox.deleted, sandbox.auto_stop_set, sandbox.labels_changed, template.labels_changed and prompt.created, or * for all of them, which is what is sent when this is left out. Each event has the same id in every webhook it is sent to, and a sandbox.* event in the log record a collector set with PUT /v1/telemetry is sent.
                      * @example [
                      *       "sandbox.created",
                      *       "sandbox.error"
@@ -10237,7 +10237,7 @@ export interface operations {
                      */
                     url?: string;
                     /**
-                     * @description What to send: sandbox.created, sandbox.started, sandbox.stopped, sandbox.archived, sandbox.error, sandbox.moved, sandbox.deleted, sandbox.auto_stop_set, sandbox.labels_changed and prompt.created, or * for all of them, which is what is sent when this is left out. Each event has the same id in every webhook it is sent to, and in the log record a collector set with PUT /v1/telemetry is sent.
+                     * @description What to send: sandbox.created, sandbox.started, sandbox.stopped, sandbox.archived, sandbox.error, sandbox.moved, sandbox.deleted, sandbox.auto_stop_set, sandbox.labels_changed, template.labels_changed and prompt.created, or * for all of them, which is what is sent when this is left out. Each event has the same id in every webhook it is sent to, and a sandbox.* event in the log record a collector set with PUT /v1/telemetry is sent.
                      * @example [
                      *       "sandbox.created",
                      *       "sandbox.error"
