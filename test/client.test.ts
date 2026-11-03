@@ -268,6 +268,26 @@ test("a stop sends no body, and keepMemory when it is asked for, and the sandbox
   assert.equal(box.info.memoryKept, true);
 });
 
+test("a stop that keeps memory and is answered 202 reads the sandbox until it has stopped", async () => {
+  const op = { id: "op_1", type: "stop", status: "pending", sandboxId: "sbx_0123456789abcdef", error: null, createdAt: "2026-10-13T00:00:00.000Z", updatedAt: "2026-10-13T00:00:00.000Z" };
+  const { agental, sent } = scripted(
+    json(200, sandbox()),
+    json(202, sandbox(), { "operation-id": "op_1" }),
+    json(200, { operation: op, sandbox: sandbox() }),
+    json(200, sandbox({ status: "stopped", memoryKept: true })),
+  );
+  const box = await agental.sandboxes.get("sbx_0123456789abcdef");
+  await box.stop({ keepMemory: true });
+  assert.equal(box.info.status, "stopped");
+  assert.equal(box.info.memoryKept, true);
+  assert.deepEqual(sent.map((one) => [one.method, one.path]), [
+    ["GET", "/v1/sandboxes/sbx_0123456789abcdef"],
+    ["POST", "/v1/sandboxes/sbx_0123456789abcdef/stop"],
+    ["GET", "/v1/operations/op_1"],
+    ["GET", "/v1/sandboxes/sbx_0123456789abcdef"],
+  ]);
+});
+
 test("a request the API turned away as it restarted is sent again, a command too, as nothing was done with it", async () => {
   const { agental, sent } = scripted(
     json(200, sandbox()),

@@ -5498,6 +5498,15 @@ export interface operations {
                     "application/json": components["schemas"]["Sandbox"];
                 };
             };
+            /** @description keepMemory was asked for, and the memory was still being written after 60 seconds, as for a large sandbox full of memory. The stop goes on: the sandbox is answered as it is, running and metered as running, until it is stopped. Read it until its status is stopped, and GET /v1/operations/{id} with the Operation-Id header, which says whether the stop failed and the sandbox goes on running. A plain stop sent while a memory is being written is answered so too. Sending the stop again meanwhile waits for the same one. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Sandbox"];
+                };
+            };
             /** @description Missing or invalid API key. */
             401: {
                 headers: {

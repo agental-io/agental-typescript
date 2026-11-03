@@ -163,6 +163,11 @@ export interface StopOptions {
    * second for each 110 MB the sandbox uses. info.memoryKept says whether it was.
    */
   keepMemory?: boolean;
+  /**
+   * How long to wait for a stop that keeps memory, in ms: past a minute the API answers
+   * that it goes on, and this reads the sandbox until it has stopped. 600000 when left out.
+   */
+  timeoutMs?: number;
 }
 
 /** How to start a sandbox: whether to wait until it runs, and what its burst may cost. */
@@ -889,7 +894,28 @@ export class Sandbox {
    */
   async stop(options: StopOptions = {}): Promise<this> {
     const body = options.keepMemory ? { keepMemory: true } : undefined;
-    this.info = (await this.http.json<SandboxInfo>({ method: "POST", path: `${this.path}/stop`, ...(body ? { body } : {}), replay: true })).body;
+    const answer = await this.http.json<SandboxInfo>({ method: "POST", path: `${this.path}/stop`, ...(body ? { body } : {}), replay: true });
+    this.info = answer.body;
+    if (answer.status !== 202) {
+      return this;
+    }
+    // Its memory is still being written, and the stop goes on: read it until it has stopped.
+    const operationId = answer.headers.get("operation-id");
+    const timeoutMs = options.timeoutMs ?? RESTORE_TIMEOUT_MS;
+    const deadline = Date.now() + timeoutMs;
+    while (this.info.status !== "stopped") {
+      if (operationId) {
+        const { operation } = (await this.http.json<{ operation: Operation }>({ method: "GET", path: `/v1/operations/${operationId}`, replay: true })).body;
+        if (operation.status === "failed") {
+          throw new AgentalError(`Sandbox ${this.id} was not stopped: ${operation.error ?? "the stop failed"}`);
+        }
+      }
+      if (Date.now() + this.http.pollIntervalMs > deadline) {
+        throw new TimeoutError(`Sandbox ${this.id} was still writing its memory after ${timeoutMs} ms. The stop goes on.`);
+      }
+      await sleep(this.http.pollIntervalMs);
+      await this.refresh();
+    }
     return this;
   }
 
