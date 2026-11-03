@@ -1282,6 +1282,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/usage/schedules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getScheduleUsage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/sandboxes/{id}/schedules/{scheduleId}/runs": {
         parameters: {
             query?: never;
@@ -3631,6 +3647,27 @@ export interface components {
             overlap?: "skip" | "replace" | "parallel";
             /** @description False pauses it. Defaults to true. */
             enabled?: boolean;
+        };
+        ScheduleUsage: {
+            since: string;
+            until: string;
+            runningSeconds: number;
+            listCostMicros: number;
+            schedules: {
+                scheduleId: string;
+                /** @description Null for a schedule deleted while a run of it went on. */
+                name: string | null;
+                sandboxId: string;
+                sandboxName: string;
+                size: string;
+                runs: number;
+                startedSandbox: number;
+                failed: number;
+                skipped: number;
+                missed: number;
+                runningSeconds: number;
+                listCostMicros: number;
+            }[];
         };
         Team: {
             id: string;
@@ -11090,6 +11127,49 @@ export interface operations {
             };
             /** @description Not found. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getScheduleUsage: {
+        parameters: {
+            query?: {
+                /** @description Count the runs due from this moment. The start of this month in UTC when left out. */
+                since?: string;
+                /** @description Count the runs due before this moment. Now when left out, and never later than now. */
+                until?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Each schedule of the caller's sandboxes that had runs due in the window, the costliest first: how many runs, how many started their sandbox, failed, were skipped or were missed, and the running time they caused and what it comes to at the list price. Running time is counted from each run that started a stopped sandbox to its end, the stop after it included. A run in a sandbox that was running already adds none: it is the sandbox's own, as /v1/usage counts it. Stopped time between runs is the sandbox's, in /v1/usage. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScheduleUsage"];
+                };
+            };
+            /** @description invalid_request: since is not before until, or the two are more than 366 days apart. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };
