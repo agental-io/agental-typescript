@@ -78,7 +78,6 @@ export type {
   TemplateApplied,
   TemplateInfo,
   TemplateNetwork,
-  TemplateRepo,
   TemplateSandbox,
   TemplateStart,
   TemplateSsh,

@@ -10,7 +10,6 @@ import type {
   TemplateApplied,
   TemplateInfo,
   TemplateNetwork,
-  TemplateRepo,
   TemplateSandbox,
   TemplateSsh,
   TemplateStart,
@@ -227,19 +226,6 @@ export class Template {
     const set = (await this.http.json<TemplateStart>({ method: "PUT", path: `${this.path}/start`, body: start, replay: true })).body;
     this.info = { ...this.info, start: set };
     return set;
-  }
-
-  /** The repository it links to, for reference. Nothing is cloned. */
-  async repo(): Promise<TemplateRepo | null> {
-    return (await this.http.json<TemplateRepo | null>({ method: "GET", path: `${this.path}/repo`, replay: true })).body;
-  }
-
-  async setRepo(repo: { name: string; url: string }): Promise<TemplateRepo> {
-    return (await this.http.json<TemplateRepo>({ method: "PUT", path: `${this.path}/repo`, body: repo, replay: true })).body;
-  }
-
-  async removeRepo(): Promise<void> {
-    await this.http.send({ method: "DELETE", path: `${this.path}/repo`, replay: true });
   }
 
   /** What a sandbox on it may reach outside itself, before the addresses of its own. One that was never set is open. */

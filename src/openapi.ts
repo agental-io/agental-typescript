@@ -1801,24 +1801,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/templates/{id}/repo": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description The repository the template links to. It is kept for reference: nothing is cloned yet. */
-        get: operations["getTemplateRepo"];
-        /** @description Links the template to a repository, in place of the one it linked to. Nothing is cloned. */
-        put: operations["setTemplateRepo"];
-        post?: never;
-        delete: operations["deleteTemplateRepo"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/templates/{id}/sandboxes": {
         parameters: {
             query?: never;
@@ -3954,7 +3936,6 @@ export interface components {
             hidden: string[];
             /** @description The paths of its secret files. Contents are read one at a time. */
             files: string[];
-            repo: components["schemas"]["TemplateRepo"] | null;
             network: components["schemas"]["TemplateNetwork"];
             ssh: components["schemas"]["TemplateSsh"];
             /** @description Raised by every change to its variables, files and outbound rule. A sandbox that has it at another revision is not up to date with it. */
@@ -3991,15 +3972,6 @@ export interface components {
             snapshotId: string | null;
             /** @description Seconds a sandbox made from the template runs after each start before it is stopped, when the create names none. Null is the deployment's default. */
             ttlSeconds: number | null;
-        };
-        TemplateRepo: {
-            name: string;
-            url: string;
-            /**
-             * @description Nothing is cloned yet. The link is kept for reference.
-             * @enum {boolean}
-             */
-            connected: false;
         };
         TemplateNetwork: {
             /**
@@ -13579,140 +13551,6 @@ export interface operations {
             };
             /** @description key_action_forbidden: the key does not take the action ssh, or it is limited to some sandboxes and not to this template. Nothing was changed. */
             403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Not found. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    getTemplateRepo: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The repository, or null when there is none. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TemplateRepo"] | null;
-                };
-            };
-            /** @description Missing or invalid API key. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Not found. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    setTemplateRepo: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    name: string;
-                    url: string;
-                };
-            };
-        };
-        responses: {
-            /** @description The repository it links to now. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TemplateRepo"];
-                };
-            };
-            /** @description invalid_request: the name, path or value is not one that can be kept. invalid_path: the path leads out of the working folder. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Missing or invalid API key. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Not found. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    deleteTemplateRepo: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The template links to no repository. */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Missing or invalid API key. */
-            401: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -822,7 +822,6 @@ function template(changes: Record<string, unknown> = {}): Record<string, unknown
     variables: ["API_TOKEN"],
     hidden: [],
     files: [".npmrc"],
-    repo: null,
     network: { outbound: "open", allow: [] },
     revision: 3,
     sandboxes: 1,
@@ -979,12 +978,10 @@ test("a variable is kept out of the sandbox by setting it with hosts, its hosts 
   assert.equal(sent.length, 15);
 });
 
-test("a template's start, repository, sandboxes and apply ask for what the API needs of them", async () => {
+test("a template's start, sandboxes and apply ask for what the API needs of them", async () => {
   const { agental, sent } = scripted(
     json(200, template()),
     json(200, { size: "large", snapshotId: "snap_1", ttlSeconds: null }),
-    json(200, { name: "you/agent", url: "https://github.com/you/agent", connected: false }),
-    json(200, null),
     json(200, { sandboxes: [{ id: "sbx_0123456789abcdef", name: "agent-1", status: "running", upToDate: false, takenAt: "", allow: [] }] }),
     json(200, { templateId: "tpl_0000000000000002", revision: 4, applied: ["sbx_0123456789abcdef"], failed: [] }),
     json(200, { templateId: "tpl_0000000000000002", revision: 4, applied: [], failed: [] }),
@@ -994,13 +991,11 @@ test("a template's start, repository, sandboxes and apply ask for what the API n
   assert.deepEqual(await made.setStart({ size: "large", snapshotId: "snap_1" }), { size: "large", snapshotId: "snap_1", ttlSeconds: null });
   assert.deepEqual([sent[1]?.method, sent[1]?.path, sent[1]?.body], ["PUT", "/v1/templates/tpl_0000000000000002/start", { size: "large", snapshotId: "snap_1" }]);
   assert.deepEqual(made.info.start, { size: "large", snapshotId: "snap_1", ttlSeconds: null });
-  assert.equal((await made.setRepo({ name: "you/agent", url: "https://github.com/you/agent" })).connected, false);
-  assert.equal(await made.repo(), null);
   assert.equal((await made.sandboxes())[0]?.upToDate, false);
   assert.deepEqual((await made.apply(["sbx_0123456789abcdef"])).applied, ["sbx_0123456789abcdef"]);
-  assert.deepEqual(sent[5]?.body, { sandboxIds: ["sbx_0123456789abcdef"] });
+  assert.deepEqual(sent[3]?.body, { sandboxIds: ["sbx_0123456789abcdef"] });
   await made.apply();
-  assert.deepEqual([sent[6]?.path, sent[6]?.body], ["/v1/templates/tpl_0000000000000002/apply", {}]);
+  assert.deepEqual([sent[4]?.path, sent[4]?.body], ["/v1/templates/tpl_0000000000000002/apply", {}]);
   await assert.rejects(made.delete(), (error: unknown) => error instanceof ApiError && error.code === "template_in_use");
 });
 

@@ -145,7 +145,6 @@ export type HiddenVariable = Schemas["HiddenVariable"];
 export type TemplateStart = Schemas["TemplateStart"];
 /** What a sandbox made from a template is given for SSH as it is made: whether SSH is turned on, and the keys let in. */
 export type TemplateSsh = Schemas["TemplateSsh"];
-export type TemplateRepo = Schemas["TemplateRepo"];
 /** A sandbox on a template, whether it has the template as it is now, and the addresses of its own it may reach on top of the template's rule. */
 export type TemplateSandbox = Schemas["TemplateSandboxes"]["sandboxes"][number];
 /** The sandboxes an apply brought up to date, and those whose server did not take the template's rule, each with what went wrong. */
