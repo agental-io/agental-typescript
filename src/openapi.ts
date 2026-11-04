@@ -9562,10 +9562,11 @@ export interface operations {
                         organizations: {
                             id: string;
                             name: string;
+                            /** @description Whether it is the caller's own organization. */
                             personal: boolean;
                             /** @enum {string|null} */
                             role: "owner" | "admin" | "member" | null;
-                            /** @description Whether its plan lets it have members besides its owners: $500 or $2000, or limits of that level given by hand. Below that, only its owners may use a team. Always false for a person's own. */
+                            /** @description Whether its plan lets it have members besides its owners: $500 or $2000, or limits of that level given by hand. Below that, only its owners may use it. A person's own organization takes members on those plans too, with its person its only owner. */
                             membersAllowed: boolean;
                         }[];
                         closed: components["schemas"]["ClosedAccount"];
@@ -9665,6 +9666,7 @@ export interface operations {
                         organizations: {
                             id: string;
                             name: string;
+                            /** @description Whether it is the caller's own organization. Someone else's own, which the caller was invited into, is false, as a team's is. */
                             personal: boolean;
                             createdAt: string;
                             /**
@@ -9672,7 +9674,7 @@ export interface operations {
                              * @enum {string|null}
                              */
                             role: "owner" | "admin" | "member" | null;
-                            /** @description Whether its plan lets it have members besides its owners: $500 or $2000, or limits of that level given by hand. Below that, only its owners may use a team. Always false for a person's own. */
+                            /** @description Whether its plan lets it have members besides its owners: $500 or $2000, or limits of that level given by hand. Below that, only its owners may use it. A person's own organization takes members on those plans too, with its person its only owner. */
                             membersAllowed: boolean;
                         }[];
                     };
@@ -9728,6 +9730,7 @@ export interface operations {
                         organization: {
                             id: string;
                             name: string;
+                            /** @description Whether it is the caller's own organization. Someone else's own, which the caller was invited into, is false, as a team's is. */
                             personal: boolean;
                             createdAt: string;
                         };
@@ -9746,6 +9749,7 @@ export interface operations {
                         organization: {
                             id: string;
                             name: string;
+                            /** @description Whether it is the caller's own organization. Someone else's own, which the caller was invited into, is false, as a team's is. */
                             personal: boolean;
                             createdAt: string;
                             /**
@@ -9753,7 +9757,7 @@ export interface operations {
                              * @enum {string|null}
                              */
                             role: "owner" | "admin" | "member" | null;
-                            /** @description Whether its plan lets it have members besides its owners: $500 or $2000, or limits of that level given by hand. Below that, only its owners may use a team. Always false for a person's own. */
+                            /** @description Whether its plan lets it have members besides its owners: $500 or $2000, or limits of that level given by hand. Below that, only its owners may use it. A person's own organization takes members on those plans too, with its person its only owner. */
                             membersAllowed: boolean;
                         };
                         /** @enum {boolean} */
@@ -9819,6 +9823,7 @@ export interface operations {
                     "application/json": {
                         id: string;
                         name: string;
+                        /** @description Whether it is the caller's own organization. Someone else's own, which the caller was invited into, is false, as a team's is. */
                         personal: boolean;
                         createdAt: string;
                     };
@@ -11275,7 +11280,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description team_not_empty, plan_active, or personal_organization. */
+            /** @description team_not_empty, plan_active, or personal_organization: a person's own organization goes only with their account. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -11303,7 +11308,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description The team, renamed. Only an owner renames it. */
+            /** @description The team, or the caller's own organization, renamed: those invited into it see it by this name. Only an owner renames it. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -11323,15 +11328,6 @@ export interface operations {
             };
             /** @description not_found. */
             404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description personal_organization: a person's own organization keeps its name. */
-            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -11427,7 +11423,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description last_owner. personal_organization. */
+            /** @description last_owner. personal_organization: a person's own organization keeps its person. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -11488,7 +11484,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description last_owner: a team keeps at least one owner. personal_organization. */
+            /** @description last_owner: a team keeps at least one owner. personal_organization: a person's own organization has one owner, its person. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -11537,7 +11533,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description personal_organization: the caller acts in their own organization, which has no invites. */
+            /** @description personal_organization: the caller acts in no organization. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -11578,7 +11574,7 @@ export interface operations {
                     "application/json": components["schemas"]["Invite"];
                 };
             };
-            /** @description plan_required: a team has members on the $500 or $2000 plan. role_required, key_action_forbidden. */
+            /** @description plan_required: an organization has members besides its owners on the $500 or $2000 plan, a person's own too. role_required, key_action_forbidden. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -11596,7 +11592,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description invite_open, already_member, or personal_organization: act in a team first. */
+            /** @description invite_open, already_member, or personal_organization: the caller acts in no organization. */
             409: {
                 headers: {
                     [name: string]: unknown;
