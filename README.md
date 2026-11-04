@@ -3,27 +3,27 @@
 TypeScript SDK for [agental.io](https://agental.io): a Linux virtual machine of your own over HTTP. One call makes it, another runs a command in it, another stops it. Its disk is kept while it is stopped.
 
 ```bash
-npm install agental
+npm install agental-sdk
 ```
 
 Node 20.16 or later. No dependencies. The package is ESM only: `import`, not `require`. It uses only `fetch` and Web Crypto, so Bun, Deno and Cloudflare Workers should run it too, but it is only tested on Node.
 
 ## The agental command
 
-The same package is the `agental` command. To sign in on this computer and get a shell in a new sandbox:
+The `agental` command is a package of its own, [agental](https://www.npmjs.com/package/agental). To sign in on this computer and get a shell in a new sandbox:
 
 ```bash
 npx agental@latest sh
 ```
 
-`npx agental@latest` alone signs in through the browser, installs the command with `npm install -g agental`, and installs the agent skills. `agental help` lists every command: `agental create`, `agental exec`, `agental ssh` and the rest. The command's source is in agental's own repository, which builds and publishes this package. The public repository, agental-io/agental-typescript, has the SDK alone.
+`npx agental@latest` alone signs in through the browser, installs the command with `npm install -g agental`, and installs the agent skills. `agental help` lists every command: `agental create`, `agental exec`, `agental ssh` and the rest.
 
 ## Start
 
 Make an API key in the console and put it in `AGENTAL_API_KEY`. Without one, the SDK uses the sign-in the agental command keeps on this computer, in `~/.config/agental/credentials.json`: `npx agental@latest` makes it.
 
 ```ts
-import { Agental } from "agental";
+import { Agental } from "agental-sdk";
 
 const agental = new Agental();
 
@@ -456,7 +456,7 @@ const { messages } = await mail.list();
 ## Errors
 
 ```ts
-import { ApiError, ProxyError, TimeoutError } from "agental";
+import { ApiError, ProxyError, TimeoutError } from "agental-sdk";
 
 try {
   await sandbox.exec("make");
@@ -492,7 +492,7 @@ await agental.deleteWebhook(hook.id);
 Check each post your server receives:
 
 ```ts
-import { verifyWebhook } from "agental";
+import { verifyWebhook } from "agental-sdk";
 
 const genuine = await verifyWebhook(rawBody, request.headers.get("x-agental-signature"), signingSecret);
 ```

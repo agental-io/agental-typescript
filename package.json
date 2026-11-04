@@ -1,7 +1,7 @@
 {
-  "name": "agental",
+  "name": "agental-sdk",
   "version": "0.1.0",
-  "description": "agental.io: Linux sandboxes for your agents. The TypeScript SDK, and the agental command: npx agental@latest sh.",
+  "description": "TypeScript SDK for agental.io: Linux sandboxes for your agents. The agental command is the package agental.",
   "license": "MIT",
   "author": "VERTIXER LTD",
   "homepage": "https://agental.io",
@@ -16,9 +16,6 @@
   "engines": {
     "node": ">=20.16"
   },
-  "bin": {
-    "agental": "bin/agental.js"
-  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -28,7 +25,6 @@
   },
   "types": "./dist/index.d.ts",
   "files": [
-    "bin",
     "dist",
     "README.md",
     "LICENSE"
@@ -36,22 +32,19 @@
   "sideEffects": false,
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "build:cli": "node scripts/bundle-cli.mjs",
     "test": "tsx --test test/*.test.ts",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && npm run build && npm run build:cli"
+    "prepublishOnly": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && npm run build"
   },
   "keywords": [
     "agental",
     "agents",
-    "cli",
     "sandbox",
     "ssh",
     "virtual-machine"
   ],
   "devDependencies": {
     "@types/node": "^22.20.5",
-    "esbuild": "0.28.2",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3"
   }
