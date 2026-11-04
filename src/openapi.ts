@@ -3733,6 +3733,11 @@ export interface components {
             poolMax: number | null;
             /** @description The template its pool sandboxes are made on, where the repository is private and runs no workflows from fork pull requests. Null: the organization's empty runs-on template, which every other pool and a fork's own sandbox get. */
             templateId: string | null;
+            /**
+             * @description The size a job that asks for runs-on: agental gets: its template's, or medium with none. A job that asks for agental-<size> gets that size. Each size has a pool of its own.
+             * @enum {string}
+             */
+            size: "tiny" | "small" | "medium" | "large";
             sandboxes: {
                 sandboxId: string;
                 name: string;
@@ -11798,7 +11803,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Set. A pool keeps the sandboxes it has: a smaller pool makes no more, and a new template is for sandboxes made from now on. */
+            /** @description Set. A pool keeps the sandboxes it has: a smaller pool makes no more, and a new template is for sandboxes made from now on. A template of another size sends the plain agental jobs queued from now on to the pool of that size. */
             200: {
                 headers: {
                     [name: string]: unknown;
