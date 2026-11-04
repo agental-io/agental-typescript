@@ -3511,6 +3511,8 @@ export interface components {
             keepMemory: boolean;
             /** @enum {string} */
             overlap: "skip" | "replace" | "parallel";
+            /** @description Whether its run deletes the sandbox after, where its command exits 0. Only a schedule that runs once has it. */
+            deleteAfter: boolean;
             enabled: boolean;
             /** @description When it next runs. Null while it is paused, and for one that ran once. A cron's or a one-off's is its time and the schedule's own delay of up to a minute, the same each time, so that the schedules due at one time do not all start their sandboxes at once. */
             nextRunAt: string | null;
@@ -3547,6 +3549,8 @@ export interface components {
              * @enum {string|null}
              */
             stoppedSandbox: "disk" | "memory" | null;
+            /** @description Whether this run deleted its sandbox after its command exited 0, as its schedule's deleteAfter asks. Where it did not, a schedule with deleteAfter says why in reason. */
+            deletedSandbox: boolean;
         };
         CreateSchedule: {
             /**
@@ -3593,6 +3597,8 @@ export interface components {
              * @enum {string}
              */
             overlap?: "skip" | "replace" | "parallel";
+            /** @description For a schedule that runs once, with at: true deletes the sandbox when its run's command exits 0, whether the run started it or it was running already, as DELETE /v1/sandboxes/{id} does. A run that fails, times out, is skipped or could not start leaves it, so that it can be looked at, and its record says so. Defaults to false. It takes a key that may delete the sandbox: sandbox.delete, or sandbox.delete-own for one the key made. */
+            deleteAfter?: boolean;
             /** @description False pauses it. Defaults to true. */
             enabled?: boolean;
         };
@@ -3641,6 +3647,8 @@ export interface components {
              * @enum {string}
              */
             overlap?: "skip" | "replace" | "parallel";
+            /** @description For a schedule that runs once, with at: true deletes the sandbox when its run's command exits 0, whether the run started it or it was running already, as DELETE /v1/sandboxes/{id} does. A run that fails, times out, is skipped or could not start leaves it, so that it can be looked at, and its record says so. Defaults to false. It takes a key that may delete the sandbox: sandbox.delete, or sandbox.delete-own for one the key made. */
+            deleteAfter?: boolean;
             /** @description False pauses it. Defaults to true. */
             enabled?: boolean;
         };
@@ -10878,7 +10886,7 @@ export interface operations {
                     "application/json": components["schemas"]["Schedule"];
                 };
             };
-            /** @description invalid_request: neither every nor cron, both, or one that is not right; an unknown time zone; or a cron that names no time. */
+            /** @description invalid_request: neither every nor cron, both, or one that is not right; an unknown time zone; a cron that names no time; or deleteAfter on a schedule that does not run once. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -10896,7 +10904,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description key_action_forbidden: a schedule that starts its sandbox, made with a key that may not start and stop it. */
+            /** @description key_action_forbidden: a schedule that starts its sandbox, made with a key that may not start and stop it; or one that deletes it, with a key that may not delete it. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -11021,7 +11029,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Changed. What was left out is as it was. A change of when it runs, or a resume, sets its next run from now. A run under way goes on as it began. */
+            /** @description Changed. What was left out is as it was. A change of when it runs, or a resume, sets its next run from now. A run under way goes on as it began, save that turning deleteAfter off while it runs keeps its sandbox. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -11107,7 +11115,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description key_action_forbidden: a schedule that starts its sandbox, run with a key that may not start and stop it. */
+            /** @description key_action_forbidden: a schedule that starts its sandbox, run with a key that may not start and stop it; or one that deletes it, with a key that may not delete it. */
             403: {
                 headers: {
                     [name: string]: unknown;

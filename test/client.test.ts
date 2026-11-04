@@ -1847,3 +1847,14 @@ test("a sandbox's schedules are listed, made, read, changed, run, their runs rea
   await box.schedules.delete("sch_1");
   assert.deepEqual([sent[7]?.method, sent[7]?.path], ["DELETE", `${base}/sch_1`]);
 });
+
+test("a schedule that runs once is asked to delete its sandbox after with deleteAfter, and its run says it did", async () => {
+  const run = { id: "run_1", scheduleId: "sch_1", sandboxId: "sbx_0123456789abcdef", dueAt: "2026-11-04T09:00:20.000Z", startedAt: "2026-11-04T09:00:21.000Z", finishedAt: "2026-11-04T09:00:30.000Z", outcome: "succeeded", reason: null, exitCode: 0, commandId: "cmd_1", startedSandbox: false, stoppedSandbox: null, deletedSandbox: true } as const;
+  const schedule = { id: "sch_1", sandboxId: "sbx_0123456789abcdef", name: "last", command: "./finish.sh", every: null, cron: null, at: "2026-11-04T09:00:00.000Z", timeZone: "UTC", timeoutMs: 600000, ifStopped: "start", keepMemory: false, overlap: "skip", deleteAfter: true, enabled: true, nextRunAt: null, pausedReason: null, lastRun: run, createdAt: "2026-11-03T16:00:00.000Z", updatedAt: "2026-11-03T16:00:00.000Z" } as const;
+  const { agental, sent } = scripted(json(200, sandbox()), json(201, schedule), json(200, { runs: [run] }));
+  const box = await agental.sandboxes.get("sbx_0123456789abcdef");
+  const made = await box.schedules.create({ command: "./finish.sh", at: "2026-11-04T09:00:00Z", deleteAfter: true });
+  assert.equal(made.deleteAfter, true);
+  assert.deepEqual(sent[1]?.body, { command: "./finish.sh", at: "2026-11-04T09:00:00Z", deleteAfter: true });
+  assert.equal((await box.schedules.runs("sch_1"))[0]?.deletedSandbox, true);
+});

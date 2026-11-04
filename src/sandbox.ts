@@ -622,7 +622,8 @@ export class Schedules {
    * Makes a schedule: what it runs, through sh -c, and every ("15m", "1h", "1d"), cron
    * ("0 7 * * 1-5", in timeZone), or at, once ("2026-11-04T09:00:00Z"). A run gets 600000 ms unless timeoutMs says, up to six hours.
    * One that may start the sandbox needs a key that may start and stop it; ifStopped "skip"
-   * runs only while it runs.
+   * runs only while it runs. deleteAfter, with at only, deletes the sandbox once the run's command
+   * exits 0; a run that fails leaves it, to be looked at. It needs a key that may delete the sandbox.
    */
   async create(schedule: CreateSchedule): Promise<Schedule> {
     return (await this.http.json<Schedule>({ method: "POST", path: this.path, body: schedule })).body;
