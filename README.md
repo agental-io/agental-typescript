@@ -309,8 +309,11 @@ A sandbox has no point for a moment it was stopped at, and its `reading` is then
 const billing = await agental.billing();
 console.log(billing.usedMicros, billing.topUpMicros);
 
-// What is sold: plans with the sizes each makes, top-ups and their bonus, the free month and the hourly prices.
+// What is sold: plans with the sizes each makes, top-ups and their bonus, the free plan's credit and the hourly prices.
 const prices = await agental.prices();
+
+// On the free plan, save a card first: nothing is charged, and the account is given $10 of credit once.
+const { url: cardPage } = await agental.checkout({ card: true });
 
 // Start paying $500 for $537 of credits. A person pays at url: nothing is charged before.
 const { url } = await agental.checkout({ topUp: 500 });
@@ -319,15 +322,17 @@ const { url } = await agental.checkout({ topUp: 500 });
 await agental.setAutoReload(50);
 ```
 
+An account starts on the free plan: nothing a month, and what it runs is paid from credits at the same list prices. It needs a card saved first, charged nothing, and is then given $10 of credit, once an account and once a card; `billing().free` says whether a card is saved (`cardSaved`) and whether the account has paid for anything (`paid`). Until a card is saved, a create throws an `ApiError` 402 `billing_required`; once the credits are used, 402 `out_of_credit`, and a top-up ends it. To go back to the free plan from a paid one, cancel it in the billing portal.
+
 `usedMicros` is the month's usage at list price, spent from the plan's credits first and then from the top-ups, which do not expire. A top-up is any whole number of dollars from $15 to $100,000. From $200 it adds a bonus: 2% at $200, growing evenly on a log scale to 25% at $10,000 and over, so $1,000 adds $1,115. `prices.topUps` lists what each offered amount adds, and `prices.topUpBonus` the curve. `checkout({ plan: "plan100" })` starts a plan the same way, or moves an account that has one at once, with `url` null and `changed` true. A checkout whose answer is lost is not sent again.
 
-`setAutoReload(dollars)` has the card saved at the last purchase charged for a top-up of that much, with tax, when the month's credits and the top-ups run out, and the credits added at once, before any sandbox is stopped: at most three times a day, and not again for a day after a card that would not pay. `setAutoReload(null)` turns it off, and `billing().autoReload` says how it is set. It needs a plan or a top-up bought first, which saves the card: `billing().canAutoReload` says whether it can be set, and the call answers `409 no_card` until then.
+`setAutoReload(dollars)` has the card saved at the last purchase charged for a top-up of that much, with tax, when the month's credits and the top-ups run out, and the credits added at once, before any sandbox is stopped: at most three times a day, and not again for a day after a card that would not pay. `setAutoReload(null)` turns it off, and `billing().autoReload` says how it is set. It needs a card saved first: `billing().canAutoReload` says whether it can be set, and the call answers `409 no_card` until then.
 
-The $20 plan makes tiny and small sandboxes, the $100 plan medium ones too, and the $500 and $2000 plans every size: `prices.tiers` lists the plans, and each plan's `sizes` says which. A create, fork or template start of a size the plan does not make throws an `ApiError` with the status 402 and the code `size_not_on_plan`, whose message names the plan that makes it. A sandbox made before a change of plan still starts at its own size.
+The free plan makes tiny and small sandboxes, the $100 plan medium ones too, and the $500 and $2000 plans every size: `prices.tiers` lists the plans, and each plan's `sizes` says which. A create, fork or template start of a size the plan does not make throws an `ApiError` with the status 402 and the code `size_not_on_plan`, whose message names the plan that makes it. A sandbox made before a change of plan still starts at its own size.
 
 ## How many you run, and how fast you start them
 
-Each plan runs so many small sandboxes at once, its running count, and starts so many at once for nothing, its free burst: a tiny counts half, a medium 2 and a large 4. The $20 plan runs 20 and bursts 20, the $100 plan 100 and 100, the $500 plan 600 and 200, the $2000 plan 2000 and 400; `prices().tiers` gives each plan's `runningUnits` and `freeBurstUnits`, and `burstFee` how fees are worked out. Each start adds its memory to a burst meter that halves every 15 minutes. Starting faster than the free burst is never refused for speed: it costs a burst fee, which grows with how far over the meter goes.
+Each plan runs so many small sandboxes at once, its running count, and starts so many at once for nothing, its free burst: a tiny counts half, a medium 2 and a large 4. The free plan runs 20 and bursts 20, though only 2 at once until the account has paid for something (`burst().unpaid`, `prices().free.unpaidUnits`), the $100 plan 100 and 100, the $500 plan 600 and 200, the $2000 plan 2000 and 400; `prices().tiers` gives each plan's `runningUnits` and `freeBurstUnits`, and `burstFee` how fees are worked out. Each start adds its memory to a burst meter that halves every 15 minutes. Starting faster than the free burst is never refused for speed: it costs a burst fee, which grows with how far over the meter goes.
 
 ```ts
 const burst = await agental.burst();
@@ -356,9 +361,8 @@ Where `enforced` is true, a start is refused with an `ApiError` of status 429 an
 - `running_limit_reached`: the account already runs its plan's running count. Stop something first.
 - `burst_fee_too_high`: the start would cost more than `maxBurstFeeMicros`.
 - `burst_budget_reached`: the fee would take this month's burst fees past the budget.
-- `burst_in_free_month`: the start would cost a fee, which the free month does not pay.
 
-With `maxBurstWaitMs`, a start refused with one of the last three waits `retryAfterSeconds`, if that is no longer than allowed, and is tried once more. It is off by default, and never waits for `running_limit_reached`. Burst fees come out of the plan's credits, then the top-ups, and `billing().burstMicros` is this month's.
+With `maxBurstWaitMs`, a start refused with one of the last two waits `retryAfterSeconds`, if that is no longer than allowed, and is tried once more. It is off by default, and never waits for `running_limit_reached`. Burst fees come out of the plan's credits, then the top-ups, and `billing().burstMicros` is this month's.
 
 ## Send it to your own collector
 

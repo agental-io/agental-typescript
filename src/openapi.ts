@@ -2259,7 +2259,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Where to send the browser to pay for a plan, for an account that must start one before it allows a terminal. The checkout comes back to this sign-in's page, which then allows it. Any other purchase is POST /v1/billing/checkout. */
+        /** @description Where to send the browser to save a card for the free plan, or pay for a plan, for an account that must do one before it allows a terminal. The checkout comes back to this sign-in's page, which then allows it. Any other purchase is POST /v1/billing/checkout. */
         post: operations["checkoutForCliSignIn"];
         delete?: never;
         options?: never;
@@ -3863,7 +3863,8 @@ export interface components {
                 status: string;
                 periodStart: string | null;
                 periodEnd: string | null;
-                hadFreeMonth: boolean;
+                /** @description When a card was first saved on the free plan, or null. */
+                cardSavedAt: string | null;
             } | null;
             payments: {
                 id: string;
@@ -4286,7 +4287,7 @@ export interface components {
              * @enum {string}
              */
             signup: "open" | "invite";
-            /** @description Sandboxes one account held to no plan may hold at a time, stopped ones included. An account on a plan, where plans are enforced, may hold any number, and runs as many at once as its plan's runningUnits. Null means no per-account limit. */
+            /** @description Sandboxes one account may hold at a time, stopped ones included, before it has saved a card or bought a plan. One that has, where plans are enforced, may hold any number, and runs as many at once as its plan's runningUnits. Null means no per-account limit. */
             sandboxesPerAccount: number | null;
             /** @description Seconds a new sandbox runs after a start before it is stopped. Null means it is not stopped for age. */
             defaultTtlSeconds: number | null;
@@ -4383,7 +4384,7 @@ export interface components {
                 /** @enum {string} */
                 label: "list price";
             }[];
-            /** @description The monthly plans: what each costs, what it includes, which sizes it makes, how many sandboxes it runs at once, and how many it starts at once for nothing. */
+            /** @description The plans: what each costs a month, what it includes, which sizes it makes, how many sandboxes it runs at once, and how many it starts at once for nothing. The first, free, costs and includes nothing: it pays from top-ups and its one credit, see free. */
             tiers: {
                 /** @example plan100 */
                 id: string;
@@ -4413,7 +4414,7 @@ export interface components {
                  * @description Kept for clients that read it: the free burst in megabytes. Nothing is refused for speed now; a start faster than the free burst costs a fee.
                  */
                 burst: {
-                    /** @description The plan's place among the plans, 0 for the $20 plan. */
+                    /** @description The plan's place among the plans, 0 for the free plan. */
                     tier: number;
                     /**
                      * @description The plan's free burst, in megabytes: freeBurstUnits times 4096.
@@ -4436,7 +4437,7 @@ export interface components {
                  */
                 sizes: ("tiny" | "small" | "medium" | "large")[];
             }[];
-            /** @description What a start costs when an account starts sandboxes faster than its plan's free burst. Fees come out of the plan's credits and then the top-ups. The free month pays none: such a start is refused. */
+            /** @description What a start costs when an account starts sandboxes faster than its plan's free burst. Fees come out of the plan's credits and then the top-ups. */
             burstFee: {
                 /**
                  * @description How long an account's burst meter takes to fall by half. Each start adds its memory to it.
@@ -4454,7 +4455,7 @@ export interface components {
                  */
                 defaultBudgetMicros: number;
             };
-            /** @description Top-ups offered as a choice: credits bought once, on top of a plan. Any other whole number of dollars in topUpRange may be bought too. It is used after the month's credits, and it does not expire. */
+            /** @description Top-ups offered as a choice: credits bought once, on any plan, the free one included. Any other whole number of dollars in topUpRange may be bought too. It is used after the month's credits, and it does not expire. */
             topUps: {
                 /** @example topup500 */
                 id: string;
@@ -4522,20 +4523,20 @@ export interface components {
                  */
                 snapshotMicrosPerHour: number;
             };
-            /** @description A new account's first month on the $20 plan is free. The card is taken first, and the plan is charged when the days end. Once an account. */
-            freeMonth: {
-                /** @example 30 */
-                days: number;
+            /** @description The free plan: nothing a month, and what it runs is paid from top-ups and its one credit. It needs a card saved, charged nothing: POST /v1/billing/checkout with {"card": true}. */
+            free: {
+                /** @enum {string} */
+                planId: "free";
                 /**
-                 * @description The plan whose first days are free: its credits and its sizes.
-                 * @example plan20
+                 * @description The credit an account on the free plan is given once, when it first saves a card, in millionths of a US dollar. It does not expire.
+                 * @example 10000000
                  */
-                planId: string;
+                creditMicros: number;
                 /**
-                 * @description Small sandboxes the free month runs and starts at once, at most, in place of the plan's runningUnits and freeBurstUnits where those are larger. A tiny counts half.
-                 * @example 4
+                 * @description Small sandboxes the free plan runs and starts at once, at most, until the account has paid for something, a top-up of any size. Then the plan's runningUnits. A tiny counts half.
+                 * @example 2
                  */
-                runningUnits: number;
+                unpaidUnits: number;
             };
         };
         Billing: {
@@ -4548,13 +4549,14 @@ export interface components {
             testMode: boolean;
             /** @description Whether a plan is needed to run a sandbox. False: plans are shown and sold, and nothing is held to them. */
             enforced: boolean;
-            /** @description True while this account must start a plan before it uses agental: plans are enforced here, and it has no plan, or the one it had has ended. The console shows the plan choice before anything else while it is. A paused plan, or one whose payment is late, is still a plan. */
+            /** @description True while this account must save a card, or buy a plan, before it uses agental: plans are enforced here, and it is on the free plan with no card saved. The console shows that choice before anything else while it is. */
             needsPlan: boolean;
             /**
-             * @description trialing is the plan's free first month, as the payment provider names it. active is a paid month.
+             * @description The subscription to a plan bought by the month, as the payment provider names it. none or canceled: the account is on the free plan.
              * @enum {string}
              */
             status: "none" | "trialing" | "active" | "past_due" | "paused" | "canceled";
+            /** @description The plan the account is on: one bought by the month while it is live, else the free plan. Null where plans are not enforced on it and it has none bought. */
             plan: {
                 id: string;
                 dollarsPerMonth: number;
@@ -4579,7 +4581,7 @@ export interface components {
                  * @description Kept for clients that read it: the free burst in megabytes. Nothing is refused for speed now; a start faster than the free burst costs a fee.
                  */
                 burst: {
-                    /** @description The plan's place among the plans, 0 for the $20 plan. */
+                    /** @description The plan's place among the plans, 0 for the free plan. */
                     tier: number;
                     /**
                      * @description The plan's free burst, in megabytes: freeBurstUnits times 4096.
@@ -4594,15 +4596,19 @@ export interface components {
                 };
                 sizes: ("tiny" | "small" | "medium" | "large")[];
             } | null;
-            /** @description The month the plan is in, the free month included. */
+            /** @description The month the plan is in. On the free plan, from where its use was last settled against its credits to the next month's start, in UTC. */
             period: {
                 start: string;
                 end: string;
             } | null;
-            /** @description Set while the plan is in its free first month. It is the plan's includedMicros and sizes, running and starting at most freeMonth.runningUnits small sandboxes at once (GET /v1/billing/plans). */
-            freeMonth: {
-                /** @description When the free days end and the plan is first charged. */
-                endsAt: string | null;
+            /** @description Set while the account is on the free plan. */
+            free: {
+                /** @description Whether the account has a card saved, which it must before it runs anything, and so has had its credit. */
+                cardSaved: boolean;
+                /** @description Whether it has paid for anything. Until it has, it runs and starts at most unpaidUnits small sandboxes at once. */
+                paid: boolean;
+                /** @example 2 */
+                unpaidUnits: number;
             } | null;
             includedMicros: number;
             /** @description What has been used this month at list price: running time, mail, stopped sandboxes and snapshots past the free ones. */
@@ -4624,9 +4630,9 @@ export interface components {
             snapshotMicros: number;
             /** @description The part of usedMicros that is burst fees: what starts faster than the plan's free burst cost. GET /v1/burst says where the account stands. */
             burstMicros: number;
-            /** @description What an earlier month ran past its plan and its top-ups. This month's credits pay it first, then the top-ups. */
+            /** @description What an earlier month ran past its plan and its top-ups. This month's credits pay it first, then the top-ups. On the free plan, what the account owes now: what it has run past its credits. */
             carriedMicros: number;
-            /** @description What is left of the credits bought on top of the plan. It is used after the month's credits, and it does not expire. */
+            /** @description What is left of the credits bought on top of the plan, and of the free plan's credit. It is used after the month's credits, and it does not expire. */
             topUpMicros: number;
             /**
              * @deprecated
@@ -4634,8 +4640,6 @@ export interface components {
              */
             sandboxesAtOnce: number | null;
             cancelAtPeriodEnd: boolean;
-            /** @description Whether the account has had its free month. One that has pays for the $20 plan from its first day. */
-            hadFreeMonth: boolean;
             canRun: boolean;
             /** @enum {string|null} */
             reason: "billing_required" | "out_of_credit" | null;
@@ -4644,18 +4648,18 @@ export interface components {
                 /** @description The top-up charged, in whole US dollars. */
                 dollars: number;
             } | null;
-            /** @description Whether an auto-reload can be set: Stripe sells here, and the account has bought a plan or a top-up there, which saved its card. */
+            /** @description Whether an auto-reload can be set: Stripe sells here, and the account has saved a card there, or bought a plan or a top-up. */
             canAutoReload: boolean;
-            /** @description Set while the account has no plan, or owes for what it used past its plan, and still holds sandboxes or snapshots. The account is emailed when it begins, 7 days before deletesAt and the day before. Starting a plan, paying what is owed, or deleting everything ends it. Null otherwise, and always where plans are not enforced. */
+            /** @description Set while the account has no card saved, or has used its credits, and still holds sandboxes or snapshots. The account is emailed when it begins, 7 days before deletesAt and the day before; the account itself stays open. A top-up that pays what is owed, a card saved, a plan started, or deleting everything ends it. Null otherwise, and always where plans are not enforced. */
             lapse: {
                 /**
-                 * @description no_plan: the account has no plan. unpaid: it has a plan and owes for what it used past the plan's credits and its top-ups, from a month that has closed.
+                 * @description no_plan: the account is on the free plan with no card saved. out_of_credit: it is on the free plan and its credits are used. unpaid: it has a plan bought by the month and owes for what it used past the plan's credits and its top-ups, from a month that has closed.
                  * @enum {string}
                  */
-                reason: "no_plan" | "unpaid";
+                reason: "no_plan" | "unpaid" | "out_of_credit";
                 /** @description When the account was first seen with no plan, or owing, while it held sandboxes or snapshots. */
                 lapsedAt: string;
-                /** @description When its sandboxes and snapshots are deleted, with the mail they received, unless a plan is started, or what is owed paid, first. 30 days after lapsedAt. */
+                /** @description When its sandboxes and snapshots are deleted, with the mail they received, unless what is owed is paid, a card saved or a plan started first. 30 days after lapsedAt. */
                 deletesAt: string;
             } | null;
         };
@@ -4975,7 +4979,7 @@ export interface components {
         Burst: {
             /** @description Whether the account is held to its plan: a start past the running count is refused, and a fast one costs a fee. False: what it starts is only measured. */
             enforced: boolean;
-            /** @description The plan it is on, in its free month or not, or null when it is on none. */
+            /** @description The plan it is on, free included, or null where plans are not enforced on it. */
             plan: string | null;
             /**
              * @description Whose limits it has: its plan's, a plan's we gave it, or, on no plan, the smallest plan's.
@@ -5008,8 +5012,8 @@ export interface components {
             feeMicrosPerGib: number;
             /** @description Whether it may start a sandbox at all now. A plan out of credit may not: GET /v1/billing says why. */
             mayStart: boolean;
-            /** @description Whether its plan is in its free month, which pays no burst fees: a start that would cost one is refused. */
-            freeMonth: boolean;
+            /** @description Whether it is on the free plan and has paid for nothing yet: until it has, it runs and starts at most free.unpaidUnits small sandboxes at once (GET /v1/billing/plans). */
+            unpaid: boolean;
             /** @description What it has spent on burst fees this month, in millionths of a US dollar. */
             spentMicros: number;
             /** @description The most it spends on burst fees in a month. A start that would go past it is refused with 429 burst_budget_reached. */
@@ -5317,7 +5321,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description billing_required: the account is on no plan. out_of_credit: the month's credits and the top-ups are used. size_not_on_plan: the plan does not make sandboxes of this size, and the message names the plan that does. Nothing was created. */
+            /** @description billing_required: the account is on the free plan with no card saved. out_of_credit: its credits, the plan's and the top-ups, are used. size_not_on_plan: the plan does not make sandboxes of this size, and the message names the plan that does. Nothing was created. */
             402: {
                 headers: {
                     [name: string]: unknown;
@@ -5353,7 +5357,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description running_limit_reached: the account runs as many sandboxes as its plan's runningUnits allows. burst_fee_too_high: the start would cost more in burst fees than the Agental-Max-Burst-Fee header allows. burst_budget_reached: the burst fee would take this month's fees past the account's budget. burst_in_free_month: the start would cost a burst fee, which the free month does not pay. feeMicros says what the start would have cost; retryAfterSeconds and the Retry-After header say when it would cost nothing. Nothing was created. */
+            /** @description running_limit_reached: the account runs as many sandboxes as its plan's runningUnits allows. burst_fee_too_high: the start would cost more in burst fees than the Agental-Max-Burst-Fee header allows. burst_budget_reached: the burst fee would take this month's fees past the account's budget. feeMicros says what the start would have cost; retryAfterSeconds and the Retry-After header say when it would cost nothing. Nothing was created. */
             429: {
                 headers: {
                     [name: string]: unknown;
@@ -5623,7 +5627,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description running_limit_reached: the account runs as many sandboxes as its plan's runningUnits allows. burst_fee_too_high: the start would cost more in burst fees than the Agental-Max-Burst-Fee header allows. burst_budget_reached: the burst fee would take this month's fees past the account's budget. burst_in_free_month: the start would cost a burst fee, which the free month does not pay. feeMicros says what the start would have cost; retryAfterSeconds and the Retry-After header say when it would cost nothing. It is left stopped. */
+            /** @description running_limit_reached: the account runs as many sandboxes as its plan's runningUnits allows. burst_fee_too_high: the start would cost more in burst fees than the Agental-Max-Burst-Fee header allows. burst_budget_reached: the burst fee would take this month's fees past the account's budget. feeMicros says what the start would have cost; retryAfterSeconds and the Retry-After header say when it would cost nothing. It is left stopped. */
             429: {
                 headers: {
                     [name: string]: unknown;
@@ -6279,7 +6283,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description running_limit_reached: the account runs as many sandboxes as its plan's runningUnits allows. burst_fee_too_high: the start would cost more in burst fees than the Agental-Max-Burst-Fee header allows. burst_budget_reached: the burst fee would take this month's fees past the account's budget. burst_in_free_month: the start would cost a burst fee, which the free month does not pay. feeMicros says what the start would have cost; retryAfterSeconds and the Retry-After header say when it would cost nothing. It is left stopped. */
+            /** @description running_limit_reached: the account runs as many sandboxes as its plan's runningUnits allows. burst_fee_too_high: the start would cost more in burst fees than the Agental-Max-Burst-Fee header allows. burst_budget_reached: the burst fee would take this month's fees past the account's budget. feeMicros says what the start would have cost; retryAfterSeconds and the Retry-After header say when it would cost nothing. It is left stopped. */
             429: {
                 headers: {
                     [name: string]: unknown;
@@ -6340,7 +6344,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description The sandbox was not running, and bringing it back on is a start. running_limit_reached: the account runs as many sandboxes as its plan's runningUnits allows. burst_fee_too_high: the start would cost more in burst fees than the Agental-Max-Burst-Fee header allows. burst_budget_reached: the burst fee would take this month's fees past the account's budget. burst_in_free_month: the start would cost a burst fee, which the free month does not pay. feeMicros says what the start would have cost; retryAfterSeconds and the Retry-After header say when it would cost nothing. It is left as it was. */
+            /** @description The sandbox was not running, and bringing it back on is a start. running_limit_reached: the account runs as many sandboxes as its plan's runningUnits allows. burst_fee_too_high: the start would cost more in burst fees than the Agental-Max-Burst-Fee header allows. burst_budget_reached: the burst fee would take this month's fees past the account's budget. feeMicros says what the start would have cost; retryAfterSeconds and the Retry-After header say when it would cost nothing. It is left as it was. */
             429: {
                 headers: {
                     [name: string]: unknown;
@@ -6418,7 +6422,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description billing_required: the account is on no plan. out_of_credit: the month's credits and the top-ups are used. size_not_on_plan: the plan does not make sandboxes of the source's size, and the message names the plan that does. Nothing was forked. */
+            /** @description billing_required: the account is on the free plan with no card saved. out_of_credit: its credits, the plan's and the top-ups, are used. size_not_on_plan: the plan does not make sandboxes of the source's size, and the message names the plan that does. Nothing was forked. */
             402: {
                 headers: {
                     [name: string]: unknown;
@@ -6454,7 +6458,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description running_limit_reached: the account runs as many sandboxes as its plan's runningUnits allows. burst_fee_too_high: the start would cost more in burst fees than the Agental-Max-Burst-Fee header allows. burst_budget_reached: the burst fee would take this month's fees past the account's budget. burst_in_free_month: the start would cost a burst fee, which the free month does not pay. feeMicros says what the start would have cost; retryAfterSeconds and the Retry-After header say when it would cost nothing. Nothing was forked. */
+            /** @description running_limit_reached: the account runs as many sandboxes as its plan's runningUnits allows. burst_fee_too_high: the start would cost more in burst fees than the Agental-Max-Burst-Fee header allows. burst_budget_reached: the burst fee would take this month's fees past the account's budget. feeMicros says what the start would have cost; retryAfterSeconds and the Retry-After header say when it would cost nothing. Nothing was forked. */
             429: {
                 headers: {
                     [name: string]: unknown;
@@ -14404,7 +14408,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description billing_required: the account has no plan, where plans are required. Start one in the console first; the message gives its address. */
+            /** @description billing_required: the account is on the free plan with no card saved, where plans are required. Save one, or start a plan, in the console first; the message gives its address. */
             402: {
                 headers: {
                     [name: string]: unknown;
@@ -14972,7 +14976,13 @@ export interface operations {
             content: {
                 "application/json": {
                     /** @enum {string} */
-                    plan: "plan20" | "plan100" | "plan500" | "plan2000";
+                    plan: "plan100" | "plan500" | "plan2000";
+                } | {
+                    /**
+                     * @description Save a card for the free plan, charging nothing. Once Stripe says it was saved, the account is given the free plan's credit, once an account and once a card, and may run sandboxes.
+                     * @enum {boolean}
+                     */
+                    card: true;
                 } | {
                     /** @description How many US dollars to pay for credits: a whole number from 15 to 100000. From 200 on it adds a bonus, see topUpBonus in GET /v1/billing/plans. true is $20, as clients older than the choice send it. */
                     topUp: number | true;
@@ -14980,7 +14990,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Where to send the browser to pay: for a plan, or for a top-up of credits that do not expire. An account that already has a plan and picks another is moved with nothing to pay on a page: url is null and changed is true, and the month's credits are each plan's for the part of the month it holds. A smaller plan is moved to at once, and a bigger one once the payment provider has charged the difference, within seconds. The first $20 plan starts with its first month free. */
+            /** @description Where to send the browser: to save a card for the free plan, charging nothing; to pay for a plan; or for a top-up of credits that do not expire. An account that already has a plan and picks another is moved with nothing to pay on a page: url is null and changed is true, and the month's credits are each plan's for the part of the month it holds. A smaller plan is moved to at once, and a bigger one once the payment provider has charged the difference, within seconds. To go back to the free plan, cancel the plan in the billing portal. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -14989,7 +14999,7 @@ export interface operations {
                     "application/json": components["schemas"]["Checkout"];
                 };
             };
-            /** @description billing_not_configured, already_on_plan, or payment_late: the plan's last payment has not gone through, so it is not changed until it has. */
+            /** @description billing_not_configured, already_on_plan, card_saved: a card is saved already, or payment_late: the plan's last payment has not gone through, so it is not changed until it has. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -15052,7 +15062,7 @@ export interface operations {
                     "application/json": components["schemas"]["AutoReload"];
                 };
             };
-            /** @description billing_not_configured: Stripe does not sell here. no_card: the account has not bought a plan or a top-up at Stripe, so it has no card saved there. */
+            /** @description billing_not_configured: Stripe does not sell here. no_card: the account has no card saved at Stripe: save one, or buy a plan or a top-up. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -15294,7 +15304,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description billing_required: the account has no plan, where plans are required. The page offers the plans first: see POST /v1/cli-sign-ins/{id}/checkout. */
+            /** @description billing_required: the account is on the free plan with no card saved, where plans are required. The page offers to save one, or a plan, first: see POST /v1/cli-sign-ins/{id}/checkout. */
             402: {
                 headers: {
                     [name: string]: unknown;
@@ -15354,12 +15364,15 @@ export interface operations {
             content: {
                 "application/json": {
                     /** @enum {string} */
-                    plan: "plan20" | "plan100" | "plan500" | "plan2000";
+                    plan: "plan100" | "plan500" | "plan2000";
+                } | {
+                    /** @enum {boolean} */
+                    card: true;
                 };
             };
         };
         responses: {
-            /** @description Where to send the browser to pay. The first $20 plan starts with its first month free. */
+            /** @description Where to send the browser: to save a card, charging nothing, or to pay for a plan. */
             200: {
                 headers: {
                     [name: string]: unknown;

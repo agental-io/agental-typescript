@@ -104,13 +104,13 @@ export type RunsOnRepository = Schemas["RunsOnRepository"];
 /** Each repository's runs-on pool, and the size a pool keeps where none was set. */
 export type RunsOnRepositories = Schemas["RunsOnRepositories"];
 export type Policy = Schemas["Policy"];
-/** What is sold: the hourly price of each size, the monthly plans in tiers, the top-ups and their bonus, storage and the free month. */
+/** What is sold: the hourly price of each size, the plans in tiers (the free one first), the top-ups and their bonus, storage and the free plan's terms. */
 export type Prices = Omit<Schemas["Prices"], "tiers" | "volumeDiscount"> & { tiers: Plan[] };
-/** Where the account stands: its plan, in its free month or not, what it has used of the month, what is left of its top-ups, and whether it may run a sandbox. */
+/** Where the account stands: its plan, the free one included, what it has used of the month, what is left of its credits, and whether it may run a sandbox. */
 export type Billing = Omit<Schemas["Billing"], "plan" | "discount" | "sandboxesAtOnce"> & {
   plan: Omit<NonNullable<Schemas["Billing"]["plan"]>, "sandboxesAtOnce" | "burst"> | null;
 };
-/** Where to send a person to pay, or null with changed true when a plan was moved at once. */
+/** Where to send a person to pay or to save a card, or null with changed true when a plan was moved at once. */
 export type Checkout = Schemas["Checkout"];
 /** The auto-reload as it is now: the top-up the saved card is charged for when the credits run out, or null while it is off. */
 export type AutoReload = Schemas["AutoReload"];

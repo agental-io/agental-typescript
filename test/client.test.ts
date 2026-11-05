@@ -682,7 +682,7 @@ function burst(changes: Partial<Burst> = {}): Burst {
     halfLifeMinutes: 15,
     feeMicrosPerGib: 20_000,
     mayStart: true,
-    freeMonth: false,
+    unpaid: false,
     spentMicros: 0,
     budgetMicros: 50_000_000,
     budgetSet: false,
@@ -760,7 +760,7 @@ test("asked to, a start refused for its burst waits until it would cost nothing 
     json(201, sandbox(), { "Agental-Burst-Fee": "0" }),
     burstRefusal("burst_budget_reached", 64_000, 0),
     json(201, sandbox({ id: "sbx_fork000000000000" })),
-    burstRefusal("burst_in_free_month", 8000, 0),
+    burstRefusal("burst_fee_too_high", 8000, 0),
     json(200, sandbox()),
   );
   const made = await agental.sandboxes.create({ maxBurstFeeMicros: 0, maxBurstWaitMs: 60_000, idempotencyKey: "task-0002" });
@@ -1208,13 +1208,12 @@ test("billing is read, and a top-up or a plan is bought by the checkout call, wh
     status: "active",
     plan: { id: "plan500", dollarsPerMonth: 500, includedMicros: 500_000_000, runningUnits: 1000, freeBurstUnits: 400, sizes: ["tiny", "small", "medium", "large"] },
     period: { start: "2026-10-01T00:00:00.000Z", end: "2026-11-01T00:00:00.000Z" },
-    freeMonth: null,
+    free: null,
     includedMicros: 500_000_000,
     usedMicros: 2_000_000_000,
     mailMicros: 0,
     topUpMicros: 215_000_000,
     cancelAtPeriodEnd: false,
-    hadFreeMonth: true,
     canRun: true,
     reason: null,
     lapse: null,
@@ -1258,6 +1257,39 @@ test("billing is read, and a top-up or a plan is bought by the checkout call, wh
   await assert.rejects(agental.checkout({ plan: "plan100" }), ConnectionError);
   assert.equal(sent.length, 4);
   assert.deepEqual(await agental.checkout({ plan: "plan100" }), { url: null, changed: true });
+});
+
+test("on the free plan, billing says whether a card is saved, and the checkout call saves one", async () => {
+  const standing: Billing = {
+    provider: "stripe",
+    testMode: true,
+    enforced: true,
+    needsPlan: true,
+    autoReload: null,
+    canAutoReload: false,
+    status: "none",
+    plan: { id: "free", dollarsPerMonth: 0, includedMicros: 0, runningUnits: 20, freeBurstUnits: 20, sizes: ["tiny", "small"] },
+    period: { start: "2026-11-01T00:00:00.000Z", end: "2026-12-01T00:00:00.000Z" },
+    free: { cardSaved: false, paid: false, unpaidUnits: 2 },
+    includedMicros: 0,
+    usedMicros: 0,
+    mailMicros: 0,
+    topUpMicros: 0,
+    cancelAtPeriodEnd: false,
+    canRun: false,
+    reason: "billing_required",
+    lapse: null,
+    stoppedMicros: 0,
+    snapshotMicros: 0,
+    burstMicros: 0,
+    carriedMicros: 0,
+  };
+  const { agental, sent } = scripted(json(200, standing), json(200, { url: "https://pay.example/card", changed: false }), refusal(409, "card_saved"));
+  const billing = await agental.billing();
+  assert.deepEqual([billing.plan?.id, billing.free, billing.needsPlan, billing.reason], ["free", { cardSaved: false, paid: false, unpaidUnits: 2 }, true, "billing_required"]);
+  assert.deepEqual(await agental.checkout({ card: true }), { url: "https://pay.example/card", changed: false });
+  assert.deepEqual([sent[1]?.method, sent[1]?.path, sent[1]?.body], ["POST", "/v1/billing/checkout", { card: true }]);
+  await assert.rejects(agental.checkout({ card: true }), (error: unknown) => error instanceof ApiError && error.status === 409 && error.code === "card_saved");
 });
 
 test("the auto-reload is set and turned off by one call, which sends the dollars or null", async () => {

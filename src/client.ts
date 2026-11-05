@@ -304,31 +304,35 @@ export class Agental {
   }
 
   /**
-   * What is sold: the list price an hour of each size, the monthly plans, the top-ups offered
-   * with what each adds, the range a top-up may be and its bonus, and the free month. It needs
-   * no key.
+   * What is sold: the list price an hour of each size, the plans, the free one first, the
+   * top-ups offered with what each adds, the range a top-up may be and its bonus, and the free
+   * plan's credit and what it runs at once before the account has paid. It needs no key.
    */
   async prices(): Promise<Prices> {
     return (await this.http.json<Prices>({ method: "GET", path: "/v1/billing/plans", replay: true })).body;
   }
 
   /**
-   * Where the account stands: its plan, in its free month or not, what it has used this month at list price,
-   * what is left of its top-ups, and whether it may run a sandbox. Amounts are millionths of a US dollar.
+   * Where the account stands: its plan, the free one included, what it has used this month at list price,
+   * what is left of its credits, and whether it may run a sandbox. On the free plan, `free` says whether a
+   * card is saved and whether the account has paid for anything. Amounts are millionths of a US dollar.
    */
   async billing(): Promise<Billing> {
     return (await this.http.json<Billing>({ method: "GET", path: "/v1/billing", replay: true })).body;
   }
 
   /**
-   * Starts a purchase and gives the address of the payment page, for a person to open: a
-   * plan, or a top-up of credits that do not expire, any whole number of US dollars
-   * from 15 to 100,000. From $200 a top-up adds a bonus, 2% there and growing to 25% at
-   * $10,000: $500 adds $537. prices() says what each adds.
-   * An account that already has a plan and asks for another is moved to it at once: url is
-   * null and changed is true. Nothing is charged until the person pays.
+   * Starts a purchase, or a card saved, and gives the address of the page, for a person to
+   * open: a plan; a top-up of credits that do not expire, any whole number of US dollars from
+   * 15 to 100,000; or `{ card: true }`, which saves a card for the free plan and charges
+   * nothing. Once the card is saved, the account is given the free plan's credit, once, and may
+   * run sandboxes; an account with a card saved already is refused with 409 card_saved.
+   * From $200 a top-up adds a bonus, 2% there and growing to 25% at $10,000: $500 adds $537.
+   * prices() says what each adds. An account that already has a plan and asks for another is
+   * moved to it at once: url is null and changed is true. Nothing is charged until the person
+   * pays. To go back to the free plan, cancel the plan in the billing portal.
    */
-  async checkout(purchase: { plan: "plan20" | "plan100" | "plan500" | "plan2000" } | { topUp: number }): Promise<Checkout> {
+  async checkout(purchase: { plan: "plan100" | "plan500" | "plan2000" } | { topUp: number } | { card: true }): Promise<Checkout> {
     return (await this.http.json<Checkout>({ method: "POST", path: "/v1/billing/checkout", body: purchase })).body;
   }
 
@@ -336,8 +340,8 @@ export class Agental {
    * Sets the auto-reload, or turns it off with null: when the month's credits and the top-ups run
    * out, the card saved at the last purchase is charged for a top-up of this many US dollars, with
    * tax, and its credits are added at once, before any sandbox is stopped. At most three times a
-   * day, and not again for a day after a card that would not pay. It needs a plan or a top-up
-   * bought first, which saves the card: billing().canAutoReload says whether it can be set.
+   * day, and not again for a day after a card that would not pay. It needs a card saved
+   * first, by checkout(): billing().canAutoReload says whether it can be set.
    */
   async setAutoReload(dollars: number | null): Promise<AutoReload> {
     return (await this.http.json<AutoReload>({ method: "PUT", path: "/v1/billing/auto-reload", body: { dollars } })).body;
@@ -357,8 +361,9 @@ export class Agental {
    *
    * Where `enforced` is true, a create, fork or start past the running count throws an
    * `ApiError` 429 `running_limit_reached`; one faster than the free burst costs a burst fee,
-   * and is refused with `burst_budget_reached` past the monthly budget or
-   * `burst_in_free_month` in the free month. Amounts are millionths of a US dollar.
+   * and is refused with `burst_budget_reached` past the monthly budget.
+   * On the free plan, until the account has paid for something (`unpaid`), the running count
+   * is `free.unpaidUnits` of prices(). Amounts are millionths of a US dollar.
    */
   async burst(quote?: { size: Size; count?: number }): Promise<Burst> {
     const query = { size: quote?.size, count: quote?.count?.toString() };

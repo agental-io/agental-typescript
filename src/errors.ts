@@ -50,10 +50,9 @@ export class ApiError extends AgentalError {
  * Why a create, fork or start was refused with the status 429. running_limit_reached: the
  * account already runs as many sandboxes as its plan's runningUnits allows. burst_fee_too_high:
  * the start would cost more in burst fees than maxBurstFeeMicros allows. burst_budget_reached:
- * the fee would take this month's burst fees past the account's budget. burst_in_free_month:
- * the start would cost a fee, which the free month does not pay.
+ * the fee would take this month's burst fees past the account's budget.
  */
-export type BurstRefusalCode = "running_limit_reached" | "burst_fee_too_high" | "burst_budget_reached" | "burst_in_free_month";
+export type BurstRefusalCode = "running_limit_reached" | "burst_fee_too_high" | "burst_budget_reached";
 
 /**
  * Something in front of the API answered, not the API: a 502, a 504, a 52x, or any error

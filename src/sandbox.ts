@@ -69,8 +69,8 @@ export interface BurstOptions {
    */
   maxBurstFeeMicros?: number;
   /**
-   * When the start is refused with burst_fee_too_high, burst_budget_reached or
-   * burst_in_free_month and the API says it would cost nothing in at most this many
+   * When the start is refused with burst_fee_too_high or burst_budget_reached and the API
+   * says it would cost nothing in at most this many
    * milliseconds, wait that long and try once more. Left out, it does not wait. It never
    * waits for running_limit_reached, which waiting does not help.
    */
@@ -200,7 +200,7 @@ function made(prefix: string): string {
 }
 
 /** The burst refusals a wait may help: the start costs nothing once the meter has fallen. */
-const WAITABLE_BURST = new Set(["burst_fee_too_high", "burst_budget_reached", "burst_in_free_month"]);
+const WAITABLE_BURST = new Set(["burst_fee_too_high", "burst_budget_reached"]);
 
 /** The header a start is sent with to cap what it pays in burst fees, when one is asked for. */
 function burstHeaders(options: BurstOptions): Record<string, string> {
