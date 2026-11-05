@@ -2850,6 +2850,22 @@ export interface components {
             createdAt: string;
             updatedAt: string;
         };
+        WaitingCreate: {
+            waiting: {
+                /** @description The region it waits for room in. */
+                region: string;
+                /**
+                 * @description When it was first asked for under this key. Its deadline is kept from then across every try.
+                 * @example 2026-11-05T12:00:00.000Z
+                 */
+                askedAt: string;
+                /**
+                 * @description Until when a try with the same key is waited for. After it, the create is refused with 409 capacity_exceeded.
+                 * @example 2026-11-05T12:02:30.000Z
+                 */
+                until: string;
+            };
+        };
         CreateSandbox: {
             /**
              * @description Lowercase letters, digits, and hyphens. 1–63 characters. Must not start or end with a hyphen.
@@ -5294,13 +5310,13 @@ export interface operations {
                     "application/json": components["schemas"]["Sandbox"];
                 };
             };
-            /** @description Create was accepted but the host result is uncertain. Retry the same Idempotency-Key or POST /v1/reconcile. */
+            /** @description Not made yet: send the same request again with the same Idempotency-Key in 10 seconds. With sandbox and operation, the create was accepted and its host result is uncertain. With waiting, no server has room for it right now: nothing is made, and a try with the same key places it as soon as there is room, until waiting.until, kept from its first try. After that it is refused with 409 capacity_exceeded. */
             202: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AcceptedCreate"];
+                    "application/json": components["schemas"]["AcceptedCreate"] | components["schemas"]["WaitingCreate"];
                 };
             };
             /** @description Invalid request, missing Idempotency-Key, or size_too_small for the snapshot. unsupported_region: there are no servers in the region asked for, and the message names the regions there are. region_mismatch: the region asked for is not the region of the snapshot it has to be made from. ttl_too_long: ttlSeconds, or the template's, is over maxTtlSeconds of GET /v1/policy. invalid_network_policy: an address in network.allow cannot be allowed, and the message says which and why. rule_on_template: network.outbound was sent, and the message says where a rule is set now. */
