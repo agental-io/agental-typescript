@@ -9588,6 +9588,11 @@ export interface operations {
                             role: "owner" | "admin" | "member" | null;
                             /** @description Whether its plan lets it have members besides its owners: $500 or $2000, or limits of that level given by hand. Below that, only its owners may use it. A person's own organization takes members on those plans too, with its person its only owner. */
                             membersAllowed: boolean;
+                            /**
+                             * @description The plan it is on, free included, where the caller may read its bill: their own, or a team they own or are an admin of. Null for a member, or where plans are not kept.
+                             * @example plan500
+                             */
+                            plan: string | null;
                         }[];
                         closed: components["schemas"]["ClosedAccount"];
                     };
