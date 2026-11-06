@@ -1477,11 +1477,11 @@ test("with no key given, a client uses the one the agental command signed in wit
   try {
     await withEnvironment({ AGENTAL_API_KEY: undefined, AGENTAL_API_URL: undefined, XDG_CONFIG_HOME: config }, async () => {
       await new Agental({ fetch }).sandboxes.list();
-      assert.deepEqual(asked.at(-1), { url: "http://127.0.0.1:8742/v1/sandboxes", authorization: "Bearer ag_signed_in_here" });
+      assert.deepEqual(asked.at(-1), { url: "http://127.0.0.1:8742/v1/sandboxes?limit=200", authorization: "Bearer ag_signed_in_here" });
 
       // A key given is the one used, at agental.io unless the API is named too.
       await new Agental({ fetch, apiKey: "ag_given" }).sandboxes.list();
-      assert.deepEqual(asked.at(-1), { url: "https://agental.io/v1/sandboxes", authorization: "Bearer ag_given" });
+      assert.deepEqual(asked.at(-1), { url: "https://agental.io/v1/sandboxes?limit=200", authorization: "Bearer ag_given" });
 
       // The kept key goes to its own API and no other.
       process.env["AGENTAL_API_URL"] = "https://other.example";
@@ -1748,7 +1748,7 @@ test("a sandbox is made, found, changed and tagged by its tags and metadata", as
 
   const found = await agental.sandboxes.list({ tag: ["run-7f3a", "claude"], metadata: { repo: "acme/web" } });
   assert.equal(found.length, 1);
-  assert.equal(sent.at(-1)?.path, `/v1/sandboxes?tag=run-7f3a&tag=claude&${encodeURIComponent("metadata[repo]")}=${encodeURIComponent("acme/web")}`);
+  assert.equal(sent.at(-1)?.path, `/v1/sandboxes?tag=run-7f3a&tag=claude&${encodeURIComponent("metadata[repo]")}=${encodeURIComponent("acme/web")}&limit=200`);
 
   await made.update({ tags: ["run-7f3a"], metadata: { repo: null } });
   assert.deepEqual([sent.at(-1)?.method, sent.at(-1)?.body], ["PATCH", { tags: ["run-7f3a"], metadata: { repo: null } }]);
@@ -1757,6 +1757,28 @@ test("a sandbox is made, found, changed and tagged by its tags and metadata", as
   assert.deepEqual(made.tags, ["claude", "run-7f3a", "pr-412"]);
   await made.removeTag("pr-412");
   assert.deepEqual([sent.at(-1)?.method, sent.at(-1)?.path], ["DELETE", "/v1/sandboxes/sbx_0123456789abcdef/tags/pr-412"]);
+});
+
+test("a list follows every page, and a page is read alone with its filter, sort and cursor", async () => {
+  const one = sandbox({ id: "sbx_0000000000000001", name: "a" });
+  const two = sandbox({ id: "sbx_0000000000000002", name: "b" });
+  const { agental, sent } = scripted(
+    json(200, { sandboxes: [one], nextCursor: "c1" }),
+    json(200, { sandboxes: [two], nextCursor: null }),
+    json(200, { sandboxes: [two], nextCursor: "c2" }),
+    // An API from before pages answers every sandbox and no nextCursor: the list ends there.
+    json(200, { sandboxes: [one, two] }),
+  );
+  const all = await agental.sandboxes.list({ status: ["running", "stopped"], archived: false, notMetadata: { repo: "*" } });
+  assert.deepEqual(all.map((each) => each.name), ["a", "b"]);
+  assert.equal(sent[0]?.path, `/v1/sandboxes?status=running&status=stopped&archived=false&${encodeURIComponent("notMetadata[repo]")}=${encodeURIComponent("*")}&limit=200`);
+  assert.equal(sent[1]?.path, `/v1/sandboxes?status=running&status=stopped&archived=false&${encodeURIComponent("notMetadata[repo]")}=${encodeURIComponent("*")}&limit=200&cursor=c1`);
+
+  const page = await agental.sandboxes.page({ text: "b", createdAfter: new Date("2026-11-06T00:00:00Z") }, { sort: "-created", limit: 1 });
+  assert.deepEqual([page.sandboxes.map((each) => each.name), page.nextCursor], [["b"], "c2"]);
+  assert.equal(sent[2]?.path, `/v1/sandboxes?createdAfter=${encodeURIComponent("2026-11-06T00:00:00.000Z")}&q=b&sort=-created&limit=1`);
+
+  assert.equal((await agental.sandboxes.list()).length, 2);
 });
 
 test("a template is made with tags and metadata, changed, and tagged", async () => {

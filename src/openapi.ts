@@ -75,7 +75,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Sandboxes that have not been deleted. With tag, only those that have every tag named, as many times as it is sent: tag=run-7f3a&tag=claude. With metadata[key]=value, only those whose metadata has that value for that key, for each key sent. A sandbox's template's tags and metadata count as its own. */
+        /** @description Sandboxes that have not been deleted, the newest last unless sort says otherwise. Times are a day, read as UTC, or a time with its zone, in ISO 8601. Every filter is judged on a sandbox as it is answered: its status, its autoStopAt, its outbound rule, and its tags and metadata with its template's counted as its own and its own value for a key winning over its template's. With metadata[key]=value, only those whose metadata has that value for that key, and with notMetadata[key]=value only those that do not; a value of * means the key is set, whatever its value, or for notMetadata not set. With limit, one page, and nextCursor for the next; a page sorted by anything but created can miss or repeat a sandbox that changes while the pages are read. */
         get: operations["listSandboxes"];
         put?: never;
         post: operations["createSandbox"];
@@ -2945,6 +2945,8 @@ export interface components {
         };
         SandboxList: {
             sandboxes: components["schemas"]["Sandbox"][];
+            /** @description What to send as cursor, with the same sort and limit, for the sandboxes after these. Null when these are the last. */
+            nextCursor: string | null;
         };
         ExecResult: {
             exitCode: number;
@@ -5236,8 +5238,44 @@ export interface operations {
     listSandboxes: {
         parameters: {
             query?: {
-                /** @description A tag the sandboxes must have. Sent more than once, they must have each. */
+                /** @description A tag the sandboxes must have. Sent more than once, they must have each; a tag has no commas, and one sent with them is one tag. A template's tags count as the sandbox's own. */
                 tag?: string | string[];
+                /** @description A tag the sandboxes must not have. Sent more than once, they must have none of them. */
+                notTag?: string | string[];
+                /** @description A status the sandboxes are in, as the API says it: creating, running, stopped, error, restoring or migrating. Sent more than once, or with commas, any of them. */
+                status?: string | string[];
+                /** @description true for only archived sandboxes, false for none: with status=stopped it parts the archived from the rest. */
+                archived?: string;
+                /** @description A size: tiny, small, medium or large. Sent more than once, or with commas, any of them. */
+                size?: string | string[];
+                /** @description A region. Sent more than once, or with commas, any of them. */
+                region?: string | string[];
+                /** @description A template's ID. Sent more than once, or with commas, any of them. */
+                templateId?: string | string[];
+                /** @description Who made the sandboxes, as createdBy says it. Sent more than once, or with commas, any of them. */
+                createdBy?: string | string[];
+                /** @description Only sandboxes made after this time, in ISO 8601. */
+                createdAfter?: string;
+                /** @description Only sandboxes made before this time, in ISO 8601. */
+                createdBefore?: string;
+                /** @description Only sandboxes stopped before this time, in ISO 8601: a sandbox that is not stopped has no time it stopped. */
+                stoppedBefore?: string;
+                /** @description Only sandboxes whose autoStopAt is before this time, in ISO 8601. */
+                stopsBefore?: string;
+                /** @description never: only sandboxes with no autoStopAt, which every sandbox that is not running is. */
+                stops?: string;
+                /** @description true for only sandboxes stopped with their memory kept, false for the rest. */
+                memoryKept?: string;
+                /** @description An outbound rule: open, blocked or allowlist. Sent more than once, or with commas, any of them. */
+                outbound?: string | string[];
+                /** @description Text found in the name or the ID, case ignored. */
+                q?: string;
+                /** @description created (the default, oldest first), -created, name, -name, status, -status, stopped or -stopped (a sandbox not stopped last). Only created and -created keep a walk through the pages exact while sandboxes change. */
+                sort?: string;
+                /** @description How many sandboxes one answer holds, 1 to 200. Left out, every sandbox that matches is answered at once. */
+                limit?: string;
+                /** @description The nextCursor of the page before, sent with the same sort and limit. */
+                cursor?: string;
             };
             header?: never;
             path?: never;
@@ -5245,7 +5283,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Sandboxes that have not been deleted, and have every tag and metadata value asked for. */
+            /** @description Sandboxes that have not been deleted and match every filter sent. */
             200: {
                 headers: {
                     [name: string]: unknown;

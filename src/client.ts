@@ -37,6 +37,48 @@ import type {
   Webhook,
 } from "./types.js";
 
+/** What a list of sandboxes is narrowed to. Each field left out narrows nothing; a list of values is any of them. */
+export interface SandboxFilter {
+  /** Tags every sandbox has. */
+  tag?: string | readonly string[];
+  /** Tags no sandbox has. */
+  notTag?: string | readonly string[];
+  /** creating, running, stopped, error, restoring or migrating. */
+  status?: string | readonly string[];
+  /** true for only archived sandboxes, false for none. */
+  archived?: boolean;
+  size?: string | readonly string[];
+  region?: string | readonly string[];
+  templateId?: string | readonly string[];
+  /** Who made them, as createdBy says it. */
+  createdBy?: string | readonly string[];
+  createdAfter?: string | Date;
+  createdBefore?: string | Date;
+  stoppedBefore?: string | Date;
+  /** Their autoStopAt is before this. */
+  stopsBefore?: string | Date;
+  /** never: they have no autoStopAt. */
+  stops?: "never";
+  memoryKept?: boolean;
+  /** open, blocked or allowlist. */
+  outbound?: string | readonly string[];
+  /** Each key at this value; "*" for any value, the key being set. */
+  metadata?: Record<string, string>;
+  /** No key at this value; "*" for the key not being set. */
+  notMetadata?: Record<string, string>;
+  /** Text found in the name or the id, case ignored. */
+  text?: string;
+}
+
+/** How a page of sandboxes is sorted. Only created and -created keep a walk through the pages exact while sandboxes change. */
+export type SandboxSort = "created" | "-created" | "name" | "-name" | "status" | "-status" | "stopped" | "-stopped";
+
+/** A page of sandboxes, and what to pass as cursor for the next one: null when this is the last. */
+export interface SandboxPage {
+  sandboxes: Sandbox[];
+  nextCursor: string | null;
+}
+
 class Sandboxes {
   constructor(private readonly http: Http) {}
 
@@ -69,20 +111,67 @@ class Sandboxes {
   }
 
   /**
-   * Your sandboxes, stopped ones included. Given a tag, or several, only those with every
-   * one of them; given metadata, only those with each key at that value. A template's
-   * tags and metadata count.
+   * Every sandbox of yours that matches the filter, stopped ones included, oldest first. With
+   * no filter, every sandbox. It reads a page of 200 at a time and follows them to the end.
+   * Tags and metadata are judged as the sandbox shows them: its template's count, and its own
+   * value for a key wins over its template's.
    */
-  async list(filter: { tag?: string | string[]; metadata?: Record<string, string> } = {}): Promise<Sandbox[]> {
+  async list(filter: SandboxFilter = {}): Promise<Sandbox[]> {
+    const found: Sandbox[] = [];
+    let cursor: string | null = null;
+    do {
+      const page: SandboxPage = await this.page(filter, { limit: 200, ...(cursor === null ? {} : { cursor }) });
+      found.push(...page.sandboxes);
+      cursor = page.nextCursor;
+    } while (cursor !== null);
+    return found;
+  }
+
+  /**
+   * One page of the sandboxes that match the filter: up to limit of them, and nextCursor to pass
+   * as cursor, with the same sort, for the page after it. Sorted by anything but created, a
+   * sandbox that changes while the pages are read can be missed or met twice.
+   */
+  async page(filter: SandboxFilter = {}, options: { sort?: SandboxSort; limit?: number; cursor?: string } = {}): Promise<SandboxPage> {
     const query: Record<string, string | string[]> = {};
-    if (filter.tag !== undefined) {
-      query["tag"] = filter.tag;
+    const many = (name: string, value: string | readonly string[] | undefined) => {
+      if (value !== undefined) {
+        query[name] = typeof value === "string" ? value : [...value];
+      }
+    };
+    const time = (value: string | Date | undefined) => (value instanceof Date ? value.toISOString() : value);
+    many("tag", filter.tag);
+    many("notTag", filter.notTag);
+    many("status", filter.status);
+    many("size", filter.size);
+    many("region", filter.region);
+    many("templateId", filter.templateId);
+    many("createdBy", filter.createdBy);
+    many("outbound", filter.outbound);
+    many("createdAfter", time(filter.createdAfter));
+    many("createdBefore", time(filter.createdBefore));
+    many("stoppedBefore", time(filter.stoppedBefore));
+    many("stopsBefore", time(filter.stopsBefore));
+    many("stops", filter.stops);
+    many("q", filter.text);
+    if (filter.archived !== undefined) {
+      query["archived"] = String(filter.archived);
+    }
+    if (filter.memoryKept !== undefined) {
+      query["memoryKept"] = String(filter.memoryKept);
     }
     for (const [key, value] of Object.entries(filter.metadata ?? {})) {
       query[`metadata[${key}]`] = value;
     }
-    const { body } = await this.http.json<{ sandboxes: SandboxInfo[] }>({ method: "GET", path: "/v1/sandboxes", query, replay: true });
-    return body.sandboxes.map((info) => new Sandbox(this.http, info));
+    for (const [key, value] of Object.entries(filter.notMetadata ?? {})) {
+      query[`notMetadata[${key}]`] = value;
+    }
+    many("sort", options.sort);
+    many("limit", options.limit === undefined ? undefined : String(options.limit));
+    many("cursor", options.cursor);
+    const { body } = await this.http.json<{ sandboxes: SandboxInfo[]; nextCursor?: string | null }>({ method: "GET", path: "/v1/sandboxes", query, replay: true });
+    // An API from before pages answers every sandbox at once, and no nextCursor.
+    return { sandboxes: body.sandboxes.map((info) => new Sandbox(this.http, info)), nextCursor: body.nextCursor ?? null };
   }
 
   /**
