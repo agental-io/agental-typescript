@@ -85,6 +85,108 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/sandbox-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description How many sandboxes the list's filters find, and what they cost: an hour, as each is charged now by its open run, running or stopped; and since midnight UTC today, by their runs. Spent covers the sandboxes found now, not the account: sandboxes deleted today, snapshots, burst fees and the rest are in GET /v1/billing. ifStopped is what the running among them would cost stopped, with and without their memory. With facets, the count and hourly cost of each value of each field named, at most 20 values a field, the most first; a field's own filter is left out of its counts, so each value says what choosing it would find. Takes every filter GET /v1/sandboxes takes, and not sort, limit or cursor. */
+        get: operations["summarizeSandboxes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sandbox-jobs/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Fixes the sandboxes a job would act on, and does nothing to them: those the filter finds (the list's filters, not limit or cursor), or the IDs named, that the caller may act on. Answers how many, the first of them, what they cost an hour now and would after, and when the preview expires. A job made from it acts on exactly these, and on no sandbox that comes into the filter later. A key needs the action the single call takes: sandbox.stop for stop and archive, sandbox.resume for start, snapshot.write, sandbox.auto-stop to set a stop time and sandbox.update to take it away, sandbox.update for labels, sandbox.delete for delete (or sandbox.delete-own, which deletes only the sandboxes the key made). */
+        post: operations["previewSandboxJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sandbox-jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description The organization's last 50 jobs, the newest first. A key limited by lists sees only the jobs it made. */
+        get: operations["listSandboxJobs"];
+        put?: never;
+        /** @description Makes a job from a preview, { previewId }, or from IDs named outright, { action, options, ids }. It acts on exactly those sandboxes, a few at a time, checking each again just before: one that left the filter it was chosen by, is already as the action would make it, or that its maker may no longer act on, is skipped. An item is pending, acting, accepted (going on after the call, as a stop writing memory does), done, skipped, failed, or uncertain (the worker stopped between acting and writing the answer; settled by reading the sandbox, never by acting again). Sent again with the same Idempotency-Key, the same job is answered. */
+        post: operations["createSandboxJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sandbox-jobs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getSandboxJob"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sandbox-jobs/{id}/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Each sandbox of the job, in order: its state, why, and what it made or follows (an operation, a stop, a snapshot). */
+        get: operations["listSandboxJobItems"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sandbox-jobs/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description No item that has not begun begins; those under way are followed to their end. Who made the job may cancel it, and an owner or admin of its organization. */
+        post: operations["cancelSandboxJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/sandboxes/{id}": {
         parameters: {
             query?: never;
@@ -2788,6 +2890,22 @@ export interface components {
             /** @description Why the memory its last stop kept was not put back by its last start, which started it from its disk: as after an upgrade of the server it is on, which the memory cannot be put back across. Null when it was put back, or none was kept. */
             memoryLost: string | null;
             network: components["schemas"]["SandboxNetwork"];
+            /** @description What it is doing, as last read: null when it is not running, not read yet, or where GET /v1/policy says metrics is false. */
+            activity: {
+                /** @description low-cpu: for the last hour, observed with enough coverage, its CPU at its busiest stayed under the line (5% of its vCPUs unless the deployment sets another). A heuristic: an agent waiting on a model or a download is busy with almost no CPU, and nothing acts on it by itself. disk-full, memory-full: at or over the line (90%). not-read: its server has not answered for 3 minutes, and none of the others is said. */
+                states: ("low-cpu" | "disk-full" | "memory-full" | "not-read")[];
+                /** @description Its CPU now, 0 to 1 of its vCPUs. */
+                cpuNow: number | null;
+                /** @description Its CPU at its busiest in the last hour, 0 to 1 of its vCPUs. */
+                cpuMaxLastHour: number | null;
+                /** @description How many of the last hour's minutes were read, since its current run began on its current server. */
+                observedMinutes: number;
+                memoryUsedBytes: number | null;
+                memoryTotalBytes: number | null;
+                diskUsedBytes: number | null;
+                diskTotalBytes: number | null;
+                readAt: string;
+            } | null;
             /**
              * @description Its template's tags and its own, each once: the template's first. A change to its template's tags shows here at once. GET /v1/sandboxes?tag= finds sandboxes by them.
              * @example [
@@ -2947,6 +3065,165 @@ export interface components {
             sandboxes: components["schemas"]["Sandbox"][];
             /** @description What to send as cursor, with the same sort and limit, for the sandboxes after these. Null when these are the last. */
             nextCursor: string | null;
+        };
+        SandboxSummary: {
+            /** @description Midnight UTC today, from when spentMicros is counted. */
+            since: string;
+            total: {
+                count: number;
+                /** @description What they are charged an hour now, in millionths of a US dollar: the rates of their open runs, running or stopped. */
+                microsPerHour: number;
+                /** @description What their runs cost since midnight UTC today, in millionths of a US dollar. */
+                spentMicros: number;
+            };
+            /** @description What was found, by status as the API says it, the archived apart from the other stopped ones. */
+            byState: {
+                creating: {
+                    count: number;
+                    /** @description What they are charged an hour now, in millionths of a US dollar: the rates of their open runs, running or stopped. */
+                    microsPerHour: number;
+                    /** @description What their runs cost since midnight UTC today, in millionths of a US dollar. */
+                    spentMicros: number;
+                };
+                running: {
+                    count: number;
+                    /** @description What they are charged an hour now, in millionths of a US dollar: the rates of their open runs, running or stopped. */
+                    microsPerHour: number;
+                    /** @description What their runs cost since midnight UTC today, in millionths of a US dollar. */
+                    spentMicros: number;
+                };
+                /** @description Stopped and not archived. */
+                stopped: {
+                    count: number;
+                    /** @description What they are charged an hour now, in millionths of a US dollar: the rates of their open runs, running or stopped. */
+                    microsPerHour: number;
+                    /** @description What their runs cost since midnight UTC today, in millionths of a US dollar. */
+                    spentMicros: number;
+                };
+                archived: {
+                    count: number;
+                    /** @description What they are charged an hour now, in millionths of a US dollar: the rates of their open runs, running or stopped. */
+                    microsPerHour: number;
+                    /** @description What their runs cost since midnight UTC today, in millionths of a US dollar. */
+                    spentMicros: number;
+                };
+                restoring: {
+                    count: number;
+                    /** @description What they are charged an hour now, in millionths of a US dollar: the rates of their open runs, running or stopped. */
+                    microsPerHour: number;
+                    /** @description What their runs cost since midnight UTC today, in millionths of a US dollar. */
+                    spentMicros: number;
+                };
+                migrating: {
+                    count: number;
+                    /** @description What they are charged an hour now, in millionths of a US dollar: the rates of their open runs, running or stopped. */
+                    microsPerHour: number;
+                    /** @description What their runs cost since midnight UTC today, in millionths of a US dollar. */
+                    spentMicros: number;
+                };
+                error: {
+                    count: number;
+                    /** @description What they are charged an hour now, in millionths of a US dollar: the rates of their open runs, running or stopped. */
+                    microsPerHour: number;
+                    /** @description What their runs cost since midnight UTC today, in millionths of a US dollar. */
+                    spentMicros: number;
+                };
+            };
+            /** @description What the running among them would cost an hour stopped, with their disks kept, and with their memory kept too. */
+            ifStopped: {
+                microsPerHour: number;
+                withMemoryMicrosPerHour: number;
+            };
+            /** @description Each field asked for in facets, by its name. */
+            facets: {
+                [key: string]: {
+                    values: {
+                        value: string;
+                        count: number;
+                        microsPerHour: number;
+                    }[];
+                    /** @description How many other values there are past the ones listed. */
+                    more: number;
+                };
+            };
+        };
+        SandboxJobPreview: {
+            id: string;
+            /** @enum {string} */
+            action: "stop" | "start" | "archive" | "snapshot" | "auto-stop" | "labels" | "delete";
+            options: {
+                /** @description For stop: keep their memory as well as their disks. */
+                keepMemory?: boolean;
+                /** @description For snapshot: its name, checkpoint when left out. */
+                name?: string;
+                /** @description For auto-stop: the time to stop at, in ISO 8601, or null to take the time limit away. */
+                at?: string | null;
+                /** @description For auto-stop: seconds from now, fixed to a time when the job is made. */
+                inSeconds?: number;
+                /** @description For labels: tags of their own to add. */
+                addTags?: string[];
+                /** @description For labels: tags of their own to take away. One from a template stays, and the item says so. */
+                removeTags?: string[];
+                /** @description For labels: their own metadata to set, a key with null taken away. */
+                metadata?: {
+                    [key: string]: string | null;
+                };
+            };
+            count: number;
+            sample: {
+                id: string;
+                name: string;
+                status: string;
+            }[];
+            /** @description What the chosen are charged an hour now, and would be once the action is done, in millionths of a US dollar. */
+            microsPerHour: {
+                now: number;
+                after: number;
+            };
+            expiresAt: string;
+        };
+        SandboxJob: {
+            id: string;
+            /** @enum {string} */
+            action: "stop" | "start" | "archive" | "snapshot" | "auto-stop" | "labels" | "delete";
+            options: {
+                /** @description For stop: keep their memory as well as their disks. */
+                keepMemory?: boolean;
+                /** @description For snapshot: its name, checkpoint when left out. */
+                name?: string;
+                /** @description For auto-stop: the time to stop at, in ISO 8601, or null to take the time limit away. */
+                at?: string | null;
+                /** @description For auto-stop: seconds from now, fixed to a time when the job is made. */
+                inSeconds?: number;
+                /** @description For labels: tags of their own to add. */
+                addTags?: string[];
+                /** @description For labels: tags of their own to take away. One from a template stays, and the item says so. */
+                removeTags?: string[];
+                /** @description For labels: their own metadata to set, a key with null taken away. */
+                metadata?: {
+                    [key: string]: string | null;
+                };
+            };
+            /** @enum {string} */
+            state: "running" | "done" | "cancelled";
+            total: number;
+            counts: {
+                pending: number;
+                acting: number;
+                accepted: number;
+                done: number;
+                skipped: number;
+                failed: number;
+                uncertain: number;
+            };
+            createdAt: string;
+            endedAt: string | null;
+            /** @description The first items that failed, are uncertain or were skipped, with why. */
+            problems: {
+                sandboxId: string;
+                state: string;
+                reason: string | null;
+            }[];
         };
         ExecResult: {
             exitCode: number;
@@ -5268,9 +5545,13 @@ export interface operations {
                 memoryKept?: string;
                 /** @description An outbound rule: open, blocked or allowlist. Sent more than once, or with commas, any of them. */
                 outbound?: string | string[];
+                /** @description What they are doing: low-cpu, disk-full, memory-full or not-read. Sent more than once, or with commas, any of them. Only where GET /v1/policy says metrics. */
+                activity?: string | string[];
+                /** @description What they are not doing: none of these states. */
+                notActivity?: string | string[];
                 /** @description Text found in the name or the ID, case ignored. */
                 q?: string;
-                /** @description created (the default, oldest first), -created, name, -name, status, -status, stopped or -stopped (a sandbox not stopped last). Only created and -created keep a walk through the pages exact while sandboxes change. */
+                /** @description created (the default, oldest first), -created, name, -name, status, -status, stopped or -stopped (a sandbox not stopped last), cost or -cost (what it is charged an hour now), -cpu, -memory or -disk (the busiest or fullest first, those not read last). Only created and -created keep a walk through the pages exact while sandboxes change. */
                 sort?: string;
                 /** @description How many sandboxes one answer holds, 1 to 200. Left out, every sandbox that matches is answered at once. */
                 limit?: string;
@@ -5431,6 +5712,427 @@ export interface operations {
             };
             /** @description network_policy_unavailable: network.allow names addresses, or the template holds the sandbox to blocked or an allowlist, where GET /v1/policy says networkPolicy is false. Nothing was created. */
             501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    summarizeSandboxes: {
+        parameters: {
+            query?: {
+                /** @description A tag the sandboxes must have. Sent more than once, they must have each; a tag has no commas, and one sent with them is one tag. A template's tags count as the sandbox's own. */
+                tag?: string | string[];
+                /** @description A tag the sandboxes must not have. Sent more than once, they must have none of them. */
+                notTag?: string | string[];
+                /** @description A status the sandboxes are in, as the API says it: creating, running, stopped, error, restoring or migrating. Sent more than once, or with commas, any of them. */
+                status?: string | string[];
+                /** @description true for only archived sandboxes, false for none: with status=stopped it parts the archived from the rest. */
+                archived?: string;
+                /** @description A size: tiny, small, medium or large. Sent more than once, or with commas, any of them. */
+                size?: string | string[];
+                /** @description A region. Sent more than once, or with commas, any of them. */
+                region?: string | string[];
+                /** @description A template's ID. Sent more than once, or with commas, any of them. */
+                templateId?: string | string[];
+                /** @description Who made the sandboxes, as createdBy says it. Sent more than once, or with commas, any of them. */
+                createdBy?: string | string[];
+                /** @description Only sandboxes made after this time, in ISO 8601. */
+                createdAfter?: string;
+                /** @description Only sandboxes made before this time, in ISO 8601. */
+                createdBefore?: string;
+                /** @description Only sandboxes stopped before this time, in ISO 8601: a sandbox that is not stopped has no time it stopped. */
+                stoppedBefore?: string;
+                /** @description Only sandboxes whose autoStopAt is before this time, in ISO 8601. */
+                stopsBefore?: string;
+                /** @description never: only sandboxes with no autoStopAt, which every sandbox that is not running is. */
+                stops?: string;
+                /** @description true for only sandboxes stopped with their memory kept, false for the rest. */
+                memoryKept?: string;
+                /** @description An outbound rule: open, blocked or allowlist. Sent more than once, or with commas, any of them. */
+                outbound?: string | string[];
+                /** @description What they are doing: low-cpu, disk-full, memory-full or not-read. Sent more than once, or with commas, any of them. Only where GET /v1/policy says metrics. */
+                activity?: string | string[];
+                /** @description What they are not doing: none of these states. */
+                notActivity?: string | string[];
+                /** @description Text found in the name or the ID, case ignored. */
+                q?: string;
+                /** @description Fields to count values of, by commas or sent more than once: status, size, region, templateId, tag, outbound, metadataKeys, activity, or metadata.<key>. */
+                facets?: string | string[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The sandboxes found, counted and costed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SandboxSummary"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    previewSandboxJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    action: "stop" | "start" | "archive" | "snapshot" | "auto-stop" | "labels" | "delete";
+                    options?: {
+                        /** @description For stop: keep their memory as well as their disks. */
+                        keepMemory?: boolean;
+                        /** @description For snapshot: its name, checkpoint when left out. */
+                        name?: string;
+                        /** @description For auto-stop: the time to stop at, in ISO 8601, or null to take the time limit away. */
+                        at?: string | null;
+                        /** @description For auto-stop: seconds from now, fixed to a time when the job is made. */
+                        inSeconds?: number;
+                        /** @description For labels: tags of their own to add. */
+                        addTags?: string[];
+                        /** @description For labels: tags of their own to take away. One from a template stays, and the item says so. */
+                        removeTags?: string[];
+                        /** @description For labels: their own metadata to set, a key with null taken away. */
+                        metadata?: {
+                            [key: string]: string | null;
+                        };
+                    };
+                    select: {
+                        /** @description GET /v1/sandboxes's filters, as its query has them. */
+                        filter?: {
+                            [key: string]: string | string[];
+                        };
+                        ids?: string[];
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description The sandboxes the job would act on, fixed. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SandboxJobPreview"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description nothing_selected: the filter finds no sandbox. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listSandboxJobs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Jobs. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        jobs: components["schemas"]["SandboxJob"][];
+                    };
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    createSandboxJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    previewId?: string;
+                    /** @description For delete, required: the count of sandboxes its preview showed. Another count is refused, and nothing is deleted. */
+                    confirm?: number;
+                    /** @enum {string} */
+                    action?: "stop" | "start" | "archive" | "snapshot" | "auto-stop" | "labels" | "delete";
+                    options?: {
+                        /** @description For stop: keep their memory as well as their disks. */
+                        keepMemory?: boolean;
+                        /** @description For snapshot: its name, checkpoint when left out. */
+                        name?: string;
+                        /** @description For auto-stop: the time to stop at, in ISO 8601, or null to take the time limit away. */
+                        at?: string | null;
+                        /** @description For auto-stop: seconds from now, fixed to a time when the job is made. */
+                        inSeconds?: number;
+                        /** @description For labels: tags of their own to add. */
+                        addTags?: string[];
+                        /** @description For labels: tags of their own to take away. One from a template stays, and the item says so. */
+                        removeTags?: string[];
+                        /** @description For labels: their own metadata to set, a key with null taken away. */
+                        metadata?: {
+                            [key: string]: string | null;
+                        };
+                    };
+                    ids?: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description The job, under way. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SandboxJob"];
+                };
+            };
+            /** @description confirm_required: a delete is made with confirm, the count its preview showed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description preview_expired: preview again; the set it finds then is the one acted on. confirm_mismatch: confirm is not the count the preview holds; nothing was deleted. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getSandboxJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The job, its counts and its first problems. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SandboxJob"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listSandboxJobItems: {
+        parameters: {
+            query?: {
+                /** @description Only items in this state. */
+                state?: string;
+                /** @description 1 to 200; 100 unless said. */
+                limit?: string;
+                /** @description The nextCursor of the page before. */
+                cursor?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of items. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            id: string;
+                            sandboxId: string;
+                            state: string;
+                            reason: string | null;
+                            link: {
+                                [key: string]: string;
+                            };
+                            startedAt: string | null;
+                            endedAt: string | null;
+                        }[];
+                        nextCursor: string | null;
+                    };
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    cancelSandboxJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The job. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SandboxJob"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

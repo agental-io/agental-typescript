@@ -1,4 +1,4 @@
-import { Http, type AgentalOptions } from "./http.js";
+import { Http, sleep, type AgentalOptions } from "./http.js";
 import { CREATE_TIMEOUT_MS, Email, iso, made, makeSandbox, Sandbox, type CreateOptions } from "./sandbox.js";
 import { Templates } from "./template.js";
 import type {
@@ -25,6 +25,10 @@ import type {
   Prices,
   RunningOverTime,
   SandboxInfo,
+  SandboxSummary,
+  SandboxJob,
+  SandboxJobItem,
+  SandboxJobPreview,
   Size,
   Snapshot,
   Team,
@@ -71,12 +75,140 @@ export interface SandboxFilter {
 }
 
 /** How a page of sandboxes is sorted. Only created and -created keep a walk through the pages exact while sandboxes change. */
-export type SandboxSort = "created" | "-created" | "name" | "-name" | "status" | "-status" | "stopped" | "-stopped";
+export type SandboxSort = "created" | "-created" | "name" | "-name" | "status" | "-status" | "stopped" | "-stopped" | "cost" | "-cost";
 
 /** A page of sandboxes, and what to pass as cursor for the next one: null when this is the last. */
 export interface SandboxPage {
   sandboxes: Sandbox[];
   nextCursor: string | null;
+}
+
+/** A filter as GET /v1/sandboxes and /v1/sandbox-summary take it. */
+function filterQuery(filter: SandboxFilter): Record<string, string | string[]> {
+  const query: Record<string, string | string[]> = {};
+  const many = (name: string, value: string | readonly string[] | undefined) => {
+    if (value !== undefined) {
+      query[name] = typeof value === "string" ? value : [...value];
+    }
+  };
+  const time = (value: string | Date | undefined) => (value instanceof Date ? value.toISOString() : value);
+  many("tag", filter.tag);
+  many("notTag", filter.notTag);
+  many("status", filter.status);
+  many("size", filter.size);
+  many("region", filter.region);
+  many("templateId", filter.templateId);
+  many("createdBy", filter.createdBy);
+  many("outbound", filter.outbound);
+  many("createdAfter", time(filter.createdAfter));
+  many("createdBefore", time(filter.createdBefore));
+  many("stoppedBefore", time(filter.stoppedBefore));
+  many("stopsBefore", time(filter.stopsBefore));
+  many("stops", filter.stops);
+  many("q", filter.text);
+  if (filter.archived !== undefined) {
+    query["archived"] = String(filter.archived);
+  }
+  if (filter.memoryKept !== undefined) {
+    query["memoryKept"] = String(filter.memoryKept);
+  }
+  for (const [key, value] of Object.entries(filter.metadata ?? {})) {
+    query[`metadata[${key}]`] = value;
+  }
+  for (const [key, value] of Object.entries(filter.notMetadata ?? {})) {
+    query[`notMetadata[${key}]`] = value;
+  }
+  return query;
+}
+
+/** What a job does to each sandbox, and how. */
+export type SandboxJobAction = "stop" | "start" | "archive" | "snapshot" | "auto-stop" | "labels" | "delete";
+export interface SandboxJobOptions {
+  /** For stop: keep their memory too. */
+  keepMemory?: boolean;
+  /** For snapshot: its name. */
+  name?: string;
+  /** For auto-stop: when to stop, or null to take the time limit away. */
+  at?: string | Date | null;
+  /** For auto-stop: seconds from now, fixed to a time when the job is made. */
+  inSeconds?: number;
+  /** For labels: own tags to add and take away, own metadata to set (null takes a key away). */
+  addTags?: string[];
+  removeTags?: string[];
+  metadata?: Record<string, string | null>;
+}
+
+/**
+ * Jobs that act on many sandboxes at once. A preview fixes the sandboxes a filter finds; a job
+ * acts on exactly those, checking each again just before, and on no other.
+ */
+class SandboxJobs {
+  constructor(private readonly http: Http) {}
+
+  /** The sandboxes a job would act on, fixed, with how many, the first of them, and the money before and after. Nothing is done. */
+  async preview(action: SandboxJobAction, select: { filter: SandboxFilter } | { ids: readonly string[] }, options: SandboxJobOptions = {}): Promise<SandboxJobPreview> {
+    const body = {
+      action,
+      options: jobOptions(options),
+      select: "ids" in select ? { ids: [...select.ids] } : { filter: filterQuery(select.filter) },
+    };
+    return (await this.http.json<SandboxJobPreview>({ method: "POST", path: "/v1/sandbox-jobs/preview", body })).body;
+  }
+
+  /**
+   * Makes a job from a preview, or from sandbox IDs named outright. Sent again with the same
+   * idempotencyKey, the same job is answered.
+   */
+  async create(
+    from: { previewId: string; confirm?: number } | { action: SandboxJobAction; ids: readonly string[]; options?: SandboxJobOptions; confirm?: number },
+    options: { idempotencyKey?: string } = {},
+  ): Promise<SandboxJob> {
+    // A delete is made with confirm: the count its preview showed.
+    const confirm = from.confirm === undefined ? {} : { confirm: from.confirm };
+    const body = "previewId" in from ? { previewId: from.previewId, ...confirm } : { action: from.action, ids: [...from.ids], options: jobOptions(from.options ?? {}), ...confirm };
+    const key = options.idempotencyKey ?? `sdk-${crypto.randomUUID().replaceAll("-", "").slice(0, 12)}`;
+    return (await this.http.json<SandboxJob>({ method: "POST", path: "/v1/sandbox-jobs", body, headers: { "Idempotency-Key": key }, replay: true })).body;
+  }
+
+  async get(id: string): Promise<SandboxJob> {
+    return (await this.http.json<SandboxJob>({ method: "GET", path: `/v1/sandbox-jobs/${encodeURIComponent(id)}`, replay: true })).body;
+  }
+
+  /** The organization's last 50 jobs, the newest first. */
+  async list(): Promise<SandboxJob[]> {
+    return (await this.http.json<{ jobs: SandboxJob[] }>({ method: "GET", path: "/v1/sandbox-jobs", replay: true })).body.jobs;
+  }
+
+  /** A page of a job's items, in order, each with its state, why, and what it made or follows. */
+  async items(id: string, options: { state?: string; limit?: number; cursor?: string } = {}): Promise<{ items: SandboxJobItem[]; nextCursor: string | null }> {
+    const query: Record<string, string> = {};
+    if (options.state) query["state"] = options.state;
+    if (options.limit !== undefined) query["limit"] = String(options.limit);
+    if (options.cursor) query["cursor"] = options.cursor;
+    return (await this.http.json<{ items: SandboxJobItem[]; nextCursor: string | null }>({ method: "GET", path: `/v1/sandbox-jobs/${encodeURIComponent(id)}/items`, query, replay: true })).body;
+  }
+
+  /** No item that has not begun begins; those under way are followed to their end. */
+  async cancel(id: string): Promise<SandboxJob> {
+    return (await this.http.json<SandboxJob>({ method: "POST", path: `/v1/sandbox-jobs/${encodeURIComponent(id)}/cancel`, replay: true })).body;
+  }
+
+  /** Reads the job until it has ended, telling onProgress each time, and answers it ended. */
+  async wait(id: string, options: { onProgress?: (job: SandboxJob) => void; signal?: AbortSignal } = {}): Promise<SandboxJob> {
+    for (;;) {
+      const job = await this.get(id);
+      options.onProgress?.(job);
+      if (job.state !== "running") {
+        return job;
+      }
+      await sleep(this.http.pollIntervalMs, options.signal);
+    }
+  }
+}
+
+function jobOptions(options: SandboxJobOptions): Record<string, unknown> {
+  const { at, ...rest } = options;
+  return { ...rest, ...(at === undefined ? {} : { at: at instanceof Date ? at.toISOString() : at }) };
 }
 
 class Sandboxes {
@@ -133,45 +265,34 @@ class Sandboxes {
    * sandbox that changes while the pages are read can be missed or met twice.
    */
   async page(filter: SandboxFilter = {}, options: { sort?: SandboxSort; limit?: number; cursor?: string } = {}): Promise<SandboxPage> {
-    const query: Record<string, string | string[]> = {};
-    const many = (name: string, value: string | readonly string[] | undefined) => {
+    const query = filterQuery(filter);
+    const many = (name: string, value: string | undefined) => {
       if (value !== undefined) {
-        query[name] = typeof value === "string" ? value : [...value];
+        query[name] = value;
       }
     };
-    const time = (value: string | Date | undefined) => (value instanceof Date ? value.toISOString() : value);
-    many("tag", filter.tag);
-    many("notTag", filter.notTag);
-    many("status", filter.status);
-    many("size", filter.size);
-    many("region", filter.region);
-    many("templateId", filter.templateId);
-    many("createdBy", filter.createdBy);
-    many("outbound", filter.outbound);
-    many("createdAfter", time(filter.createdAfter));
-    many("createdBefore", time(filter.createdBefore));
-    many("stoppedBefore", time(filter.stoppedBefore));
-    many("stopsBefore", time(filter.stopsBefore));
-    many("stops", filter.stops);
-    many("q", filter.text);
-    if (filter.archived !== undefined) {
-      query["archived"] = String(filter.archived);
-    }
-    if (filter.memoryKept !== undefined) {
-      query["memoryKept"] = String(filter.memoryKept);
-    }
-    for (const [key, value] of Object.entries(filter.metadata ?? {})) {
-      query[`metadata[${key}]`] = value;
-    }
-    for (const [key, value] of Object.entries(filter.notMetadata ?? {})) {
-      query[`notMetadata[${key}]`] = value;
-    }
     many("sort", options.sort);
     many("limit", options.limit === undefined ? undefined : String(options.limit));
     many("cursor", options.cursor);
     const { body } = await this.http.json<{ sandboxes: SandboxInfo[]; nextCursor?: string | null }>({ method: "GET", path: "/v1/sandboxes", query, replay: true });
     // An API from before pages answers every sandbox at once, and no nextCursor.
     return { sandboxes: body.sandboxes.map((info) => new Sandbox(this.http, info)), nextCursor: body.nextCursor ?? null };
+  }
+
+  /**
+   * How many sandboxes the filter finds and what they cost: an hour as each is charged now, and
+   * since midnight UTC today; what the running among them would cost stopped; and, for each field
+   * in facets (status, size, region, templateId, tag, outbound, metadataKeys, metadata.<key>), the
+   * count and hourly cost of each value. Money is in millionths of a US dollar. Spent is for the
+   * sandboxes found, not the account: the account's whole month is on billing.
+   */
+  async summary(filter: SandboxFilter = {}, options: { facets?: readonly string[] } = {}): Promise<SandboxSummary> {
+    const query = filterQuery(filter);
+    if (options.facets !== undefined && options.facets.length > 0) {
+      query["facets"] = options.facets.join(",");
+    }
+    const { body } = await this.http.json<SandboxSummary>({ method: "GET", path: "/v1/sandbox-summary", query, replay: true });
+    return body;
   }
 
   /**
@@ -351,6 +472,8 @@ export class Agental {
   readonly apiKeys: ApiKeys;
   /** The organizations the key's person is in, and the members and invites of a team. */
   readonly organizations: Organizations;
+  /** Jobs that act on many sandboxes at once: a preview fixes the set, a job acts on exactly it. */
+  readonly jobs: SandboxJobs;
   private readonly http: Http;
 
   constructor(options: AgentalOptions = {}) {
@@ -360,6 +483,7 @@ export class Agental {
     this.templates = new Templates(this.http);
     this.apiKeys = new ApiKeys(this.http);
     this.organizations = new Organizations(this.http);
+    this.jobs = new SandboxJobs(this.http);
   }
 
   /** The regions sandboxes can be made in now, the default first, with the sizes each has room for. */

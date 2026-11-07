@@ -48,6 +48,7 @@ function sandbox(changes: Partial<SandboxInfo> = {}): SandboxInfo {
     size: "small",
     status: "running",
     hostId: null,
+    activity: null,
     vmIsolation: true,
     resources: { vcpu: 1, memoryMb: 2048, diskGb: 10 },
     error: null,
@@ -1779,6 +1780,40 @@ test("a list follows every page, and a page is read alone with its filter, sort 
   assert.equal(sent[2]?.path, `/v1/sandboxes?createdAfter=${encodeURIComponent("2026-11-06T00:00:00.000Z")}&q=b&sort=-created&limit=1`);
 
   assert.equal((await agental.sandboxes.list()).length, 2);
+});
+
+test("a summary is asked with the list's filter and the facets named, and answered as the API says it", async () => {
+  const counted = {
+    since: "2026-11-07T00:00:00.000Z",
+    total: { count: 2, microsPerHour: 108000, spentMicros: 1200 },
+    byState: { running: { count: 2, microsPerHour: 108000, spentMicros: 1200 } },
+    ifStopped: { microsPerHour: 5400, withMemoryMicrosPerHour: 10800 },
+    facets: { "metadata.repo": { values: [{ value: "acme/web", count: 2, microsPerHour: 108000 }], more: 0 } },
+  };
+  const { agental, sent } = scripted(json(200, counted));
+  const summary = await agental.sandboxes.summary({ status: "running", metadata: { repo: "*" } }, { facets: ["status", "metadata.repo"] });
+  assert.equal(summary.total.microsPerHour, 108000);
+  assert.equal(sent[0]?.path, `/v1/sandbox-summary?status=running&${encodeURIComponent("metadata[repo]")}=${encodeURIComponent("*")}&facets=${encodeURIComponent("status,metadata.repo")}`);
+});
+
+test("a job is previewed by a filter, made from the preview with a key that makes it once, and waited on to its end", async () => {
+  const counts = { pending: 0, acting: 0, accepted: 0, done: 2, skipped: 0, failed: 0, uncertain: 0 };
+  const job = { id: "sjb_1", action: "stop", options: {}, state: "running", total: 2, counts, createdAt: "2026-11-07T00:00:00.000Z", endedAt: null, problems: [] };
+  const { agental, sent } = scripted(
+    json(201, { id: "sjp_1", action: "stop", options: {}, count: 2, sample: [], microsPerHour: { now: 108000, after: 5400 }, expiresAt: "2026-11-07T00:15:00.000Z" }),
+    json(202, job),
+    json(200, job),
+    json(200, { ...job, state: "done", endedAt: "2026-11-07T00:01:00.000Z" }),
+  );
+  const preview = await agental.jobs.preview("stop", { filter: { status: "running", tag: "ci" } }, { keepMemory: true });
+  assert.deepEqual(sent[0]?.body, { action: "stop", options: { keepMemory: true }, select: { filter: { status: "running", tag: "ci" } } });
+  const made = await agental.jobs.create({ previewId: preview.id }, { idempotencyKey: "nightly-stop-1" });
+  assert.equal(sent[1]?.headers.get("idempotency-key"), "nightly-stop-1");
+  assert.deepEqual(sent[1]?.body, { previewId: "sjp_1" });
+  const seen: string[] = [];
+  const done = await agental.jobs.wait(made.id, { onProgress: (each) => seen.push(each.state) });
+  assert.deepEqual([done.state, seen], ["done", ["running", "done"]]);
+  assert.equal(sent[3]?.path, "/v1/sandbox-jobs/sjb_1");
 });
 
 test("a template is made with tags and metadata, changed, and tagged", async () => {

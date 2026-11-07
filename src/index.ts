@@ -1,4 +1,4 @@
-export { Agental, type SandboxFilter, type SandboxPage, type SandboxSort } from "./client.js";
+export { Agental, type SandboxFilter, type SandboxJobAction, type SandboxJobOptions, type SandboxPage, type SandboxSort } from "./client.js";
 export { AgentalError, ApiError, ConnectionError, ProxyError, TimeoutError } from "./errors.js";
 export type { BurstRefusalCode } from "./errors.js";
 export type { AgentalOptions } from "./http.js";
@@ -50,6 +50,10 @@ export type {
   SandboxAutoStop,
   SandboxEmail,
   SandboxInfo,
+  SandboxSummary,
+  SandboxJob,
+  SandboxJobItem,
+  SandboxJobPreview,
   SandboxMetrics,
   SandboxNetwork,
   SandboxNetworkDetail,

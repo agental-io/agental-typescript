@@ -4,6 +4,22 @@ type Schemas = components["schemas"];
 
 /** A sandbox as the API reports it. */
 export type SandboxInfo = Schemas["Sandbox"];
+/** What a filter finds, counted and costed: GET /v1/sandbox-summary. Money is in millionths of a US dollar; spent is since midnight UTC. */
+export type SandboxSummary = Schemas["SandboxSummary"];
+/** A job that acts on many sandboxes: its state, its items counted by state, and its first problems. */
+export type SandboxJob = Schemas["SandboxJob"];
+/** The sandboxes a job would act on, fixed, and what they cost an hour before and after. */
+export type SandboxJobPreview = Schemas["SandboxJobPreview"];
+/** One sandbox of a job: its state, why, and what it made or follows. */
+export interface SandboxJobItem {
+  id: string;
+  sandboxId: string;
+  state: "pending" | "acting" | "accepted" | "done" | "skipped" | "failed" | "uncertain";
+  reason: string | null;
+  link: Record<string, string>;
+  startedAt: string | null;
+  endedAt: string | null;
+}
 export type SandboxStatus = SandboxInfo["status"];
 /**
  * When a running sandbox is to be stopped, how many seconds that is from now, and what
