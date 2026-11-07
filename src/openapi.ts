@@ -111,7 +111,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Fixes the sandboxes a job would act on, and does nothing to them: those the filter finds (the list's filters, not limit or cursor), or the IDs named, that the caller may act on. Answers how many, the first of them, what they cost an hour now and would after, and when the preview expires. A job made from it acts on exactly these, and on no sandbox that comes into the filter later. A key needs the action the single call takes: sandbox.stop for stop and archive, sandbox.resume for start, snapshot.write, sandbox.auto-stop to set a stop time and sandbox.update to take it away, sandbox.update for labels, sandbox.delete for delete (or sandbox.delete-own, which deletes only the sandboxes the key made). */
+        /** @description Fixes the sandboxes a job would act on, and does nothing to them: those the filter finds (the list's filters, not limit or cursor), or the IDs named, that the caller may act on. Answers how many, the first of them, what they cost an hour now and would after, and when the preview expires. A job made from it acts on exactly these, and on no sandbox that comes into the filter later. A key needs the action the single call takes: sandbox.stop for stop and archive, sandbox.resume for start, snapshot.write, sandbox.auto-stop to set a stop time and sandbox.update to take it away, sandbox.update for labels. */
         post: operations["previewSandboxJob"];
         delete?: never;
         options?: never;
@@ -2890,22 +2890,6 @@ export interface components {
             /** @description Why the memory its last stop kept was not put back by its last start, which started it from its disk: as after an upgrade of the server it is on, which the memory cannot be put back across. Null when it was put back, or none was kept. */
             memoryLost: string | null;
             network: components["schemas"]["SandboxNetwork"];
-            /** @description What it is doing, as last read: null when it is not running, not read yet, or where GET /v1/policy says metrics is false. */
-            activity: {
-                /** @description low-cpu: for the last hour, observed with enough coverage, its CPU at its busiest stayed under the line (5% of its vCPUs unless the deployment sets another). A heuristic: an agent waiting on a model or a download is busy with almost no CPU, and nothing acts on it by itself. disk-full, memory-full: at or over the line (90%). not-read: its server has not answered for 3 minutes, and none of the others is said. */
-                states: ("low-cpu" | "disk-full" | "memory-full" | "not-read")[];
-                /** @description Its CPU now, 0 to 1 of its vCPUs. */
-                cpuNow: number | null;
-                /** @description Its CPU at its busiest in the last hour, 0 to 1 of its vCPUs. */
-                cpuMaxLastHour: number | null;
-                /** @description How many of the last hour's minutes were read, since its current run began on its current server. */
-                observedMinutes: number;
-                memoryUsedBytes: number | null;
-                memoryTotalBytes: number | null;
-                diskUsedBytes: number | null;
-                diskTotalBytes: number | null;
-                readAt: string;
-            } | null;
             /**
              * @description Its template's tags and its own, each once: the template's first. A change to its template's tags shows here at once. GET /v1/sandboxes?tag= finds sandboxes by them.
              * @example [
@@ -3150,7 +3134,7 @@ export interface components {
         SandboxJobPreview: {
             id: string;
             /** @enum {string} */
-            action: "stop" | "start" | "archive" | "snapshot" | "auto-stop" | "labels" | "delete";
+            action: "stop" | "start" | "archive" | "snapshot" | "auto-stop" | "labels";
             options: {
                 /** @description For stop: keep their memory as well as their disks. */
                 keepMemory?: boolean;
@@ -3185,7 +3169,7 @@ export interface components {
         SandboxJob: {
             id: string;
             /** @enum {string} */
-            action: "stop" | "start" | "archive" | "snapshot" | "auto-stop" | "labels" | "delete";
+            action: "stop" | "start" | "archive" | "snapshot" | "auto-stop" | "labels";
             options: {
                 /** @description For stop: keep their memory as well as their disks. */
                 keepMemory?: boolean;
@@ -5545,13 +5529,9 @@ export interface operations {
                 memoryKept?: string;
                 /** @description An outbound rule: open, blocked or allowlist. Sent more than once, or with commas, any of them. */
                 outbound?: string | string[];
-                /** @description What they are doing: low-cpu, disk-full, memory-full or not-read. Sent more than once, or with commas, any of them. Only where GET /v1/policy says metrics. */
-                activity?: string | string[];
-                /** @description What they are not doing: none of these states. */
-                notActivity?: string | string[];
                 /** @description Text found in the name or the ID, case ignored. */
                 q?: string;
-                /** @description created (the default, oldest first), -created, name, -name, status, -status, stopped or -stopped (a sandbox not stopped last), cost or -cost (what it is charged an hour now), -cpu, -memory or -disk (the busiest or fullest first, those not read last). Only created and -created keep a walk through the pages exact while sandboxes change. */
+                /** @description created (the default, oldest first), -created, name, -name, status, -status, stopped or -stopped (a sandbox not stopped last), cost or -cost (what it is charged an hour now). Only created and -created keep a walk through the pages exact while sandboxes change. */
                 sort?: string;
                 /** @description How many sandboxes one answer holds, 1 to 200. Left out, every sandbox that matches is answered at once. */
                 limit?: string;
@@ -5754,13 +5734,9 @@ export interface operations {
                 memoryKept?: string;
                 /** @description An outbound rule: open, blocked or allowlist. Sent more than once, or with commas, any of them. */
                 outbound?: string | string[];
-                /** @description What they are doing: low-cpu, disk-full, memory-full or not-read. Sent more than once, or with commas, any of them. Only where GET /v1/policy says metrics. */
-                activity?: string | string[];
-                /** @description What they are not doing: none of these states. */
-                notActivity?: string | string[];
                 /** @description Text found in the name or the ID, case ignored. */
                 q?: string;
-                /** @description Fields to count values of, by commas or sent more than once: status, size, region, templateId, tag, outbound, metadataKeys, activity, or metadata.<key>. */
+                /** @description Fields to count values of, by commas or sent more than once: status, size, region, templateId, tag, outbound, metadataKeys, or metadata.<key>. */
                 facets?: string | string[];
             };
             header?: never;
@@ -5809,7 +5785,7 @@ export interface operations {
             content: {
                 "application/json": {
                     /** @enum {string} */
-                    action: "stop" | "start" | "archive" | "snapshot" | "auto-stop" | "labels" | "delete";
+                    action: "stop" | "start" | "archive" | "snapshot" | "auto-stop" | "labels";
                     options?: {
                         /** @description For stop: keep their memory as well as their disks. */
                         keepMemory?: boolean;
@@ -5928,10 +5904,8 @@ export interface operations {
             content: {
                 "application/json": {
                     previewId?: string;
-                    /** @description For delete, required: the count of sandboxes its preview showed. Another count is refused, and nothing is deleted. */
-                    confirm?: number;
                     /** @enum {string} */
-                    action?: "stop" | "start" | "archive" | "snapshot" | "auto-stop" | "labels" | "delete";
+                    action?: "stop" | "start" | "archive" | "snapshot" | "auto-stop" | "labels";
                     options?: {
                         /** @description For stop: keep their memory as well as their disks. */
                         keepMemory?: boolean;
@@ -5964,15 +5938,6 @@ export interface operations {
                     "application/json": components["schemas"]["SandboxJob"];
                 };
             };
-            /** @description confirm_required: a delete is made with confirm, the count its preview showed. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
             /** @description Missing or invalid API key. */
             401: {
                 headers: {
@@ -5991,7 +5956,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description preview_expired: preview again; the set it finds then is the one acted on. confirm_mismatch: confirm is not the count the preview holds; nothing was deleted. */
+            /** @description preview_expired: preview again; the set it finds then is the one acted on. */
             409: {
                 headers: {
                     [name: string]: unknown;

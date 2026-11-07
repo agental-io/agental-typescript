@@ -57,7 +57,7 @@ function environment(name: string): string | undefined {
 }
 
 /**
- * What every request says it is, where the runtime lets it: agental-typescript/0.2.0. A
+ * What every request says it is, where the runtime lets it: agental-typescript/0.1.0. A
  * browser sends its own User-Agent, and asked for another it would ask the API first whether
  * it may, so in a browser none is set.
  */
