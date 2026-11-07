@@ -48,6 +48,7 @@ function sandbox(changes: Partial<SandboxInfo> = {}): SandboxInfo {
     size: "small",
     status: "running",
     hostId: null,
+    activity: null,
     vmIsolation: true,
     resources: { vcpu: 1, memoryMb: 2048, diskGb: 10 },
     error: null,

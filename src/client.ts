@@ -122,7 +122,7 @@ function filterQuery(filter: SandboxFilter): Record<string, string | string[]> {
 }
 
 /** What a job does to each sandbox, and how. */
-export type SandboxJobAction = "stop" | "start" | "archive" | "snapshot" | "auto-stop" | "labels";
+export type SandboxJobAction = "stop" | "start" | "archive" | "snapshot" | "auto-stop" | "labels" | "delete";
 export interface SandboxJobOptions {
   /** For stop: keep their memory too. */
   keepMemory?: boolean;
@@ -159,8 +159,13 @@ class SandboxJobs {
    * Makes a job from a preview, or from sandbox IDs named outright. Sent again with the same
    * idempotencyKey, the same job is answered.
    */
-  async create(from: { previewId: string } | { action: SandboxJobAction; ids: readonly string[]; options?: SandboxJobOptions }, options: { idempotencyKey?: string } = {}): Promise<SandboxJob> {
-    const body = "previewId" in from ? { previewId: from.previewId } : { action: from.action, ids: [...from.ids], options: jobOptions(from.options ?? {}) };
+  async create(
+    from: { previewId: string; confirm?: number } | { action: SandboxJobAction; ids: readonly string[]; options?: SandboxJobOptions; confirm?: number },
+    options: { idempotencyKey?: string } = {},
+  ): Promise<SandboxJob> {
+    // A delete is made with confirm: the count its preview showed.
+    const confirm = from.confirm === undefined ? {} : { confirm: from.confirm };
+    const body = "previewId" in from ? { previewId: from.previewId, ...confirm } : { action: from.action, ids: [...from.ids], options: jobOptions(from.options ?? {}), ...confirm };
     const key = options.idempotencyKey ?? `sdk-${crypto.randomUUID().replaceAll("-", "").slice(0, 12)}`;
     return (await this.http.json<SandboxJob>({ method: "POST", path: "/v1/sandbox-jobs", body, headers: { "Idempotency-Key": key }, replay: true })).body;
   }
