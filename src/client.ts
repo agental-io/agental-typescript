@@ -66,6 +66,10 @@ export interface SandboxFilter {
   memoryKept?: boolean;
   /** open, blocked or allowlist. */
   outbound?: string | readonly string[];
+  /** What they are doing: low-cpu, disk-full, memory-full or not-read. Any of them. */
+  activity?: string | readonly string[];
+  /** None of these. */
+  notActivity?: string | readonly string[];
   /** Each key at this value; "*" for any value, the key being set. */
   metadata?: Record<string, string>;
   /** No key at this value; "*" for the key not being set. */
@@ -75,7 +79,7 @@ export interface SandboxFilter {
 }
 
 /** How a page of sandboxes is sorted. Only created and -created keep a walk through the pages exact while sandboxes change. */
-export type SandboxSort = "created" | "-created" | "name" | "-name" | "status" | "-status" | "stopped" | "-stopped" | "cost" | "-cost";
+export type SandboxSort = "created" | "-created" | "name" | "-name" | "status" | "-status" | "stopped" | "-stopped" | "cost" | "-cost" | "-cpu" | "-memory" | "-disk";
 
 /** A page of sandboxes, and what to pass as cursor for the next one: null when this is the last. */
 export interface SandboxPage {
@@ -100,6 +104,8 @@ function filterQuery(filter: SandboxFilter): Record<string, string | string[]> {
   many("templateId", filter.templateId);
   many("createdBy", filter.createdBy);
   many("outbound", filter.outbound);
+  many("activity", filter.activity);
+  many("notActivity", filter.notActivity);
   many("createdAfter", time(filter.createdAfter));
   many("createdBefore", time(filter.createdBefore));
   many("stoppedBefore", time(filter.stoppedBefore));

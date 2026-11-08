@@ -2747,6 +2747,93 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/egress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Where the account stands for residential egress: whether it may send a sandbox's web traffic out through a residential address, what it still needs before it may, what that traffic has cost this month against its budget, and whether it is refused now. */
+        get: operations["getEgress"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/egress/business": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Tells us the account's company, website and what its sandboxes will use residential addresses for, in place of what it said before. It is kept on the account, and we may refuse residential egress on it. With a plan of Fleet or larger and a card saved, the account may then turn it on for its sandboxes. */
+        put: operations["setEgressBusiness"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/egress/budget": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Sets the most the account's residential traffic costs in a month. Past it, its residential connections are refused, within a minute, until the month ends or the budget is raised. */
+        put: operations["setEgressBudget"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sandboxes/{id}/egress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Where the sandbox's web traffic leaves: from its server, or through a residential address in a country. GET /v1/egress says whether the account's residential traffic is refused now. */
+        get: operations["getSandboxEgress"];
+        /** @description Sets where the sandbox's web traffic leaves, running or stopped, without a restart: new connections take it within seconds of the answer, and connections already open are not moved. residential: its TCP to ports 80 and 443 leaves through a residential address in country, at $3 a GB both directions, from the account's credits, and its UDP to port 443 is refused so HTTP/3 falls back to TCP; box: from its server again. Takes the action network.write. */
+        put: operations["setSandboxEgress"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/templates/{id}/egress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Where the web traffic of a sandbox made on the template leaves, unless its create says otherwise. */
+        get: operations["getTemplateEgress"];
+        /** @description Sets where the web traffic of each sandbox made on the template from now on leaves, unless its create says otherwise. Sandboxes already on it keep their own: PUT /v1/sandboxes/{id}/egress changes one. Takes the action network.write. */
+        put: operations["setTemplateEgress"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3050,6 +3137,7 @@ export interface components {
             metadata?: {
                 [key: string]: string;
             };
+            egress?: components["schemas"]["EgressInput"];
         };
         /** @description Addresses the sandbox may reach on top of its template's outbound rule. It is held to the two from its first boot, so it never runs open first. Left out, it has none of its own. The rule itself is its template's: PUT /v1/templates/{id}/network. PUT /v1/sandboxes/{id}/network changes its own addresses later, while it runs. A fork has its source's. Sending outbound here is refused with rule_on_template. Only where GET /v1/policy says networkPolicy. */
         SandboxOwnNetworkInput: {
@@ -3060,6 +3148,26 @@ export interface components {
              *     ]
              */
             allow: string[];
+        };
+        /** @description Where its web traffic leaves, from its first boot. Left out, its template's (GET /v1/templates/{id}/egress); {"via": "box"} leaves from its server whatever its template says. PUT /v1/sandboxes/{id}/egress changes it later. A fork has its source's. residential asks that the account may use it: GET /v1/egress. Only where GET /v1/policy says residentialEgress. */
+        EgressInput: {
+            /**
+             * @description box: from the server the sandbox is on, as every sandbox's does unless it asks otherwise, for nothing. residential: its TCP to ports 80 and 443 leaves through a residential address in country, charged at $3 a GB, both directions counted, from the account's credits; its UDP to port 443 is refused, so HTTP/3 falls back to TCP; other ports leave from its server as before.
+             * @example residential
+             * @enum {string}
+             */
+            via: "box" | "residential";
+            /**
+             * @description With residential: the country the address is in, as two letters of ISO 3166-1, such as de or us. Not with box.
+             * @example de
+             */
+            country?: string;
+            /**
+             * @description With residential: sticky keeps one address for the sandbox for as long as it holds, as a person's browser would; rotating gives each connection another. Left out, sticky. Not with box.
+             * @example sticky
+             * @enum {string}
+             */
+            session?: "sticky" | "rotating";
         };
         SandboxList: {
             sandboxes: components["schemas"]["Sandbox"][];
@@ -4626,6 +4734,8 @@ export interface components {
             networkPolicy: boolean;
             /** @description Whether a variable can be kept out of its sandbox: set with hosts, its commands see a stand-in, and the proxy on the sandbox's server puts the value in on HTTPS requests to those hosts. False, a save with hosts answers 501 hidden_variables_unavailable, and a variable already kept out stays out. */
             hiddenVariables: boolean;
+            /** @description Whether a sandbox's web traffic can leave through a residential address, at $3 a GB: PUT /v1/sandboxes/{id}/egress, and egress on a create or a template. GET /v1/egress says whether the account may. False, asking for it answers 501 residential_egress_unavailable. */
+            residentialEgress: boolean;
             /** @description Whether a sandbox's CPU, memory, disk and network are read and kept: GET /v1/sandboxes/{id}/metrics and GET /v1/metrics. False, both answer 501 metrics_unavailable. GET /v1/metrics/running answers either way. */
             metrics: boolean;
             /** @description Whether an account can have its sandboxes' metrics and lifecycle events sent to a collector of its own, over OTLP/HTTP: GET, PUT and DELETE /v1/telemetry, and POST /v1/telemetry/test. Metrics are sent only where metrics is true as well. False, those calls answer 501 telemetry_unavailable. */
@@ -5377,6 +5487,79 @@ export interface components {
             firstPaidAt: string | null;
             /** @description Always null: nothing raises an account but a change of plan. */
             next: null;
+        };
+        EgressAccount: {
+            /** @description Whether this deployment offers residential egress at all, as GET /v1/policy says residentialEgress. */
+            offered: boolean;
+            /** @description Whether a sandbox of this account may go out residential now: offered, nothing missing, and not refused. */
+            enabled: boolean;
+            /** @description What the account still needs: plan, to be on Fleet ($100 a month) or a larger plan; card, a card saved; business, its company, website and intended use, with PUT /v1/egress/business. */
+            missing: ("plan" | "card" | "business")[];
+            /** @description Set when we refused the account residential egress: its sandboxes' residential traffic is refused until we lift it. */
+            refused: {
+                reason: string;
+                at: string;
+            } | null;
+            /** @description What the account told us of itself, or null. */
+            business: {
+                company: string;
+                website: string;
+                intendedUse: string;
+                submittedAt: string;
+            } | null;
+            /** @description What a GB of residential traffic costs, both directions counted, in millionths of a US dollar: 3000000 is $3. */
+            microsPerGb: number;
+            /** @description What its residential traffic has cost this month, in millionths of a US dollar. It is part of usedMicros in GET /v1/billing. */
+            spentMicros: number;
+            /** @description The most its residential traffic costs in a month. Past it, residential connections are refused until the month ends or the budget is raised. */
+            budgetMicros: number;
+            /** @description Whether the account set its budget. False: it is defaultBudgetMicros. */
+            budgetSet: boolean;
+            defaultBudgetMicros: number;
+            /**
+             * @description Why its residential connections are refused now, or null when they are not: refused, by us; out_of_credit, the credits ran out and an auto-reload did not cover it; budget_reached, this month's budget is spent; plan, the account is no longer on a plan that offers it. It is checked each minute, so a change shows within one.
+             * @enum {string|null}
+             */
+            blocked: "refused" | "out_of_credit" | "budget_reached" | "plan" | null;
+        };
+        EgressBusiness: {
+            /**
+             * @description The company's legal name.
+             * @example Example Labs Ltd
+             */
+            company: string;
+            /**
+             * Format: uri
+             * @description Its website.
+             * @example https://example.com
+             */
+            website: string;
+            /**
+             * @description What its sandboxes will use residential addresses for, in a few sentences: the sites, and why they need it.
+             * @example Our agents test our customers' sign-up flows from the countries they sell in, behind Cloudflare Turnstile.
+             */
+            intendedUse: string;
+        };
+        EgressBudget: {
+            /**
+             * @description The most the account's residential traffic costs in a month, in millionths of a US dollar: 0 refuses all of it. null gives it the default again, $50.
+             * @example 50000000
+             */
+            budgetMicros: number | null;
+        };
+        Egress: {
+            /** @enum {string} */
+            via: "box" | "residential";
+            /**
+             * @description With residential, the country, in lower case. Null with box.
+             * @example de
+             */
+            country: string | null;
+            /**
+             * @description With residential, sticky or rotating. Null with box.
+             * @enum {string|null}
+             */
+            session: "sticky" | "rotating" | null;
         };
     };
     responses: never;
@@ -17680,6 +17863,386 @@ export interface operations {
             };
             /** @description The account behind the key is gone. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getEgress: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Where the account stands. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EgressAccount"];
+                };
+            };
+            /** @description invalid_request. The key belongs to no account. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    setEgressBusiness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EgressBusiness"];
+            };
+        };
+        responses: {
+            /** @description Kept, and the account as it stands now. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EgressAccount"];
+                };
+            };
+            /** @description invalid_request: a field is missing, too long, or website is not an address. The key belongs to no account. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description role_required: in a team, only an owner says this. egress_refused: we refused the account residential egress. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description residential_egress_unavailable: GET /v1/policy says residentialEgress is false. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    setEgressBudget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EgressBudget"];
+            };
+        };
+        responses: {
+            /** @description The budget is set, and the account as it stands now. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EgressAccount"];
+                };
+            };
+            /** @description invalid_request. The budget is not a whole number from 0 to 100000000000, or null, or the key belongs to no account. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description role_required: in a team, only an owner sets its budget. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description residential_egress_unavailable: GET /v1/policy says residentialEgress is false. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getSandboxEgress: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Where its web traffic leaves. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Egress"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    setSandboxEgress: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EgressInput"];
+            };
+        };
+        responses: {
+            /** @description Where its web traffic leaves from now on. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Egress"];
+                };
+            };
+            /** @description invalid_request: residential without country, or country or session with box. Nothing was changed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description egress_not_enabled: the account may not go out residential yet, and missing says what it lacks (GET /v1/egress). egress_refused: we refused it. Nothing was changed. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description residential_egress_unavailable: residential was asked for where GET /v1/policy says residentialEgress is false. Nothing was changed. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getTemplateEgress: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Where a new sandbox's web traffic leaves. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Egress"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    setTemplateEgress: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EgressInput"];
+            };
+        };
+        responses: {
+            /** @description Where a new sandbox's web traffic leaves from now on. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Egress"];
+                };
+            };
+            /** @description invalid_request: residential without country, or country or session with box. Nothing was changed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description egress_not_enabled: the account may not go out residential yet, and missing says what it lacks (GET /v1/egress). egress_refused: we refused it. Nothing was changed. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description residential_egress_unavailable: residential was asked for where GET /v1/policy says residentialEgress is false. Nothing was changed. */
+            501: {
                 headers: {
                     [name: string]: unknown;
                 };
