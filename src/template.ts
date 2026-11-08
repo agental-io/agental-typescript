@@ -13,6 +13,8 @@ import type {
   TemplateSandbox,
   TemplateSsh,
   TemplateStart,
+  Egress,
+  EgressInput,
 } from "./types.js";
 
 /**
@@ -244,6 +246,22 @@ export class Template {
     const set = (await this.http.json<TemplateNetwork>({ method: "PUT", path: `${this.path}/network`, body: rule, replay: true })).body;
     this.info = { ...this.info, network: set };
     return set;
+  }
+
+  /** Where the web traffic of a sandbox made from it leaves. One that was never set is box: from its server. */
+  async egress(): Promise<Egress> {
+    return (await this.http.json<Egress>({ method: "GET", path: `${this.path}/egress`, replay: true })).body;
+  }
+
+  /**
+   * Sets where the web traffic of a sandbox made from it from now on leaves: { via: "box" },
+   * or { via: "residential", country: "de" }. A sandbox already made keeps its own, and one
+   * made with egress of its own has that. Residential asks that the account may use it:
+   * client.egress(). It takes a key with network.write. Only where policy() says
+   * residentialEgress.
+   */
+  async setEgress(egress: EgressInput): Promise<Egress> {
+    return (await this.http.json<Egress>({ method: "PUT", path: `${this.path}/egress`, body: egress, replay: true })).body;
   }
 
   /** What a sandbox made from it is given for SSH as it is made: whether SSH is turned on, and the keys let in. */

@@ -31,6 +31,8 @@ import type {
   SetAutoStop,
   Size,
   Snapshot,
+  Egress,
+  EgressInput,
 } from "./types.js";
 
 /** A create answers when the machine is ready, usually in under a minute. The API says to allow it three. */
@@ -114,6 +116,14 @@ export interface CreateOptions extends BurstOptions {
    * networkPolicy.
    */
   network?: SandboxOwnNetwork;
+  /**
+   * Where its web traffic leaves, from its first boot: { via: "residential", country: "de" }
+   * sends its TCP to ports 80 and 443 out through a residential address in Germany, charged
+   * at $3 a GB from the account's credits. Left out, its template's; { via: "box" } leaves
+   * from its server whatever the template says. Residential asks that the account may use it:
+   * client.egress(). It takes a key with network.write. Only where policy() says residentialEgress.
+   */
+  egress?: EgressInput;
   /**
    * OpenSSH public key lines let in as root as it is made, on top of the keys its template
    * lets in. It turns nothing on: SSH is on as it is made only where its template says so,
@@ -920,6 +930,22 @@ export class Sandbox {
     const detail = (await this.http.json<SandboxNetworkDetail>({ method: "PUT", path: `${this.path}/network`, body: own, replay: true })).body;
     this.info = { ...this.info, network: { outbound: detail.outbound, allow: detail.allow } };
     return detail;
+  }
+
+  /** Where its web traffic leaves: from its server (box), or through a residential address in a country. */
+  async egress(): Promise<Egress> {
+    return (await this.http.json<Egress>({ method: "GET", path: `${this.path}/egress`, replay: true })).body;
+  }
+
+  /**
+   * Sets where its web traffic leaves, in place of what it had: { via: "box" }, or
+   * { via: "residential", country: "us", session: "rotating" }. New connections take it
+   * within seconds, without a restart, and connections already open are not moved.
+   * Residential asks that the account may use it: client.egress(). It takes a key with
+   * network.write. Only where policy() says residentialEgress.
+   */
+  async setEgress(egress: EgressInput): Promise<Egress> {
+    return (await this.http.json<Egress>({ method: "PUT", path: `${this.path}/egress`, body: egress, replay: true })).body;
   }
 
   /**

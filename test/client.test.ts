@@ -17,6 +17,7 @@ import {
   type Billing,
   type Burst,
   type BurstQuote,
+  type EgressAccount,
   type EmailMessageSummary,
   type HiddenVariable,
   type MetricsAtMoment,
@@ -1946,4 +1947,64 @@ test("a schedule that runs once is asked to delete its sandbox after with delete
   assert.equal(made.deleteAfter, true);
   assert.deepEqual(sent[1]?.body, { command: "./finish.sh", at: "2026-11-04T09:00:00Z", deleteAfter: true });
   assert.equal((await box.schedules.runs("sch_1"))[0]?.deletedSandbox, true);
+});
+
+function egressAccount(changes: Partial<EgressAccount> = {}): EgressAccount {
+  return {
+    offered: true,
+    enabled: false,
+    missing: ["use_case"],
+    refused: null,
+    useCase: null,
+    microsPerGb: 3_000_000,
+    spentMicros: 0,
+    budgetMicros: 50_000_000,
+    budgetSet: false,
+    defaultBudgetMicros: 50_000_000,
+    blocked: null,
+    ...changes,
+  };
+}
+
+test("residential egress: the account's standing is read, its use case told and its budget set, and a sandbox and a template are sent out residential", async () => {
+  const useCase = "Our agents test our customers' sign-up flows from the countries they sell in.";
+  const residential = { via: "residential" as const, country: "de", session: "sticky" as const };
+  const { agental, sent } = scripted(
+    json(200, egressAccount()),
+    json(200, egressAccount({ enabled: true, missing: [], useCase: { text: useCase, submittedAt: "2026-11-08T00:00:00.000Z" } })),
+    json(200, egressAccount({ enabled: true, missing: [], budgetMicros: 0, budgetSet: true })),
+    json(200, egressAccount({ enabled: true, missing: [] })),
+    json(201, sandbox()),
+    json(200, residential),
+    json(200, { via: "box", country: null, session: null }),
+    refusal(403, "egress_not_enabled"),
+    json(200, { id: "tpl_0000000000000002", name: "coding-agent" }),
+    json(200, residential),
+    json(200, { via: "box", country: null, session: null }),
+  );
+  assert.deepEqual((await agental.egress()).missing, ["use_case"]);
+  assert.deepEqual([sent[0]?.method, sent[0]?.path], ["GET", "/v1/egress"]);
+  assert.equal((await agental.setEgressUseCase(useCase)).useCase?.text, useCase);
+  assert.deepEqual([sent[1]?.method, sent[1]?.path, sent[1]?.body], ["PUT", "/v1/egress/use-case", { useCase }]);
+  assert.equal((await agental.setEgressBudget(0)).budgetMicros, 0);
+  assert.deepEqual([sent[2]?.method, sent[2]?.path, sent[2]?.body], ["PUT", "/v1/egress/budget", { budgetMicros: 0 }]);
+  assert.equal((await agental.setEgressBudget(null)).budgetSet, false);
+  assert.deepEqual(sent[3]?.body, { budgetMicros: null });
+
+  // A create sends where it leaves from its first boot.
+  const made = await agental.sandboxes.create({ name: "abroad", egress: { via: "residential", country: "de" } });
+  assert.deepEqual(sent[4]?.body, { name: "abroad", egress: { via: "residential", country: "de" } });
+  assert.deepEqual(await made.setEgress({ via: "residential", country: "de", session: "sticky" }), residential);
+  assert.deepEqual([sent[5]?.method, sent[5]?.path, sent[5]?.body], ["PUT", "/v1/sandboxes/sbx_0123456789abcdef/egress", residential]);
+  assert.equal((await made.egress()).via, "box");
+  assert.deepEqual([sent[6]?.method, sent[6]?.path], ["GET", "/v1/sandboxes/sbx_0123456789abcdef/egress"]);
+  // An account that may not use it is told what it still needs.
+  await assert.rejects(made.setEgress(residential), (error: unknown) => error instanceof ApiError && error.status === 403 && error.code === "egress_not_enabled");
+
+  const template = await agental.templates.get("tpl_0000000000000002");
+  assert.deepEqual(await template.setEgress(residential), residential);
+  assert.deepEqual([sent[9]?.method, sent[9]?.path, sent[9]?.body], ["PUT", "/v1/templates/tpl_0000000000000002/egress", residential]);
+  assert.equal((await template.egress()).via, "box");
+  assert.deepEqual([sent[10]?.method, sent[10]?.path], ["GET", "/v1/templates/tpl_0000000000000002/egress"]);
+  assert.equal(sent.length, 11);
 });

@@ -39,6 +39,7 @@ import type {
   RunsOnRepositories,
   Usage,
   Webhook,
+  EgressAccount,
 } from "./types.js";
 
 /** What a list of sandboxes is narrowed to. Each field left out narrows nothing; a list of values is any of them. */
@@ -234,6 +235,7 @@ class Sandboxes {
       ...(options.snapshotId !== undefined ? { snapshotId: options.snapshotId } : {}),
       ...(options.ttlSeconds !== undefined ? { ttlSeconds: options.ttlSeconds } : {}),
       ...(options.network ? { network: options.network } : {}),
+      ...(options.egress ? { egress: options.egress } : {}),
       ...(options.sshKeys !== undefined ? { sshKeys: options.sshKeys } : {}),
       ...(options.tags !== undefined ? { tags: options.tags } : {}),
       ...(options.metadata !== undefined ? { metadata: options.metadata } : {}),
@@ -596,6 +598,34 @@ export class Agental {
    */
   async setBurstBudget(budgetMicros: number | null): Promise<Burst> {
     return (await this.http.json<Burst>({ method: "PUT", path: "/v1/burst/budget", body: { budgetMicros }, replay: true })).body;
+  }
+
+  /**
+   * Whether the account may send sandboxes out through residential addresses, and what it
+   * still needs: plan (Fleet or larger), card (one saved), use_case (setEgressUseCase()).
+   * With what a GB costs, what it has spent this month, its budget, and why its residential
+   * connections are refused now, if they are. Amounts are millionths of a US dollar.
+   */
+  async egress(): Promise<EgressAccount> {
+    return (await this.http.json<EgressAccount>({ method: "GET", path: "/v1/egress", replay: true })).body;
+  }
+
+  /**
+   * Tells us what the account's sandboxes will use residential addresses for, in a few
+   * sentences (20 to 2,000 characters): said once for the whole account. Sent again, it
+   * replaces what was sent. An owner's key only. Only where policy() says residentialEgress.
+   */
+  async setEgressUseCase(useCase: string): Promise<EgressAccount> {
+    return (await this.http.json<EgressAccount>({ method: "PUT", path: "/v1/egress/use-case", body: { useCase }, replay: true })).body;
+  }
+
+  /**
+   * Sets the most the account's residential traffic costs in a month, in millionths of a US
+   * dollar: 0 refuses all of it. null gives it the default again, defaultBudgetMicros. An
+   * owner's key only. Only where policy() says residentialEgress.
+   */
+  async setEgressBudget(budgetMicros: number | null): Promise<EgressAccount> {
+    return (await this.http.json<EgressAccount>({ method: "PUT", path: "/v1/egress/budget", body: { budgetMicros }, replay: true })).body;
   }
 
   /**

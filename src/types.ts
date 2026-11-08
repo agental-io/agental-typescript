@@ -45,6 +45,16 @@ export type SandboxOwnNetwork = Schemas["SandboxOwnNetworkInput"];
 export type TemplateNetwork = Schemas["TemplateNetwork"];
 /** A rule to hold a template's sandboxes to: open, blocked, or allowlist with the IPv4 addresses and ranges in allow. */
 export type NetworkRule = Schemas["TemplateNetworkInput"];
+/** Where a sandbox's web traffic leaves: from its server (box), or through a residential address in a country. */
+export type Egress = Schemas["Egress"];
+/**
+ * Where to send a sandbox's web traffic out: { via: "box" }, or { via: "residential",
+ * country: "de", session?: "sticky" | "rotating" }. Residential is charged at $3 a GB, both
+ * directions counted, and only ports 80 and 443 over TCP go through it.
+ */
+export type EgressInput = Schemas["EgressInput"];
+/** Whether the account may send sandboxes out residential, what it still needs, and what it has spent and may spend this month. */
+export type EgressAccount = Schemas["EgressAccount"];
 export type Size = SandboxInfo["size"];
 /** What a command ended with. A command that failed is still an answer: read exitCode. */
 export type ExecResult = Schemas["ExecResult"];

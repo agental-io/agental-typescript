@@ -2764,7 +2764,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/egress/business": {
+    "/v1/egress/use-case": {
         parameters: {
             query?: never;
             header?: never;
@@ -2772,8 +2772,8 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** @description Tells us the account's company, website and what its sandboxes will use residential addresses for, in place of what it said before. It is kept on the account, and we may refuse residential egress on it. With a plan of Fleet or larger and a card saved, the account may then turn it on for its sandboxes. */
-        put: operations["setEgressBusiness"];
+        /** @description Tells us what the account's sandboxes will use residential addresses for, in place of what it said before. It is said once for the whole account, covers all its sandboxes and templates, and we may refuse residential egress on it. With a plan of Fleet or larger and a card saved, the account may then turn it on for its sandboxes. */
+        put: operations["setEgressUseCase"];
         post?: never;
         delete?: never;
         options?: never;
@@ -5493,18 +5493,16 @@ export interface components {
             offered: boolean;
             /** @description Whether a sandbox of this account may go out residential now: offered, nothing missing, and not refused. */
             enabled: boolean;
-            /** @description What the account still needs: plan, to be on Fleet ($100 a month) or a larger plan; card, a card saved; business, its company, website and intended use, with PUT /v1/egress/business. */
-            missing: ("plan" | "card" | "business")[];
+            /** @description What the account still needs: plan, to be on Fleet ($100 a month) or a larger plan; card, a card saved; use_case, what its sandboxes will use residential addresses for, with PUT /v1/egress/use-case. */
+            missing: ("plan" | "card" | "use_case")[];
             /** @description Set when we refused the account residential egress: its sandboxes' residential traffic is refused until we lift it. */
             refused: {
                 reason: string;
                 at: string;
             } | null;
-            /** @description What the account told us of itself, or null. */
-            business: {
-                company: string;
-                website: string;
-                intendedUse: string;
+            /** @description What the account told us its sandboxes will use residential addresses for, once for all of them, or null. */
+            useCase: {
+                text: string;
                 submittedAt: string;
             } | null;
             /** @description What a GB of residential traffic costs, both directions counted, in millionths of a US dollar: 3000000 is $3. */
@@ -5522,23 +5520,12 @@ export interface components {
              */
             blocked: "refused" | "out_of_credit" | "budget_reached" | "plan" | null;
         };
-        EgressBusiness: {
-            /**
-             * @description The company's legal name.
-             * @example Example Labs Ltd
-             */
-            company: string;
-            /**
-             * Format: uri
-             * @description Its website.
-             * @example https://example.com
-             */
-            website: string;
+        EgressUseCase: {
             /**
              * @description What its sandboxes will use residential addresses for, in a few sentences: the sites, and why they need it.
              * @example Our agents test our customers' sign-up flows from the countries they sell in, behind Cloudflare Turnstile.
              */
-            intendedUse: string;
+            useCase: string;
         };
         EgressBudget: {
             /**
@@ -17910,7 +17897,7 @@ export interface operations {
             };
         };
     };
-    setEgressBusiness: {
+    setEgressUseCase: {
         parameters: {
             query?: never;
             header?: never;
@@ -17919,7 +17906,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["EgressBusiness"];
+                "application/json": components["schemas"]["EgressUseCase"];
             };
         };
         responses: {
@@ -17932,7 +17919,7 @@ export interface operations {
                     "application/json": components["schemas"]["EgressAccount"];
                 };
             };
-            /** @description invalid_request: a field is missing, too long, or website is not an address. The key belongs to no account. */
+            /** @description invalid_request: useCase is missing, shorter than 20 characters or longer than 2,000. The key belongs to no account. */
             400: {
                 headers: {
                     [name: string]: unknown;
