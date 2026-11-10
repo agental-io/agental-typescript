@@ -2881,7 +2881,7 @@ export interface components {
                  */
                 feeMicros?: number;
                 /**
-                 * @description Only on a 429 burst refusal: seconds until the same start costs no burst fee, as the meter falls. Also sent as Retry-After. Null where waiting would not do: on running_limit_reached, or for a start larger than the plan's whole free burst.
+                 * @description On a 429 burst refusal: seconds until the same start costs no burst fee, as the meter falls. Null where waiting would not do: on running_limit_reached, or for a start larger than the plan's whole free burst. On a 503 admission_unavailable: 1. Also sent as Retry-After.
                  * @example 240
                  */
                 retryAfterSeconds?: number | null;
@@ -5883,6 +5883,17 @@ export interface operations {
             /** @description network_policy_unavailable: network.allow names addresses, or the template holds the sandbox to blocked or an allowlist, where GET /v1/policy says networkPolicy is false. Nothing was created. */
             501: {
                 headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description admission_unavailable: the create could not be written just now, and nothing was made or charged. Send the same request again, with the same Idempotency-Key, after Retry-After (1 second). */
+            503: {
+                headers: {
+                    /** @description Seconds to wait before sending it again: 1. */
+                    "Retry-After": string;
                     [name: string]: unknown;
                 };
                 content: {
