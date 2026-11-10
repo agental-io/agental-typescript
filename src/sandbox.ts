@@ -1096,12 +1096,20 @@ export class Sandbox {
   /**
    * Copies it into a new sandbox, running, with the same disk. From then on the two share
    * nothing. Nothing that was running here is started in the copy.
+   *
+   * With `memory: true` the copy goes on from where this one was instead: every process
+   * running on, with what it held in memory, under the copy's own address, machine id and SSH
+   * host key. Its processes still hold this sandbox's environment, its token among them, until
+   * they end. A running sandbox is paused while its memory is written, about a second for every
+   * 2 to 3 GiB; one stopped with `keepMemory` gives the memory it kept. Only on Firecracker
+   * boxes: elsewhere it throws `501 driver_operation_unavailable`, and for a stopped sandbox
+   * that kept no memory `409 invalid_state`. The copy is made in this sandbox's organization.
    */
-  async fork(options: Pick<CreateOptions, "name" | "idempotencyKey" | "timeoutMs" | "maxBurstFeeMicros" | "maxBurstWaitMs"> = {}): Promise<Sandbox> {
+  async fork(options: Pick<CreateOptions, "name" | "idempotencyKey" | "timeoutMs" | "maxBurstFeeMicros" | "maxBurstWaitMs"> & { memory?: boolean } = {}): Promise<Sandbox> {
     const { info, burstFeeMicros } = await makeSandbox(
       this.http,
       `${this.path}/fork`,
-      { name: options.name ?? made("sbx") },
+      { name: options.name ?? made("sbx"), ...(options.memory === true ? { memory: true } : {}) },
       options.idempotencyKey ?? made("sdk"),
       options.timeoutMs ?? CREATE_TIMEOUT_MS,
       options,

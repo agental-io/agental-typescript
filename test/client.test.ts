@@ -442,6 +442,12 @@ test("a fork, a snapshot and a port ask for what the API needs of them", async (
   assert.ok(sent[1]?.headers.get("idempotency-key"));
   assert.deepEqual(sent[1]?.body, { name: "second-try" });
 
+  // memory is sent only when asked for.
+  const { agental: withMemory, sent: sentMemory } = scripted(json(200, sandbox()), json(201, sandbox({ id: "sbx_fork000000000001", name: "going-on" })));
+  const running = await withMemory.sandboxes.get("sbx_0123456789abcdef");
+  assert.equal((await running.fork({ name: "going-on", memory: true })).id, "sbx_fork000000000001");
+  assert.deepEqual(sentMemory[1]?.body, { name: "going-on", memory: true });
+
   assert.equal((await box.snapshot("before")).id, "snap_1");
   assert.deepEqual(sent[2]?.body, { name: "before" });
   assert.deepEqual((await box.restore("snap_1")).discarded, ["snap_2"]);

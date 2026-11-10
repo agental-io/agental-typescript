@@ -7319,6 +7319,8 @@ export interface operations {
             content: {
                 "application/json": {
                     name: string;
+                    /** @description true: the fork goes on from where the source was, with every process that ran in it running on and what they held in memory, instead of starting from a copy of its disk. It has its own address, machine id, SSH host key and random seed, and its processes still hold the source's environment, its token among them, until they end. A running source is paused while its memory is written, about a second for every 2 to 3 GiB; a source stopped with keepMemory gives the memory it kept and stays as it was. Only on sandboxes whose host offers it (501 driver_operation_unavailable elsewhere); a stopped source that kept no memory is 409 invalid_state. */
+                    memory?: boolean;
                 };
             };
         };
@@ -7332,7 +7334,7 @@ export interface operations {
                     "application/json": components["schemas"]["Sandbox"];
                 };
             };
-            /** @description Fork created and running: a new sandbox of the same size with a copy of what the source held, on the source's template, with the source's own secrets and addresses. It is held to that template's outbound rule as it is now, with those addresses on top, from its first boot. The source is left as it was. */
+            /** @description Fork created and running: a new sandbox of the same size with a copy of what the source held, on the source's template, with the source's own secrets and addresses. It is held to that template's outbound rule as it is now, with those addresses on top, from its first boot. The source is left as it was. With memory, the fork's processes are the source's, running on. */
             201: {
                 headers: {
                     [name: string]: unknown;

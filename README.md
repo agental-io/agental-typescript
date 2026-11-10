@@ -112,6 +112,7 @@ await sandbox.stop({ keepMemory: true }); // or keep its memory too, at 10%: sta
 await sandbox.start(); // waits until it is running, also when it has to be brought back from storage
 
 const copy = await sandbox.fork(); // a new sandbox with the same disk
+const live = await sandbox.fork({ memory: true }); // or one that goes on from where it was, every process running on (Firecracker boxes only)
 
 const snapshot = await sandbox.snapshot("before-upgrade");
 await sandbox.restore(snapshot.id); // roll the disk back
