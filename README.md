@@ -455,7 +455,7 @@ const { messages } = await mail.list();
 ## What the SDK does for you
 
 - A create or a fork is sent with an `Idempotency-Key`. If its answer is lost, or the machine is not confirmed yet, the same request is sent again with the same key, which gives the same sandbox back and never a second one. Pass `idempotencyKey` yourself to be able to ask again after your process has died.
-- Reads, file writes, starts and stops are sent again when a proxy answers in the API's place, when the connection drops, and when the sandbox was moved to another server mid-request.
+- Reads, file writes, starts and stops are sent again when a proxy answers in the API's place, and when the connection drops.
 - A command is never sent twice. One that was cut off may have done part of its work, so that is yours to decide.
 - A delete carries the confirm header the API asks for.
 
