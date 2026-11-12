@@ -175,6 +175,21 @@ await sandbox.ssh.off(); // its port is closed
 
 `sandbox.ssh.get()` reads it and changes nothing, and `removeKey(id)` takes a key away. SSH stays on through a stop, a start and a move, and `address` is null while the sandbox is not running. The command's `agental ssh <sandbox-id>` does all of it in one go.
 
+## Terminal
+
+A login shell in the sandbox, as root in `/root`, over a WebSocket: no key and no port, as the console's Terminal tab has it.
+
+```ts
+const terminal = await sandbox.terminal({ cols: 120, rows: 32 });
+terminal.write("cd /opt/agental && ls\n");
+terminal.resize(132, 40); // as your own terminal's window changes
+terminal.write("exit 3\n");
+for await (const chunk of terminal) process.stdout.write(chunk); // Uint8Array, as the shell wrote it
+const { exitCode, closeCode } = await terminal.exited; // 3, 1000
+```
+
+It needs a key with the `exec` action, and the sandbox running. It is opened with the runtime's own `WebSocket` (Node 22 and later, browsers, Deno, Bun); in Node 20 pass `new Agental({ WebSocket })` from the `ws` package. The API closes it when the shell ends (`closeCode` 1000, with `exitCode`), when the key or the sandbox no longer lets it be open (4003), after 30 minutes with nothing typed (4008), and when its sandbox stops answering (4011); `error` says why when the API did. `close()`, or leaving the `for await`, hangs the shell up, as an SSH session's end does: start what must outlive it with `nohup` or `setsid`. The command's `agental shell <sandbox-id>` opens one in your own terminal.
+
 ## Desktop
 
 ```ts

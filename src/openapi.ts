@@ -1336,6 +1336,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/sandboxes/{id}/terminal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Whether a terminal can be opened on the sandbox now. A WebSocket handshake to this address opens one instead, with a ticket from POST /v1/sandboxes/{id}/terminal. */
+        get: operations["getSandboxTerminal"];
+        put?: never;
+        /** @description A ticket to open a terminal on the sandbox: a login shell in it, as root in /root, with what a command runs with. Open a WebSocket to path on this API's address within 30 seconds, from the same address, with the subprotocols agental.terminal.v1 and ticket.<ticket>. Send what is typed as binary messages, and {"type":"resize","cols":n,"rows":n} as text. The terminal's output comes as binary messages; {"type":"started"}, {"type":"exit","code","signal","timedOut"} and {"type":"error","code","message"} come as text. It is closed when the shell ends (1000), when what let it be opened no longer does, as a key taken away, a session ended or the sandbox stopped (4003), after 30 minutes with nothing typed (4008), and when it could not be opened or its sandbox stopped answering (4011). Closing it hangs the shell up: what runs in it is sent SIGHUP, as when an SSH session ends. */
+        post: operations["openSandboxTerminal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/sandboxes/{id}/schedules": {
         parameters: {
             query?: never;
@@ -3894,6 +3912,33 @@ export interface components {
                 kept: string;
             }[];
         };
+        SandboxTerminal: {
+            /** @description Whether a terminal can be opened on it now: it is running, and terminals are offered here. */
+            available: boolean;
+            /** @description Why not, when it cannot. Null when it can. */
+            reason: string | null;
+            /** @description How long a terminal stays open with nothing typed in it. */
+            idleSeconds: number;
+        };
+        SandboxTerminalTicket: {
+            /** @description Opens one terminal on this sandbox, once, from the address it was asked from. Sent as the WebSocket subprotocol ticket.<ticket>, never in a URL. */
+            ticket: string;
+            /** @description When it stops working, 30 seconds after it was given. */
+            expiresAt: string;
+            /**
+             * @description Where the WebSocket is opened, on this API's own address.
+             * @example /v1/sandboxes/sbx_0123456789abcdef/terminal
+             */
+            path: string;
+            /** @description The subprotocols to open it with: agental.terminal.v1, and the ticket. */
+            protocols: string[];
+        };
+        OpenSandboxTerminal: {
+            /** @example 120 */
+            cols: number;
+            /** @example 32 */
+            rows: number;
+        };
         Schedule: {
             /** @example sch_0123456789abcdef */
             id: string;
@@ -4712,6 +4757,8 @@ export interface components {
             desktop: boolean;
             /** @description Whether a sandbox's browser can be driven from outside it, over the Chrome DevTools Protocol: by Playwright, Puppeteer, browser-use or Stagehand on your own computer. Where it can, PUT /v1/sandboxes/{id}/browser starts Chrome in the sandbox and answers with the address to connect to. */
             browser: boolean;
+            /** @description Whether a sandbox's terminal can be opened: a login shell in it, typed in from a browser or a program over a WebSocket. Where it can, POST /v1/sandboxes/{id}/terminal gives a ticket to open it with. */
+            terminal: boolean;
             /** @description Whether a sandbox can be stopped with its memory kept: POST /v1/sandboxes/{id}/stop with keepMemory, after which a start puts back every process as it was. A stopped sandbox that keeps its memory costs 10% of its running price, and 5% without. */
             keepMemory: boolean;
             /** @description Whether a stopped sandbox can be archived: its machine kept in storage until it is started again. An archived sandbox is still stopped and loses nothing, and a start of it answers 202 and takes longer. */
@@ -11764,6 +11811,117 @@ export interface operations {
             };
             /** @description github_not_connected. */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getSandboxTerminal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Whether a terminal can be opened. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SandboxTerminal"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    openSandboxTerminal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OpenSandboxTerminal"];
+            };
+        };
+        responses: {
+            /** @description A ticket to open the terminal with. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SandboxTerminalTicket"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description sandbox_not_running: start it first. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description too_many_tickets: 16 terminals are being opened on it already. too_many_terminals: this key or account has 16 terminals open or being opened. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description terminal_unavailable: terminals are not offered here. */
+            501: {
                 headers: {
                     [name: string]: unknown;
                 };

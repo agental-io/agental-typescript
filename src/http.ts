@@ -1,4 +1,5 @@
 import { AgentalError, ApiError, ConnectionError, ProxyError } from "./errors.js";
+import type { WebSocketConstructor } from "./terminal.js";
 import { VERSION } from "./version.js";
 
 export const DEFAULT_BASE_URL = "https://agental.io";
@@ -19,6 +20,11 @@ export interface AgentalOptions {
   retryDelayMs?: number;
   /** How often something that is waited for is looked at, in milliseconds. Default 2000. */
   pollIntervalMs?: number;
+  /**
+   * What a sandbox's terminal is opened with. Left out, it is the runtime's own WebSocket: in
+   * Node 22 and later, browsers, Deno and Bun. In Node 20, pass WebSocket from the ws package.
+   */
+  WebSocket?: WebSocketConstructor;
 }
 
 export interface Call {
@@ -115,6 +121,7 @@ export class Http {
   private readonly fetch: typeof fetch;
   private readonly maxRetries: number;
   private readonly retryDelayMs: number;
+  private readonly webSocket: WebSocketConstructor | undefined;
 
   constructor(options: AgentalOptions = {}) {
     let apiKey = options.apiKey ?? environment("AGENTAL_API_KEY");
@@ -138,6 +145,32 @@ export class Http {
     this.maxRetries = options.maxRetries ?? 3;
     this.retryDelayMs = options.retryDelayMs ?? 1000;
     this.pollIntervalMs = options.pollIntervalMs ?? 2000;
+    this.webSocket = options.WebSocket;
+  }
+
+  /** The WebSocket a terminal is opened with: the one given, else the runtime's own. */
+  get WebSocket(): WebSocketConstructor {
+    const found = this.webSocket ?? (globalThis as { WebSocket?: WebSocketConstructor }).WebSocket;
+    if (!found) {
+      throw new AgentalError("This runtime has no WebSocket, which a terminal is opened with. Use Node 22 or later, or pass new Agental({ WebSocket }) with WebSocket from the ws package.");
+    }
+    return found;
+  }
+
+  /**
+   * The ws: or wss: URL of a path on the API's own address, as a terminal's WebSocket is opened
+   * on it. Only a path is taken, so that no answer can send the WebSocket, and the ticket in
+   * it, to another host.
+   */
+  webSocketUrl(path: string): string {
+    if (!path.startsWith("/") || path.startsWith("//") || /[\\\s]/.test(path)) {
+      throw new AgentalError(`The API gave the terminal a path that is not one on its own address: ${JSON.stringify(path.slice(0, 200))}.`);
+    }
+    const url = new URL(this.baseUrl);
+    if (url.protocol !== "https:" && url.protocol !== "http:") {
+      throw new AgentalError(`A terminal is opened on an http: or https: API, not ${url.protocol}.`);
+    }
+    return `${url.origin.replace(/^http/, "ws")}${url.pathname.replace(/\/+$/, "")}${path}`;
   }
 
   /** The answer to a request that worked. One that did not is thrown, after it was sent again if that was safe. */

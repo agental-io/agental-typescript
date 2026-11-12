@@ -1,6 +1,7 @@
 import { AgentalError, ApiError, ConnectionError, TimeoutError } from "./errors.js";
 import { sleep, tagSegment, type Http } from "./http.js";
 import { Secrets, type Template } from "./template.js";
+import { Terminal, terminalSize, type TerminalOptions, type TerminalTicket } from "./terminal.js";
 import type {
   BrowserState,
   CreateSchedule,
@@ -956,6 +957,27 @@ export class Sandbox {
    */
   async exec(command: CommandLine, options: ExecOptions = {}): Promise<ExecResult> {
     return (await this.http.json<ExecResult>(this.command("/exec", command, options))).body;
+  }
+
+  /**
+   * Opens a terminal on it: a login shell as root in /root, with what a command runs with, in
+   * a terminal of cols by rows (80 by 24 unless given). Read its output by iterating it, type
+   * with write(), change its size with resize(), and end it with close(); exited says how it
+   * ended. It needs the key action exec, and the sandbox running. It is closed by the API after
+   * 30 minutes with nothing typed, and when the key or the sandbox no longer lets it be open.
+   *
+   *     const terminal = await sandbox.terminal({ cols: 120, rows: 32 });
+   *     terminal.write("uname -a; exit\n");
+   *     for await (const chunk of terminal) process.stdout.write(chunk);
+   *     console.log((await terminal.exited).exitCode);
+   *
+   * It is opened with the runtime's WebSocket: in Node 20, pass new Agental({ WebSocket }).
+   */
+  async terminal(options: TerminalOptions = {}): Promise<Terminal> {
+    const { cols, rows } = terminalSize(options);
+    const WebSocket = this.http.WebSocket;
+    const { ticket, path } = (await this.http.json<TerminalTicket>({ method: "POST", path: `${this.path}/terminal`, body: { cols, rows } })).body;
+    return await Terminal.open(WebSocket, this.http.webSocketUrl(path), ticket);
   }
 
   /** Runs a command and gives its output as it arrives, then what it exited with. */
