@@ -92,14 +92,32 @@ export type Catalog = Schemas["Catalog"];
 export type Region = Schemas["Region"];
 export type Usage = Schemas["Usage"];
 /**
- * Where your account stands against its plan: what it runs against its running count, what
- * its burst meter reads against the free burst, what it spent on burst fees this month
- * against its budget, and what a start of each size would cost now.
+ * Where your account stands against its plan now: what it runs against its running count,
+ * what its burst meter reads against the free burst, what it spent on burst fees this month
+ * against its budget, and what one sandbox of each size would cost to start now.
  */
-export type Burst = Omit<Schemas["Burst"], "quote"> & {
-  /** With burst({ size }), what starting that many of that size now would cost. Null without. */
+export type HeadroomNow = Omit<Schemas["Burst"], "quote"> & {
+  /** Always null here. */
   quote: BurstQuote | null;
 };
+/**
+ * How close your account runs to its plan's limits: where it stands now, and over a range,
+ * what it ran against its running count, its burst meter against its free burst, each burst
+ * (a stretch when the meter was over the free burst, so every start in it paid a fee), what
+ * did not start and why, and how fast what started ran.
+ */
+export type Headroom = Omit<Schemas["Headroom"], "now"> & { now: HeadroomNow };
+/** How often headroom() reads its series: every 10 minutes, hour or day. */
+export type HeadroomStep = Schemas["Headroom"]["step"];
+/** The range headroom() covers. Left out, today (UTC) to now. */
+export interface HeadroomRange {
+  /** Where the range begins: a Date, or a time in ISO 8601. */
+  from?: Date | string;
+  /** Where it ends, never later than now. */
+  to?: Date | string;
+  /** Left out, 10m up to two days, hour up to 8, day past that. */
+  step?: HeadroomStep;
+}
 /** What starting so many sandboxes of one size now would cost in burst fees, and when it would cost nothing. */
 export type BurstQuote = Schemas["BurstQuote"];
 /** What a start costs when an account starts sandboxes faster than its plan's free burst, and the default monthly budget. */

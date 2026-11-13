@@ -2732,6 +2732,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/headroom/budget": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["setHeadroomBudget"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/burst/budget": {
         parameters: {
             query?: never;
@@ -18019,6 +18035,66 @@ export interface operations {
             };
         };
     };
+    setHeadroomBudget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BurstBudget"];
+            };
+        };
+        responses: {
+            /** @description The budget is set, and the account is answered as it stands now (the now of GET /v1/headroom). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Burst"];
+                };
+            };
+            /** @description invalid_request. The budget is not a whole number from 0 to 100000000000, or null, or the key belongs to no account. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description role_required: in a team, only an owner sets its budget. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The account behind the key is gone. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     setBurstBudget: {
         parameters: {
             query?: never;
@@ -18032,7 +18108,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description The budget is set, and the account is answered as it stands now. */
+            /** @description The budget is set, and the account is answered as it stands now (the now of GET /v1/headroom). */
             200: {
                 headers: {
                     [name: string]: unknown;

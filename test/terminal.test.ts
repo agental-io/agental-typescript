@@ -247,8 +247,10 @@ test("the WebSocket goes to the API's own address: ws for http, a path under a b
   }
 });
 
-test("the runtime's own WebSocket is the kind a terminal takes", () => {
+// Node 20, which the SDK supports, has no WebSocket of its own: there a caller passes one, as the ws package's.
+const ownWebSocket = (globalThis as { WebSocket?: typeof WebSocket }).WebSocket;
+test("the runtime's own WebSocket is the kind a terminal takes", { skip: ownWebSocket === undefined && "this Node has no WebSocket of its own" }, () => {
   // Typechecked: Node 22's WebSocket, as browsers' is, fits WebSocketConstructor.
-  const own: WebSocketConstructor | undefined = (globalThis as { WebSocket?: typeof WebSocket }).WebSocket;
+  const own: WebSocketConstructor | undefined = ownWebSocket;
   assert.equal(typeof own, "function");
 });

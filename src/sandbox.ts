@@ -68,7 +68,7 @@ export interface BurstOptions {
    * The most this start may cost in burst fees, in millionths of a US dollar: 0 refuses any
    * fee. A start that would cost more throws ApiError burst_fee_too_high, whose feeMicros
    * says what it would cost and retryAfterSeconds when it would cost nothing. Left out, it
-   * pays what the account's monthly burst budget allows. burst() says what a start costs now.
+   * pays what the account's monthly burst budget allows. headroom() says what a start costs now (now.nextStart).
    */
   maxBurstFeeMicros?: number;
   /**

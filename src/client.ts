@@ -7,7 +7,9 @@ import type {
   ApiKey,
   ApiKeyUsage,
   Billing,
-  Burst,
+  Headroom,
+  HeadroomNow,
+  HeadroomRange,
   Catalog,
   HostRoute,
   Invite,
@@ -29,7 +31,6 @@ import type {
   SandboxJob,
   SandboxJobItem,
   SandboxJobPreview,
-  Size,
   Snapshot,
   Team,
   TeamRole,
@@ -574,30 +575,33 @@ export class Agental {
   }
 
   /**
-   * Where your account stands against its plan: how many small sandboxes it runs and may run
-   * at once (runningUnits; a tiny counts half, a medium 2, a large 4), what its burst meter
-   * reads against the free burst, what it has spent on burst fees this month against its
-   * budget, and what one sandbox of each size would cost to start now. With a size, and a
-   * count, quote says what starting that many now would cost.
+   * How close your account runs to its plan's limits. `now` is where it stands: how many small
+   * sandboxes it runs and may run at once (runningUnits; a tiny counts half, a medium 2, a
+   * large 4), what its burst meter reads against the free burst, what it has spent on burst
+   * fees this month against its budget, and what one sandbox of each size would cost to start
+   * now. Over the range, today (UTC) unless from and to say otherwise: what it ran against its
+   * running count (series, atRunningCountMs), each burst, what did not start and why
+   * (refused), and how fast what started ran (speed). A range covers 90 days at most.
    *
-   * Where `enforced` is true, a create, fork or start past the running count throws an
+   * Where `now.enforced` is true, a create, fork or start past the running count throws an
    * `ApiError` 429 `running_limit_reached`; one faster than the free burst costs a burst fee,
    * and is refused with `burst_budget_reached` past the monthly budget.
-   * On the free plan, until the account has paid for something (`unpaid`), the running count
-   * is `free.unpaidUnits` of prices(). Amounts are millionths of a US dollar.
+   * On the free plan, until the account has paid for something (`now.unpaid`), the running
+   * count is `free.unpaidUnits` of prices(). Amounts are millionths of a US dollar.
    */
-  async burst(quote?: { size: Size; count?: number }): Promise<Burst> {
-    const query = { size: quote?.size, count: quote?.count?.toString() };
-    return (await this.http.json<Burst>({ method: "GET", path: "/v1/burst", query, replay: true })).body;
+  async headroom(range: HeadroomRange = {}): Promise<Headroom> {
+    const iso = (at: Date | string | undefined): string | undefined => (at instanceof Date ? at.toISOString() : at);
+    const query = { from: iso(range.from), to: iso(range.to), step: range.step };
+    return (await this.http.json<Headroom>({ method: "GET", path: "/v1/headroom", query, replay: true })).body;
   }
 
   /**
    * Sets the most the account spends on burst fees in a month, in millionths of a US dollar:
    * 0 refuses every start that would cost one. null gives it the default again,
-   * defaultBudgetMicros. It answers with the account's burst as it stands now.
+   * defaultBudgetMicros. It answers with where the account stands now, as headroom().now.
    */
-  async setBurstBudget(budgetMicros: number | null): Promise<Burst> {
-    return (await this.http.json<Burst>({ method: "PUT", path: "/v1/burst/budget", body: { budgetMicros }, replay: true })).body;
+  async setHeadroomBudget(budgetMicros: number | null): Promise<HeadroomNow> {
+    return (await this.http.json<HeadroomNow>({ method: "PUT", path: "/v1/headroom/budget", body: { budgetMicros }, replay: true })).body;
   }
 
   /**

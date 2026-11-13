@@ -1,6 +1,6 @@
 {
   "name": "agental-sdk",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "description": "TypeScript SDK for agental.io: Linux sandboxes for your agents. The agental command is the package agental.",
   "license": "MIT",
   "author": "VERTIXER LTD",

@@ -21,29 +21,47 @@ export class ApiError extends AgentalError {
      * any other error.
      */
     readonly regionsWithRoom?: string[],
-    burst?: { feeMicros?: number; retryAfterSeconds?: number | null },
+    refusal?: { feeMicros?: number; retryAfterSeconds?: number | null; refusedLastHour?: number; headroomUrl?: string },
   ) {
     super(message);
-    if (burst?.feeMicros !== undefined) {
-      this.feeMicros = burst.feeMicros;
+    if (refusal?.feeMicros !== undefined) {
+      this.feeMicros = refusal.feeMicros;
     }
-    if (burst?.retryAfterSeconds !== undefined) {
-      this.retryAfterSeconds = burst.retryAfterSeconds;
+    if (refusal?.retryAfterSeconds !== undefined) {
+      this.retryAfterSeconds = refusal.retryAfterSeconds;
+    }
+    if (refusal?.refusedLastHour !== undefined) {
+      this.refusedLastHour = refusal.refusedLastHour;
+    }
+    if (refusal?.headroomUrl !== undefined) {
+      this.headroomUrl = refusal.headroomUrl;
     }
   }
 
   /**
-   * On a start refused with 429 for its burst (see `BurstRefusalCode`): the burst fee it
+   * On a start refused with 429 or 409 for its burst (see `BurstRefusalCode`): the burst fee it
    * would have cost, in millionths of a US dollar. Undefined on any other error.
    */
   readonly feeMicros?: number;
 
   /**
-   * On a start refused with 429 for its burst: seconds until the same start would cost no
+   * On a start refused with 429 or 409 for its burst: seconds until the same start would cost no
    * burst fee. Null where waiting would not help: on running_limit_reached, or for a start
    * larger than the plan's whole free burst. Undefined on any other error.
    */
   readonly retryAfterSeconds?: number | null;
+
+  /**
+   * On a create or start refused with 429 or 409: how many of the account's creates and starts were
+   * refused with the same code in the last hour, this one with them. Undefined on any other error.
+   */
+  readonly refusedLastHour?: number;
+
+  /**
+   * On a create or start refused with 429 or 409: the console's page where the account sees every
+   * refusal, as headroom() reads them. Undefined on any other error.
+   */
+  readonly headroomUrl?: string;
 }
 
 /**

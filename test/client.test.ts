@@ -15,7 +15,7 @@ import {
   type ApiKey,
   type ApiKeyUsage,
   type Billing,
-  type Burst,
+  type HeadroomNow,
   type BurstQuote,
   type EgressAccount,
   type EmailMessageSummary,
@@ -672,7 +672,7 @@ test("a sandbox's mail is reached by its id without reading the sandbox, and the
   assert.deepEqual([sent[2]?.method, sent[2]?.path], ["GET", "/v1/email"]);
 });
 
-function burst(changes: Partial<Burst> = {}): Burst {
+function burst(changes: Partial<HeadroomNow> = {}): HeadroomNow {
   const quote = (size: BurstQuote["size"], feeMicros = 0): BurstQuote => ({ size, count: 1, feeMicros, freeInSeconds: 0, overRunningCount: false });
   return {
     enforced: true,
@@ -701,18 +701,34 @@ function burst(changes: Partial<Burst> = {}): Burst {
   };
 }
 
-test("the burst is read, with a quote for a size and a count, and its budget is set and cleared", async () => {
-  const quoted = burst({ quote: { size: "medium", count: 30, feeMicros: 640_000, freeInSeconds: 1800, overRunningCount: false } });
-  const { agental, sent } = scripted(json(200, burst()), json(200, quoted), json(200, burst({ budgetMicros: 0, budgetSet: true })), new TypeError("fetch failed"), json(200, burst()));
-  assert.equal((await agental.burst()).quote, null);
-  assert.deepEqual([sent[0]?.method, sent[0]?.path], ["GET", "/v1/burst"]);
-  assert.equal((await agental.burst({ size: "medium", count: 30 })).quote?.feeMicros, 640_000);
-  assert.equal(sent[1]?.path, "/v1/burst?size=medium&count=30");
+function headroom(): Record<string, unknown> {
+  return {
+    now: burst(),
+    from: "2026-11-13T00:00:00.000Z",
+    to: "2026-11-13T10:00:00.000Z",
+    step: "10m",
+    series: [{ at: "2026-11-13T00:00:00.000Z", runningMb: 4096, peakRunningMb: 8192, meterMb: 2048, starts: 2, feesMicros: 0, refused: 1 }],
+    bursts: [],
+    refused: { total: 1, byReason: [{ reason: "running_count", code: "running_limit_reached", count: 1 }] },
+    speed: { count: 2, p50Ms: 900, p90Ms: 1200, p99Ms: 1200, maxMs: 1200 },
+    atRunningCountMs: 0,
+    peakRunningMb: 8192,
+    peakAt: "2026-11-13T00:05:00.000Z",
+  };
+}
 
-  assert.equal((await agental.setBurstBudget(0)).budgetMicros, 0);
-  assert.deepEqual([sent[2]?.method, sent[2]?.path, sent[2]?.body], ["PUT", "/v1/burst/budget", { budgetMicros: 0 }]);
+test("the headroom is read, over today or a range, and its budget is set and cleared", async () => {
+  const { agental, sent } = scripted(json(200, headroom()), json(200, headroom()), json(200, burst({ budgetMicros: 0, budgetSet: true })), new TypeError("fetch failed"), json(200, burst()));
+  const today = await agental.headroom();
+  assert.deepEqual([today.now.runningUnits, today.refused.byReason[0]?.reason, today.speed.p50Ms], [100, "running_count", 900]);
+  assert.deepEqual([sent[0]?.method, sent[0]?.path], ["GET", "/v1/headroom"]);
+  await agental.headroom({ from: new Date("2026-11-06T00:00:00Z"), to: "2026-11-13T00:00:00Z", step: "hour" });
+  assert.equal(sent[1]?.path, "/v1/headroom?from=2026-11-06T00%3A00%3A00.000Z&to=2026-11-13T00%3A00%3A00Z&step=hour");
+
+  assert.equal((await agental.setHeadroomBudget(0)).budgetMicros, 0);
+  assert.deepEqual([sent[2]?.method, sent[2]?.path, sent[2]?.body], ["PUT", "/v1/headroom/budget", { budgetMicros: 0 }]);
   // Setting a budget twice sets it once, so a lost answer is sent again.
-  assert.equal((await agental.setBurstBudget(null)).budgetSet, false);
+  assert.equal((await agental.setHeadroomBudget(null)).budgetSet, false);
   assert.deepEqual([sent[4]?.method, sent[4]?.body], ["PUT", { budgetMicros: null }]);
 });
 
@@ -746,7 +762,7 @@ test("a create, fork and start send the most they may pay, and say what they pai
 
 function burstRefusal(code: string, feeMicros: number, retryAfterSeconds: number | null): Response {
   const headers: Record<string, string> = retryAfterSeconds === null ? {} : { "Retry-After": String(retryAfterSeconds) };
-  return json(429, { error: { code, message: `${code} it is`, feeMicros, retryAfterSeconds } }, headers);
+  return json(429, { error: { code, message: `${code} it is`, feeMicros, retryAfterSeconds, refusedLastHour: 3, headroomUrl: "https://console.agental.io/headroom" } }, headers);
 }
 
 test("a start refused for its burst says what it would cost and when it would cost nothing, and is not sent again by itself", async () => {
@@ -755,10 +771,21 @@ test("a start refused for its burst says what it would cost and when it would co
     agental.sandboxes.create({ maxBurstFeeMicros: 0 }),
     (error: unknown) => error instanceof ApiError && error.status === 429 && error.code === "burst_fee_too_high" && error.feeMicros === 64_000 && error.retryAfterSeconds === 240,
   );
-  await assert.rejects(agental.sandboxes.create(), (error: unknown) => error instanceof ApiError && error.code === "running_limit_reached" && error.retryAfterSeconds === null);
+  await assert.rejects(
+    agental.sandboxes.create(),
+    (error: unknown) =>
+      error instanceof ApiError &&
+      error.code === "running_limit_reached" &&
+      error.retryAfterSeconds === null &&
+      error.refusedLastHour === 3 &&
+      error.headroomUrl === "https://console.agental.io/headroom",
+  );
   assert.equal(sent.length, 2);
-  // Any other refusal has neither.
-  await assert.rejects(scripted(refusal(409, "name_taken")).agental.sandboxes.create(), (error: unknown) => error instanceof ApiError && error.feeMicros === undefined && error.retryAfterSeconds === undefined);
+  // Any other refusal has none of them.
+  await assert.rejects(
+    scripted(refusal(409, "name_taken")).agental.sandboxes.create(),
+    (error: unknown) => error instanceof ApiError && error.feeMicros === undefined && error.retryAfterSeconds === undefined && error.refusedLastHour === undefined && error.headroomUrl === undefined,
+  );
 });
 
 test("asked to, a start refused for its burst waits until it would cost nothing and is tried once more", async () => {

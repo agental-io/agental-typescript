@@ -348,20 +348,26 @@ The free plan makes tiny and small sandboxes, the $100 plan medium ones too, and
 
 ## How many you run, and how fast you start them
 
-Each plan runs so many small sandboxes at once, its running count, and starts so many at once for nothing, its free burst: a tiny counts half, a medium 2 and a large 4. The free plan runs 20 and bursts 20, though only 2 at once until the account has paid for something (`burst().unpaid`, `prices().free.unpaidUnits`), the $100 plan 100 and 100, the $500 plan 600 and 200, the $2000 plan 2000 and 400; `prices().tiers` gives each plan's `runningUnits` and `freeBurstUnits`, and `burstFee` how fees are worked out. Each start adds its memory to a burst meter that halves every 15 minutes. Starting faster than the free burst is never refused for speed: it costs a burst fee, which grows with how far over the meter goes.
+Each plan runs so many small sandboxes at once, its running count, and starts so many at once for nothing, its free burst: a tiny counts half, a medium 2 and a large 4. The free plan runs 20 and bursts 20, though only 2 at once until the account has paid for something (`headroom().now.unpaid`, `prices().free.unpaidUnits`), the $100 plan 100 and 100, the $500 plan 600 and 200, the $2000 plan 2000 and 400; `prices().tiers` gives each plan's `runningUnits` and `freeBurstUnits`, and `burstFee` how fees are worked out. Each start adds its memory to a burst meter that halves every 15 minutes. Starting faster than the free burst is never refused for speed: it costs a burst fee, which grows with how far over the meter goes.
+
+`headroom()` says how close the account runs to these limits: `now`, where it stands, and over a range (today, UTC, unless `from` and `to` say otherwise, 90 days at most) what it ran against its running count, each burst (a stretch when the meter was over the free burst, so every start in it paid a fee), what did not start and why, and how fast what started ran.
 
 ```ts
-const burst = await agental.burst();
-console.log(burst.runningUnits, burst.freeBurstUnits); // 100 100
-console.log(burst.freeNowMb / 4096); // small sandboxes you may start now for nothing
-console.log(burst.spentMicros, burst.budgetMicros); // burst fees this month, and the most you spend on them
+const { now, atRunningCountMs, bursts, refused } = await agental.headroom();
+console.log(now.runningMb / 4096, now.runningUnits); // small sandboxes running, of 100
+console.log(now.freeNowMb / 4096); // small sandboxes you may start now for nothing
+console.log(now.spentMicros, now.budgetMicros); // burst fees this month, and the most you spend on them
+console.log(now.nextStart); // what one sandbox of each size would cost to start now
+console.log(atRunningCountMs / 60_000); // minutes today at the running count
+console.log(bursts[0]?.startedAt, bursts[0]?.endedAt); // the newest burst; endedAt is null while it goes on
+console.log(refused.total, refused.byReason); // what did not start today: running_count, budget, fee_cap, room or other
 
-// What starting 30 medium ones now would cost, and in how many seconds it would cost nothing.
-const { quote } = await agental.burst({ size: "medium", count: 30 });
-console.log(quote?.feeMicros, quote?.freeInSeconds);
+// The last week, read every hour.
+const week = await agental.headroom({ from: new Date(Date.now() - 7 * 86_400_000), step: "hour" });
+console.log(week.series.map((point) => point.peakRunningMb / 4096));
 
 // Spend at most $10 a month on burst fees; 0 refuses every start that would cost one, null puts back the default ($50).
-await agental.setBurstBudget(10_000_000);
+await agental.setHeadroomBudget(10_000_000);
 ```
 
 A create, fork or start takes `maxBurstFeeMicros`, the most it may pay, and the sandbox's `burstFeeMicros` says what it paid:
@@ -372,7 +378,7 @@ console.log(sandbox.burstFeeMicros); // 0 within the free burst
 await sandbox.start({ maxBurstFeeMicros: 0, maxBurstWaitMs: 300_000 }); // free, waiting up to 5 minutes for it to be
 ```
 
-Where `enforced` is true, a start is refused with an `ApiError` of status 429 and one of these codes. `feeMicros` says what it would have cost and `retryAfterSeconds` when it would cost nothing, or null when waiting would not help:
+Where `now.enforced` is true, a start is refused with an `ApiError` of status 429 and one of these codes. `feeMicros` says what it would have cost and `retryAfterSeconds` when it would cost nothing, or null when waiting would not help; `refusedLastHour` how many creates and starts were refused with the same code in the last hour, this one with them, and `headroomUrl` the console's page that shows them all:
 
 - `running_limit_reached`: the account already runs its plan's running count. Stop something first.
 - `burst_fee_too_high`: the start would cost more than `maxBurstFeeMicros`.

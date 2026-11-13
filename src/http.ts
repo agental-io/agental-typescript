@@ -311,20 +311,24 @@ async function errorOf(response: Response): Promise<AgentalError> {
   const body = parsed(await response.text().catch(() => ""));
   const error = body && typeof body === "object" ? (body as { error?: unknown }).error : null;
   if (error && typeof error === "object") {
-    const { code, message, regionsWithRoom, feeMicros, retryAfterSeconds } = error as {
+    const { code, message, regionsWithRoom, feeMicros, retryAfterSeconds, refusedLastHour, headroomUrl } = error as {
       code?: unknown;
       message?: unknown;
       regionsWithRoom?: unknown;
       feeMicros?: unknown;
       retryAfterSeconds?: unknown;
+      refusedLastHour?: unknown;
+      headroomUrl?: unknown;
     };
     if (typeof code === "string" && typeof message === "string") {
       const regions = Array.isArray(regionsWithRoom) ? regionsWithRoom.filter((one): one is string => typeof one === "string") : undefined;
-      const burst = {
+      const refusal = {
         ...(typeof feeMicros === "number" ? { feeMicros } : {}),
         ...(typeof retryAfterSeconds === "number" || retryAfterSeconds === null ? { retryAfterSeconds } : {}),
+        ...(typeof refusedLastHour === "number" ? { refusedLastHour } : {}),
+        ...(typeof headroomUrl === "string" ? { headroomUrl } : {}),
       };
-      return new ApiError(response.status, code, message, regions, burst);
+      return new ApiError(response.status, code, message, regions, refusal);
     }
   }
   return new ProxyError(response.status);
