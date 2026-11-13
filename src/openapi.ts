@@ -1346,7 +1346,7 @@ export interface paths {
         /** @description Whether a terminal can be opened on the sandbox now. A WebSocket handshake to this address opens one instead, with a ticket from POST /v1/sandboxes/{id}/terminal. */
         get: operations["getSandboxTerminal"];
         put?: never;
-        /** @description A ticket to open a terminal on the sandbox: a login shell in it, as root in /root, with what a command runs with. Open a WebSocket to path on this API's address within 30 seconds, from the same address, with the subprotocols agental.terminal.v1 and ticket.<ticket>. Send what is typed as binary messages, and {"type":"resize","cols":n,"rows":n} as text. The terminal's output comes as binary messages; {"type":"started"}, {"type":"exit","code","signal","timedOut"} and {"type":"error","code","message"} come as text. It is closed when the shell ends (1000), when what let it be opened no longer does, as a key taken away, a session ended or the sandbox stopped (4003), after 30 minutes with nothing typed (4008), and when it could not be opened or its sandbox stopped answering (4011). Closing it hangs the shell up: what runs in it is sent SIGHUP, as when an SSH session ends. */
+        /** @description A ticket to open a terminal on the sandbox: a login shell in it, as root in /root, with what a command runs with. Open a WebSocket to path on this API's address within 30 seconds, with the subprotocols agental.terminal.v1 and ticket.<ticket>. Send challenge, the base64url SHA-256 (unpadded) of a verifier of 43 to 128 base64url characters that you keep, as OAuth's PKCE does with S256, and add the subprotocol verifier.<verifier>: the ticket then opens a terminal only with it, from any address. Without a challenge, it opens one only from the address it was asked from. Send what is typed as binary messages, and {"type":"resize","cols":n,"rows":n} as text. The terminal's output comes as binary messages; {"type":"started"}, {"type":"exit","code","signal","timedOut"} and {"type":"error","code","message"} come as text. It is closed when the shell ends (1000), when what let it be opened no longer does, as a key taken away, a session ended or the sandbox stopped (4003), after 30 minutes with nothing typed (4008), and when it could not be opened or its sandbox stopped answering (4011). Closing it hangs the shell up: what runs in it is sent SIGHUP, as when an SSH session ends. */
         post: operations["openSandboxTerminal"];
         delete?: never;
         options?: never;
@@ -3921,7 +3921,7 @@ export interface components {
             idleSeconds: number;
         };
         SandboxTerminalTicket: {
-            /** @description Opens one terminal on this sandbox, once, from the address it was asked from. Sent as the WebSocket subprotocol ticket.<ticket>, never in a URL. */
+            /** @description Opens one terminal on this sandbox, once: with the verifier of the challenge it was asked with, or, asked without one, from the address it was asked from. Sent as the WebSocket subprotocol ticket.<ticket>, never in a URL. */
             ticket: string;
             /** @description When it stops working, 30 seconds after it was given. */
             expiresAt: string;
@@ -3930,7 +3930,7 @@ export interface components {
              * @example /v1/sandboxes/sbx_0123456789abcdef/terminal
              */
             path: string;
-            /** @description The subprotocols to open it with: agental.terminal.v1, and the ticket. */
+            /** @description The subprotocols to open it with: agental.terminal.v1, and the ticket. Asked with a challenge, add verifier.<verifier>. */
             protocols: string[];
         };
         OpenSandboxTerminal: {
@@ -3938,6 +3938,11 @@ export interface components {
             cols: number;
             /** @example 32 */
             rows: number;
+            /**
+             * @description The base64url SHA-256, unpadded, of a verifier kept by the caller: the ticket then opens a terminal only with that verifier.
+             * @example E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM
+             */
+            challenge?: string;
         };
         Schedule: {
             /** @example sch_0123456789abcdef */
