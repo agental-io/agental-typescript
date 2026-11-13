@@ -1,7 +1,7 @@
 import { AgentalError, ApiError, ConnectionError, TimeoutError } from "./errors.js";
 import { sleep, tagSegment, type Http } from "./http.js";
 import { Secrets, type Template } from "./template.js";
-import { Terminal, terminalSize, type TerminalOptions, type TerminalTicket } from "./terminal.js";
+import { Terminal, terminalPkce, terminalSize, type TerminalOptions, type TerminalTicket } from "./terminal.js";
 import type {
   BrowserState,
   CreateSchedule,
@@ -976,8 +976,9 @@ export class Sandbox {
   async terminal(options: TerminalOptions = {}): Promise<Terminal> {
     const { cols, rows } = terminalSize(options);
     const WebSocket = this.http.WebSocket;
-    const { ticket, path } = (await this.http.json<TerminalTicket>({ method: "POST", path: `${this.path}/terminal`, body: { cols, rows } })).body;
-    return await Terminal.open(WebSocket, this.http.webSocketUrl(path), ticket);
+    const { verifier, challenge } = await terminalPkce();
+    const { ticket, path } = (await this.http.json<TerminalTicket>({ method: "POST", path: `${this.path}/terminal`, body: { cols, rows, challenge } })).body;
+    return await Terminal.open(WebSocket, this.http.webSocketUrl(path), ticket, verifier);
   }
 
   /** Runs a command and gives its output as it arrives, then what it exited with. */

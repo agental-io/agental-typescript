@@ -4,6 +4,8 @@ import { AgentalError, ConnectionError } from "./errors.js";
 export const TERMINAL_PROTOCOL = "agental.terminal.v1";
 /** The subprotocol a ticket is sent as: this, then the ticket. The ticket is never put in a URL. */
 const TICKET_PROTOCOL_PREFIX = "ticket.";
+/** The subprotocol the ticket's verifier is sent as: this, then the verifier. */
+const VERIFIER_PROTOCOL_PREFIX = "verifier.";
 /** The most the API takes in one message of what is typed. Longer input is sent in pieces this size. */
 const MAX_INPUT_BYTES = 64 * 1024;
 /** The least and most columns or rows a terminal may have. */
@@ -61,6 +63,25 @@ export interface TerminalExit {
   reason: string;
   /** The error the API said before it closed the terminal, when it said one. */
   error: { code: string; message: string } | null;
+}
+
+/**
+ * A verifier, kept in memory alone, and its S256 challenge (RFC 7636), which a ticket is asked with: the ticket then
+ * opens the terminal only with the verifier, which no answer carries, from whatever address the WebSocket leaves by.
+ */
+export async function terminalPkce(): Promise<{ verifier: string; challenge: string }> {
+  const base64url = (bytes: Uint8Array): string => {
+    let text = "";
+    for (const byte of bytes) text += String.fromCharCode(byte);
+    return btoa(text).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  };
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle) {
+    throw new AgentalError("A terminal needs Web Crypto (globalThis.crypto.subtle): Node 20 or later, or a page on HTTPS.");
+  }
+  const verifier = base64url(globalThis.crypto.getRandomValues(new Uint8Array(32)));
+  const digest = await subtle.digest("SHA-256", new TextEncoder().encode(verifier));
+  return { verifier, challenge: base64url(new Uint8Array(digest)) };
 }
 
 /** A ticket from POST /v1/sandboxes/{id}/terminal. */
@@ -128,10 +149,15 @@ export class Terminal implements AsyncIterable<Uint8Array> {
 
   /**
    * Opens a WebSocket to the terminal a ticket is for, and gives the terminal once the API has
-   * taken the ticket. The ticket goes only in the subprotocols, never in the URL.
+   * taken the ticket. The ticket, and the verifier of the challenge it was asked with, go only in
+   * the subprotocols, never in the URL.
    */
-  static async open(WebSocket: WebSocketConstructor, url: string, ticket: string): Promise<Terminal> {
-    const socket = new WebSocket(url, [TERMINAL_PROTOCOL, `${TICKET_PROTOCOL_PREFIX}${ticket}`]);
+  static async open(WebSocket: WebSocketConstructor, url: string, ticket: string, verifier?: string): Promise<Terminal> {
+    const protocols = [TERMINAL_PROTOCOL, `${TICKET_PROTOCOL_PREFIX}${ticket}`];
+    if (verifier !== undefined) {
+      protocols.push(`${VERIFIER_PROTOCOL_PREFIX}${verifier}`);
+    }
+    const socket = new WebSocket(url, protocols);
     socket.binaryType = "arraybuffer";
     const terminal = new Terminal(socket);
     await new Promise<void>((resolve, reject) => {
@@ -143,7 +169,7 @@ export class Terminal implements AsyncIterable<Uint8Array> {
       socket.addEventListener("close", (event: { code?: number }) => {
         if (!open) {
           // A refused handshake says nothing more to a WebSocket than that it was refused.
-          reject(new ConnectionError(`The terminal could not be opened (WebSocket closed with ${event.code ?? 1006}). The ticket may have expired, or been used from another address.`));
+          reject(new ConnectionError(`The terminal could not be opened (WebSocket closed with ${event.code ?? 1006}). The ticket may have expired or been used.`));
         }
       });
     });

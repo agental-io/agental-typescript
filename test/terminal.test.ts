@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 
 import { Agental, AgentalError, ConnectionError, TERMINAL_PROTOCOL, type SandboxInfo, type WebSocketConstructor } from "../src/index.js";
@@ -106,11 +107,17 @@ test("a terminal is asked for with its size, and opened with the ticket as a sub
   const { agental, posted } = client();
   const sandbox = await agental.sandboxes.get("sbx_0123456789abcdef");
   const terminal = await sandbox.terminal({ cols: 120, rows: 32 });
-  assert.deepEqual(posted, [{ url: "https://api.test/v1/sandboxes/sbx_0123456789abcdef/terminal", body: { cols: 120, rows: 32 }, auth: "Bearer key_test" }]);
+  const { challenge, ...size } = posted[0]!.body as { cols: number; rows: number; challenge: string };
+  assert.deepEqual([{ ...posted[0]!, body: size }], [{ url: "https://api.test/v1/sandboxes/sbx_0123456789abcdef/terminal", body: { cols: 120, rows: 32 }, auth: "Bearer key_test" }]);
+  assert.match(challenge, /^[A-Za-z0-9_-]{43}$/);
   const socket = FakeSocket.made[0]!;
   assert.equal(socket.url, "wss://api.test/v1/sandboxes/sbx_0123456789abcdef/terminal");
   assert.ok(!socket.url.includes(TICKET), "the ticket is in no URL");
-  assert.deepEqual(socket.protocols, [TERMINAL_PROTOCOL, `ticket.${TICKET}`]);
+  // Then the verifier of the challenge it was asked with (RFC 7636, S256), which no answer carries.
+  assert.deepEqual(socket.protocols.slice(0, 2), [TERMINAL_PROTOCOL, `ticket.${TICKET}`]);
+  const verifier = socket.protocols[2]!.replace(/^verifier\./, "");
+  assert.equal(socket.protocols.length, 3);
+  assert.equal(createHash("sha256").update(verifier).digest("base64url"), challenge);
   assert.equal(socket.binaryType, "arraybuffer");
   terminal.close();
 });
