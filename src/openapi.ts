@@ -4897,10 +4897,15 @@ export interface components {
                  */
                 halfLifeMinutes: number;
                 /**
-                 * @description What a GiB started costs once the meter is at twice the free burst, in millionths of a US dollar. It costs nothing at the free burst's edge and rises in a straight line with how far over the meter goes: fee = feeMicrosPerGib / (2 × free) × (over after² − over before²), in GiB. A burst to twice the free burst costs about $0.04 for each small sandbox past it, one to three times about $0.08.
-                 * @example 20000
+                 * @description What each GiB of a start that is past the free burst costs, in millionths of a US dollar: fee = min(feeMicrosPerGib × GiB over, feeCapHours × the size's list price an hour). A small past the free burst costs $0.027, a large $0.108.
+                 * @example 10000
                  */
                 feeMicrosPerGib: number;
+                /**
+                 * @description The most one start costs in burst fees, in hours of its size's list price.
+                 * @example 1
+                 */
+                feeCapHours: number;
                 /**
                  * @description What an account spends on burst fees in a month at most unless it sets another budget: PUT /v1/burst/budget.
                  * @example 50000000
