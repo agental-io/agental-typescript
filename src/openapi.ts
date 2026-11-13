@@ -2716,6 +2716,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/claude/connections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listClaudeConnections"];
+        put?: never;
+        post: operations["connectClaude"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/claude/connections/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getClaudeConnection"];
+        put?: never;
+        post?: never;
+        delete: operations["disconnectClaude"];
+        options?: never;
+        head?: never;
+        patch: operations["updateClaudeConnection"];
+        trace?: never;
+    };
+    "/v1/claude/connections/{id}/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listClaudeSessions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/burst": {
         parameters: {
             query?: never;
@@ -4820,6 +4868,8 @@ export interface components {
             hiddenVariables: boolean;
             /** @description Whether a sandbox's web traffic can leave through a residential address, at $3 a GB: PUT /v1/sandboxes/{id}/egress, and egress on a create or a template. GET /v1/egress says whether the account may. False, asking for it answers 501 residential_egress_unavailable. */
             residentialEgress: boolean;
+            /** @description Whether Claude Managed Agents' self-hosted environments can be connected, so that their sessions' tool calls run in this account's sandboxes: /v1/claude/connections. False, those calls answer 501 claude_unavailable. */
+            managedAgents: boolean;
             /** @description Whether a sandbox's CPU, memory, disk and network are read and kept: GET /v1/sandboxes/{id}/metrics and GET /v1/metrics. False, both answer 501 metrics_unavailable. GET /v1/metrics/running answers either way. */
             metrics: boolean;
             /** @description Whether an account can have its sandboxes' metrics and lifecycle events sent to a collector of its own, over OTLP/HTTP: GET, PUT and DELETE /v1/telemetry, and POST /v1/telemetry/test. Metrics are sent only where metrics is true as well. False, those calls answer 501 telemetry_unavailable. */
@@ -5469,6 +5519,100 @@ export interface components {
             status: number | null;
             /** @description What went wrong, or what the collector said it did not take. */
             message: string | null;
+        };
+        ClaudeConnection: {
+            /** @example ccn_7f3a91c2d04e5b18 */
+            id: string;
+            /**
+             * @description The self-hosted environment at Anthropic whose sessions run in this account's sandboxes.
+             * @example env_01UykHXsjAbCdEfGhIjKlMnO
+             */
+            environmentId: string;
+            /** @description The template each session's sandbox is made from. Null for the account's default template, and for a template deleted since. */
+            templateId: string | null;
+            /**
+             * @description How many days a sleeping session's stopped sandbox is kept before it is deleted.
+             * @example 7
+             */
+            keepDays: number;
+            /** @description Whether the webhook's signing secret is kept. Without it no webhook is taken, and sessions are found by a pass every minute alone. */
+            hasWebhookSecret: boolean;
+            /**
+             * @description The address to give the Claude Console as this environment's webhook, for session.status_run_started.
+             * @example https://agental.io/v1/claude/webhook/ccn_7f3a91c2d04e5b18
+             */
+            webhookUrl: string;
+            createdAt: string;
+            updatedAt: string;
+        };
+        ClaudeConnectInput: {
+            /**
+             * @description A self-hosted environment's id from the Claude Console.
+             * @example env_01UykHXsjAbCdEfGhIjKlMnO
+             */
+            environmentId: string;
+            /**
+             * @description The environment's key from the Claude Console. It is kept sealed, never shown again, and never put into a sandbox in plain.
+             * @example <ENVIRONMENT_KEY>
+             */
+            environmentKey: string;
+            /**
+             * @description The webhook's signing secret from the Claude Console. Kept sealed and never shown again.
+             * @example <WEBHOOK_SIGNING_SECRET>
+             */
+            webhookSecret?: string;
+            /**
+             * @description A template of this account. Left out or null, the account's default template.
+             * @example tpl_97b3405a8aad303a
+             */
+            templateId?: string | null;
+            /**
+             * @description Days a sleeping session's stopped sandbox is kept: 1 to 90. 7 when left out.
+             * @example 7
+             */
+            keepDays?: number;
+        };
+        ClaudeSession: {
+            /** @example sesn_015kpQZQkF1Puu8vYEgsmGtY */
+            sessionId: string;
+            /** @description The session's sandbox, or null while one is being made. */
+            sandboxId: string | null;
+            /** @description The sandbox's status now, or null where it was deleted. */
+            sandboxStatus: string | null;
+            /**
+             * @description running while its worker may be up; sleeping once its sandbox is stopped, until its next turn.
+             * @enum {string}
+             */
+            state: "running" | "sleeping";
+            /** @description When its last turn's worker was started. */
+            lastTurnAt: string | null;
+            lastActiveAt: string;
+            /** @description When its sandbox is deleted, while it sleeps: keepDays after it went to sleep. */
+            deletesAt: string | null;
+            /** @description Why its last turn was not served, such as a sandbox that could not be made. Null when it was. */
+            error: string | null;
+        };
+        ClaudeConnectionChange: {
+            /**
+             * @description The environment's key from the Claude Console. It is kept sealed, never shown again, and never put into a sandbox in plain.
+             * @example <ENVIRONMENT_KEY>
+             */
+            environmentKey?: string;
+            /**
+             * @description A new signing secret, or null to forget it.
+             * @example <WEBHOOK_SIGNING_SECRET>
+             */
+            webhookSecret?: string | null;
+            /**
+             * @description A template of this account. Left out or null, the account's default template.
+             * @example tpl_97b3405a8aad303a
+             */
+            templateId?: string | null;
+            /**
+             * @description Days a sleeping session's stopped sandbox is kept: 1 to 90. 7 when left out.
+             * @example 7
+             */
+            keepDays?: number;
         };
         Burst: {
             /** @description Whether the account is held to its plan: a start past the running count is refused, and a fast one costs a fee. False: what it starts is only measured. */
@@ -11429,10 +11573,11 @@ export interface operations {
                      */
                     url: string;
                     /**
-                     * @description What to send: sandbox.created, sandbox.started, sandbox.stopped, sandbox.archived, sandbox.error, sandbox.moved, sandbox.deleted, sandbox.auto_stop_set, sandbox.labels_changed, prompt.created, template.created, template.updated, template.secrets_changed (named, never with a value), template.labels_changed and template.deleted, or * for all of them, which is what is sent when this is left out. Each event has the same id in every webhook it is sent to, and a sandbox.* event in the log record a collector set with PUT /v1/telemetry is sent.
+                     * @description What to send: sandbox.created, sandbox.started, sandbox.stopped, sandbox.archived, sandbox.error, sandbox.moved, sandbox.deleted, sandbox.auto_stop_set, sandbox.labels_changed, sandbox.scheduled_run, sandbox.schedule_paused, sandbox.low_cpu, prompt.created, email.received, email.delivered, email.bounced, member.invited, member.joined, member.removed, member.role_changed, key.revoked, template.created, template.updated, template.secrets_changed (named, never with a value), template.labels_changed, template.deleted, and Headroom's headroom.burst_started, headroom.burst_ended, headroom.refused, headroom.running_count_reached, headroom.budget_threshold and headroom.budget_reached, which are the organization's and about no sandbox. A group by its name and .*, as headroom.* or sandbox.*, is every event of the group and any added to it later; * alone is every event, which is what is sent when this is left out. A * anywhere else is refused. Each event has the same id in every webhook it is sent to, and a sandbox.* or headroom.* event is sent as a log record to the collector set with PUT /v1/telemetry.
                      * @example [
                      *       "sandbox.created",
-                     *       "sandbox.error"
+                     *       "sandbox.error",
+                     *       "headroom.*"
                      *     ]
                      */
                     events?: string[];
@@ -11626,10 +11771,11 @@ export interface operations {
                      */
                     url?: string;
                     /**
-                     * @description What to send: sandbox.created, sandbox.started, sandbox.stopped, sandbox.archived, sandbox.error, sandbox.moved, sandbox.deleted, sandbox.auto_stop_set, sandbox.labels_changed, prompt.created, template.created, template.updated, template.secrets_changed (named, never with a value), template.labels_changed and template.deleted, or * for all of them, which is what is sent when this is left out. Each event has the same id in every webhook it is sent to, and a sandbox.* event in the log record a collector set with PUT /v1/telemetry is sent.
+                     * @description What to send: sandbox.created, sandbox.started, sandbox.stopped, sandbox.archived, sandbox.error, sandbox.moved, sandbox.deleted, sandbox.auto_stop_set, sandbox.labels_changed, sandbox.scheduled_run, sandbox.schedule_paused, sandbox.low_cpu, prompt.created, email.received, email.delivered, email.bounced, member.invited, member.joined, member.removed, member.role_changed, key.revoked, template.created, template.updated, template.secrets_changed (named, never with a value), template.labels_changed, template.deleted, and Headroom's headroom.burst_started, headroom.burst_ended, headroom.refused, headroom.running_count_reached, headroom.budget_threshold and headroom.budget_reached, which are the organization's and about no sandbox. A group by its name and .*, as headroom.* or sandbox.*, is every event of the group and any added to it later; * alone is every event, which is what is sent when this is left out. A * anywhere else is refused. Each event has the same id in every webhook it is sent to, and a sandbox.* or headroom.* event is sent as a log record to the collector set with PUT /v1/telemetry.
                      * @example [
                      *       "sandbox.created",
-                     *       "sandbox.error"
+                     *       "sandbox.error",
+                     *       "headroom.*"
                      *     ]
                      */
                     events?: string[];
@@ -17973,6 +18119,357 @@ export interface operations {
                 };
             };
             /** @description telemetry_unavailable: nothing is sent to a collector here. GET /v1/policy says so as telemetry. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listClaudeConnections: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The account's connected environments. Their keys and signing secrets are never shown. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["ClaudeConnection"][];
+                    };
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description claude_unavailable: Claude Managed Agents are not served here. GET /v1/policy says so as managedAgents. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    connectClaude: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClaudeConnectInput"];
+            };
+        };
+        responses: {
+            /** @description The environment is connected. Set webhookUrl as its webhook in the Claude Console, with session.status_run_started, and give its signing secret here. The key is not tried now: a key Anthropic refuses is said on the connection once its work is claimed. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        connection: components["schemas"]["ClaudeConnection"];
+                    };
+                };
+            };
+            /** @description invalid_request: the environment's id, its key, the signing secret or keepDays is not of the shape it should be. template_required: the key is limited to templates, the default is not one of them, and no templateId was sent. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description role_required: in a team, only an owner or an admin connects an environment. key_action_forbidden: the key may not sandbox.create. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description template_not_found: no template of this account has that id, or the key does not reach it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description environment_connected: this account has connected the environment already. connection_limit_reached: the account has 20 connections. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description claude_unavailable: Claude Managed Agents are not served here. GET /v1/policy says so as managedAgents. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getClaudeConnection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The connection. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        connection: components["schemas"]["ClaudeConnection"];
+                    };
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description not_found: no connection of this account has that id. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description claude_unavailable: Claude Managed Agents are not served here. GET /v1/policy says so as managedAgents. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    disconnectClaude: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The environment is disconnected, and its key and signing secret are forgotten. Its sessions' sandboxes are left as they are. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description role_required: in a team, only an owner or an admin disconnects an environment. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description not_found: no connection of this account has that id. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description claude_unavailable: Claude Managed Agents are not served here. GET /v1/policy says so as managedAgents. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    updateClaudeConnection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClaudeConnectionChange"];
+            };
+        };
+        responses: {
+            /** @description The connection, changed: a new key or signing secret, another template, or another keepDays. What is left out stays as it was. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        connection: components["schemas"]["ClaudeConnection"];
+                    };
+                };
+            };
+            /** @description invalid_request: the key, the signing secret or keepDays is not of the shape it should be. template_required: templateId is null, the key is limited to templates, and the default is not one of them. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description role_required: in a team, only an owner or an admin changes a connection. key_action_forbidden: the key may not sandbox.create. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description not_found: no connection of this account has that id. template_not_found: no template of this account has that id, or the key does not reach it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description claude_unavailable: Claude Managed Agents are not served here. GET /v1/policy says so as managedAgents. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listClaudeSessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The sessions of this environment that have run here, the latest active first, at most 200: each one's sandbox, whether it runs or sleeps, and why its last turn was not served, where it was not. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["ClaudeSession"][];
+                    };
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description not_found: no connection of this account has that id. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description claude_unavailable: Claude Managed Agents are not served here. GET /v1/policy says so as managedAgents. */
             501: {
                 headers: {
                     [name: string]: unknown;

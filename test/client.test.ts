@@ -2041,3 +2041,43 @@ test("residential egress: the account's standing is read, its use case told and 
   assert.deepEqual([sent[10]?.method, sent[10]?.path], ["GET", "/v1/templates/tpl_0000000000000002/egress"]);
   assert.equal(sent.length, 11);
 });
+
+
+test("Claude connections are connected, read, changed and disconnected", async () => {
+  const connection = {
+    id: "ccn_7f3a91c2d04e5b18",
+    environmentId: "env_01UykHXsjAbCdEfGhIjKlMnO",
+    templateId: null,
+    keepDays: 7,
+    hasWebhookSecret: true,
+    webhookUrl: "https://agental.io/v1/claude/webhook/ccn_7f3a91c2d04e5b18",
+    createdAt: "2026-11-13T20:00:00.000Z",
+    updatedAt: "2026-11-13T20:00:00.000Z",
+  };
+  const { agental, sent } = scripted(
+    json(201, { connection }),
+    json(200, { data: [connection] }),
+    json(200, { connection: { ...connection, keepDays: 3, hasWebhookSecret: false } }),
+    new Response(null, { status: 204 }),
+    new TypeError("fetch failed"),
+  );
+  const made = await agental.connectClaude({ environmentId: connection.environmentId, environmentKey: "sk-ant-oat01-key", webhookSecret: "whsec_s" });
+  assert.deepEqual([sent[0]?.method, sent[0]?.path, sent[0]?.body], ["POST", "/v1/claude/connections", { environmentId: connection.environmentId, environmentKey: "sk-ant-oat01-key", webhookSecret: "whsec_s" }]);
+  assert.equal(made.id, connection.id);
+  assert.deepEqual((await agental.listClaudeConnections()).map((one) => one.environmentId), [connection.environmentId]);
+  const changed = await agental.updateClaudeConnection(made.id, { keepDays: 3, webhookSecret: null });
+  assert.deepEqual([sent[2]?.method, sent[2]?.body], ["PATCH", { keepDays: 3, webhookSecret: null }]);
+  assert.equal(changed.hasWebhookSecret, false);
+  await agental.disconnectClaude(made.id);
+  assert.deepEqual([sent[3]?.method, sent[3]?.path], ["DELETE", "/v1/claude/connections/ccn_7f3a91c2d04e5b18"]);
+  // A connect whose answer is lost is not sent again: a second would be refused as connected already, or connect twice.
+  await assert.rejects(agental.connectClaude({ environmentId: connection.environmentId, environmentKey: "sk-ant-oat01-key" }), ConnectionError);
+  assert.equal(sent.length, 5);
+});
+
+test("a connection's sessions are listed", async () => {
+  const session = { sessionId: "sesn_01", sandboxId: "sbx_1", sandboxStatus: "stopped", state: "sleeping" as const, lastTurnAt: "2026-11-13T20:00:00.000Z", lastActiveAt: "2026-11-13T20:05:00.000Z", deletesAt: "2026-11-20T20:05:00.000Z", error: null };
+  const { agental, sent } = scripted(json(200, { data: [session] }));
+  assert.deepEqual(await agental.listClaudeSessions("ccn_7f3a91c2d04e5b18"), [session]);
+  assert.deepEqual([sent[0]?.method, sent[0]?.path], ["GET", "/v1/claude/connections/ccn_7f3a91c2d04e5b18/sessions"]);
+});

@@ -36,6 +36,8 @@ import type {
   TeamRole,
   Telemetry,
   TelemetryTest,
+  ClaudeConnection,
+  ClaudeSession,
   RunsOnRepository,
   RunsOnRepositories,
   Usage,
@@ -698,6 +700,47 @@ export class Agental {
   }
 
   /**
+   * The Claude Managed Agents self-hosted environments connected to your account. Each
+   * session of one runs its tool calls in a sandbox of your own. Their keys and signing
+   * secrets are never shown. Only where policy() says managedAgents.
+   */
+  async listClaudeConnections(): Promise<ClaudeConnection[]> {
+    return (await this.http.json<{ data: ClaudeConnection[] }>({ method: "GET", path: "/v1/claude/connections", replay: true })).body.data;
+  }
+
+  /**
+   * Connects a self-hosted environment from the Claude Console: its id, its environment key,
+   * and, for a turn to start at once, its webhook's signing secret. The key and secret are
+   * kept sealed and never shown again, and the key never goes into a sandbox. Each session
+   * gets a sandbox on templateId (the account's default when left out), stopped between turns
+   * and deleted once it has slept keepDays (7). Set the answer's webhookUrl as the
+   * environment's webhook for session.status_run_started in the Claude Console.
+   */
+  async connectClaude(connection: { environmentId: string; environmentKey: string; webhookSecret?: string; templateId?: string | null; keepDays?: number }): Promise<ClaudeConnection> {
+    return (await this.http.json<{ connection: ClaudeConnection }>({ method: "POST", path: "/v1/claude/connections", body: connection })).body.connection;
+  }
+
+  /** One connected environment. */
+  async getClaudeConnection(id: string): Promise<ClaudeConnection> {
+    return (await this.http.json<{ connection: ClaudeConnection }>({ method: "GET", path: `/v1/claude/connections/${encodeURIComponent(id)}`, replay: true })).body.connection;
+  }
+
+  /** The sessions of a connected environment that have run here, the latest active first: each one's sandbox, whether it runs or sleeps, when a sleeping one's sandbox is deleted, and why its last turn was not served. */
+  async listClaudeSessions(id: string): Promise<ClaudeSession[]> {
+    return (await this.http.json<{ data: ClaudeSession[] }>({ method: "GET", path: `/v1/claude/connections/${encodeURIComponent(id)}/sessions`, replay: true })).body.data;
+  }
+
+  /** Changes a connection: a new key or signing secret (null forgets it), another template (null for the default), or keepDays. What is left out stays as it was. */
+  async updateClaudeConnection(id: string, change: { environmentKey?: string; webhookSecret?: string | null; templateId?: string | null; keepDays?: number }): Promise<ClaudeConnection> {
+    return (await this.http.json<{ connection: ClaudeConnection }>({ method: "PATCH", path: `/v1/claude/connections/${encodeURIComponent(id)}`, body: change, replay: true })).body.connection;
+  }
+
+  /** Disconnects an environment: its key and signing secret are forgotten, and no more of its work is claimed. Its sessions' sandboxes are left as they are. */
+  async disconnectClaude(id: string): Promise<void> {
+    await this.http.send({ method: "DELETE", path: `/v1/claude/connections/${encodeURIComponent(id)}` });
+  }
+
+  /**
    * GitHub Actions jobs on sandboxes: each repository's pool, how many sandboxes of each size it
    * keeps and the template they are made on. available is false where jobs do not run on
    * sandboxes here. GitHub itself is connected in the console.
@@ -746,8 +789,10 @@ export class Agental {
 
   /**
    * Adds a webhook. url is posted each event it takes, and has to be on the public internet.
-   * events names the kinds it takes, such as sandbox.stopped, or "*" for every one and any
-   * added later, which is what it takes when events is left out. The answer holds
+   * events names the kinds it takes, such as sandbox.stopped or headroom.burst_ended, a group
+   * of them by its name and .*, such as "headroom.*", which takes the group's kinds added later
+   * too, or "*" for every one and any added later, which is what it takes when events is left
+   * out. A * anywhere else is refused. The answer holds
    * signingSecret, the one time it is given: each post's X-Agental-Signature is checked
    * against it with verifyWebhook. It is sent once, so a lost answer is not sent again.
    */

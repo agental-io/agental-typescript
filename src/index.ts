@@ -85,6 +85,8 @@ export type {
   DataRetention,
   AccountExport,
   TelemetryTest,
+  ClaudeConnection,
+  ClaudeSession,
   RunsOnRepository,
   RunsOnRepositories,
   TemplateApplied,

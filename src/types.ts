@@ -143,6 +143,10 @@ export type DataRetention = Schemas["DataRetention"];
 export type AccountExport = Schemas["AccountExport"];
 /** What your collector answered one empty export. */
 export type TelemetryTest = Schemas["TelemetryTest"];
+/** A Claude Managed Agents self-hosted environment connected to your account: its sessions' tool calls run in your sandboxes. Its key and signing secret are never shown. */
+export type ClaudeConnection = Schemas["ClaudeConnection"];
+/** A session of a connected environment that has run here: its sandbox, whether it runs or sleeps, and why its last turn was not served. */
+export type ClaudeSession = Schemas["ClaudeSession"];
 /** A repository's runs-on pool: how many sandboxes of each size it keeps, the template they are made on, and the ones it has. */
 export type RunsOnRepository = Schemas["RunsOnRepository"];
 /** Each repository's runs-on pool, and the size a pool keeps where none was set. */
