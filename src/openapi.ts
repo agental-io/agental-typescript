@@ -2305,6 +2305,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/billing/invoices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listBillingInvoices"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/billing/card": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getBillingCard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/cli-sign-ins": {
         parameters: {
             query?: never;
@@ -5215,6 +5247,46 @@ export interface components {
             autoReload: {
                 /** @description The top-up charged, in whole US dollars. */
                 dollars: number;
+            } | null;
+        };
+        BillingInvoices: {
+            invoices: {
+                id: string;
+                /** @description The number on the invoice. Null until it is finalized. */
+                number: string | null;
+                createdAt: string;
+                /**
+                 * @description open: not paid yet. void: cancelled, nothing is owed, as a reload whose card declined. uncollectible: written off.
+                 * @enum {string}
+                 */
+                status: "open" | "paid" | "void" | "uncollectible";
+                /** @description What it was for, as the invoice says it. */
+                description: string | null;
+                /** @example usd */
+                currency: string;
+                /** @description What it came to, tax included. */
+                totalMicros: number;
+                taxMicros: number;
+                amountPaidMicros: number;
+                /** @description The payment provider's page for it, where an open one is paid. It shows the billing name and address, so it is given to an owner only: null for an admin. */
+                pageUrl: string | null;
+                /** @description Its PDF, an owner's only as pageUrl is. */
+                pdfUrl: string | null;
+            }[];
+            /** @description Pass as startingAfter for the page after this one. Null on the last page. */
+            next: string | null;
+        };
+        BillingCard: {
+            /** @description Null where the account has no card saved. */
+            card: {
+                /** @example visa */
+                brand: string | null;
+                /** @example 4242 */
+                last4: string | null;
+                expMonth: number | null;
+                expYear: number | null;
+                /** @description apple_pay, google_pay or another wallet it is kept in; null for a card typed in. */
+                wallet: string | null;
             } | null;
         };
         CliSignIn: {
@@ -16463,6 +16535,69 @@ export interface operations {
                 };
             };
             /** @description billing_not_configured, or nothing_bought: the account has not bought anything yet. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listBillingInvoices: {
+        parameters: {
+            query?: {
+                /** @description How many to answer at most, 1 to 100. 25 when left out. */
+                limit?: number;
+                /** @description The next value of the page before, for the page after it. A page may hold fewer than limit, drafts being left out, and still have a next. */
+                startingAfter?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The account's invoices, newest first, as the payment provider keeps them: a plan's months, top-ups and auto-reloads, drafts left out. Read from it each time; agental keeps none of them. Amounts are millionths of the invoice's currency. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BillingInvoices"];
+                };
+            };
+            /** @description billing_not_configured: nothing is sold here. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getBillingCard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The card the account pays with now: the one a plan's month, a top-up and an auto-reload charge. Its brand, last four and expiry only, read from the payment provider each time. Changed on the payment provider's page, POST /v1/billing/portal. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BillingCard"];
+                };
+            };
+            /** @description billing_not_configured: nothing is sold here. */
             409: {
                 headers: {
                     [name: string]: unknown;
