@@ -1335,6 +1335,43 @@ test("the auto-reload is set and turned off by one call, which sends the dollars
   assert.deepEqual(sent[1]?.body, { dollars: null });
 });
 
+test("the invoices are read a page at a time, and every one in turn; the card in one call", async () => {
+  const invoice = (id: string) => ({
+    id,
+    number: `AG-${id}`,
+    createdAt: "2026-11-09T10:00:00.000Z",
+    status: "paid",
+    description: "agental credits",
+    currency: "usd",
+    totalMicros: 100_000_000,
+    taxMicros: 0,
+    amountPaidMicros: 100_000_000,
+    pageUrl: null,
+    pdfUrl: null,
+  });
+  const card = { card: { brand: "visa", last4: "4242", expMonth: 8, expYear: 2028, wallet: null } };
+  const { agental, sent } = scripted(
+    json(200, { invoices: [invoice("in_2")], next: "in_2" }),
+    json(200, { invoices: [invoice("in_2")], next: "in_2" }),
+    // A page may come back empty, drafts being left out, and still have a next.
+    json(200, { invoices: [], next: "in_x" }),
+    json(200, { invoices: [invoice("in_1")], next: null }),
+    json(200, card),
+  );
+  const page = await agental.invoices({ limit: 1 });
+  assert.deepEqual([page.invoices.map((one) => one.id), page.next], [["in_2"], "in_2"]);
+  assert.deepEqual([sent[0]?.method, sent[0]?.path], ["GET", "/v1/billing/invoices?limit=1"]);
+  const all: string[] = [];
+  for await (const one of agental.allInvoices({ limit: 1 })) {
+    all.push(one.id);
+  }
+  assert.deepEqual(all, ["in_2", "in_1"]);
+  assert.equal(sent[2]?.path, "/v1/billing/invoices?limit=1&startingAfter=in_2");
+  assert.equal(sent[3]?.path, "/v1/billing/invoices?limit=1&startingAfter=in_x");
+  assert.deepEqual(await agental.card(), card);
+  assert.deepEqual([sent[4]?.method, sent[4]?.path], ["GET", "/v1/billing/card"]);
+});
+
 test("a desktop is turned on with the screen it is given, read and turned off, each by the call the API has for it", async () => {
   const on = { enabled: true, enabledAt: "2026-10-14T08:00:00.000Z", running: true, width: 1280, height: 800, display: ":0", url: "https://3f9c2a17b8d04e6a51c0.agental.site/vnc.html?autoconnect=1&resize=scale&reconnect=1" };
   const off = { enabled: false, enabledAt: null, running: false, width: null, height: null, display: null, url: null };

@@ -18,6 +18,9 @@ import type {
   Organization,
   Region,
   AutoReload,
+  BillingCard,
+  BillingInvoice,
+  BillingInvoices,
   Checkout,
   DataRetention,
   CreateApiKey,
@@ -569,6 +572,34 @@ export class Agental {
    */
   async setAutoReload(dollars: number | null): Promise<AutoReload> {
     return (await this.http.json<AutoReload>({ method: "PUT", path: "/v1/billing/auto-reload", body: { dollars } })).body;
+  }
+
+  /**
+   * The account's invoices, newest first, read from the payment provider: a plan's months, top-ups
+   * and auto-reloads, drafts left out. 25 unless limit says otherwise, 100 at most; pass a page's
+   * next as startingAfter for the page after it. An admin is given no pageUrl or pdfUrl.
+   */
+  async invoices(options: { limit?: number; startingAfter?: string } = {}): Promise<BillingInvoices> {
+    const query = { limit: options.limit === undefined ? undefined : String(options.limit), startingAfter: options.startingAfter };
+    return (await this.http.json<BillingInvoices>({ method: "GET", path: "/v1/billing/invoices", query, replay: true })).body;
+  }
+
+  /** Every invoice, newest first, read a page at a time as they are asked for. */
+  async *allInvoices(options: { limit?: number } = {}): AsyncGenerator<BillingInvoice, void, void> {
+    let startingAfter: string | undefined;
+    for (;;) {
+      const page = await this.invoices({ ...options, ...(startingAfter === undefined ? {} : { startingAfter }) });
+      yield* page.invoices;
+      if (page.next === null) {
+        return;
+      }
+      startingAfter = page.next;
+    }
+  }
+
+  /** The card the account pays with now, the one an auto-reload charges: its brand, last four, expiry and wallet, or null where none is saved. */
+  async card(): Promise<BillingCard> {
+    return (await this.http.json<BillingCard>({ method: "GET", path: "/v1/billing/card", replay: true })).body;
   }
 
   /** The account's mail: the handle every address of its sandboxes carries, what its plan allows, and what it has had of that today. */

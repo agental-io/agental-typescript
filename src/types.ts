@@ -162,6 +162,12 @@ export type Billing = Omit<Schemas["Billing"], "plan" | "discount" | "sandboxesA
 export type Checkout = Schemas["Checkout"];
 /** The auto-reload as it is now: the top-up the saved card is charged for when the credits run out, or null while it is off. */
 export type AutoReload = Schemas["AutoReload"];
+/** A page of the account's invoices, newest first, and the value to pass as startingAfter for the page after it, null on the last. */
+export type BillingInvoices = Schemas["BillingInvoices"];
+/** An invoice: its number, state, what it was for, what it came to in millionths, and the payment provider's page and PDF for it (an owner's only). */
+export type BillingInvoice = Schemas["BillingInvoices"]["invoices"][number];
+/** The card the account pays with now, or null where it has none: brand, last four, expiry and wallet only. */
+export type BillingCard = Schemas["BillingCard"];
 /** Whether mail is on for a sandbox, and the domain its addresses end in. */
 export type SandboxEmail = Schemas["SandboxEmail"];
 /** A message as a list gives it: who it is from and for, what was made of its sender, and where a sent one has got to. */
