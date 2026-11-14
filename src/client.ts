@@ -19,6 +19,7 @@ import type {
   Region,
   AutoReload,
   BillingCard,
+  BillingDetails,
   BillingInvoice,
   BillingInvoices,
   Checkout,
@@ -600,6 +601,11 @@ export class Agental {
   /** The card the account pays with now, the one an auto-reload charges: its brand, last four, expiry and wallet, or null where none is saved. */
   async card(): Promise<BillingCard> {
     return (await this.http.json<BillingCard>({ method: "GET", path: "/v1/billing/card", replay: true })).body;
+  }
+
+  /** Who the account's invoices are made out to: the email they go to, the name and address on them, and its tax ids. Null before it has bought anything. An owner's to read: an admin is refused with 403. */
+  async billingDetails(): Promise<BillingDetails> {
+    return (await this.http.json<BillingDetails>({ method: "GET", path: "/v1/billing/details", replay: true })).body;
   }
 
   /** The account's mail: the handle every address of its sandboxes carries, what its plan allows, and what it has had of that today. */

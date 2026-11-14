@@ -26,6 +26,7 @@ export type {
   Region,
   AutoReload,
   BillingCard,
+  BillingDetails,
   BillingInvoice,
   BillingInvoices,
   Checkout,

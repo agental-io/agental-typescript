@@ -1357,6 +1357,7 @@ test("the invoices are read a page at a time, and every one in turn; the card in
     json(200, { invoices: [], next: "in_x" }),
     json(200, { invoices: [invoice("in_1")], next: null }),
     json(200, card),
+    json(200, { details: { email: "billing@example.com", name: "Example Ltd", address: null, taxIds: [{ type: "eu_vat", value: "BG123456789", verification: "verified" }] } }),
   );
   const page = await agental.invoices({ limit: 1 });
   assert.deepEqual([page.invoices.map((one) => one.id), page.next], [["in_2"], "in_2"]);
@@ -1370,6 +1371,9 @@ test("the invoices are read a page at a time, and every one in turn; the card in
   assert.equal(sent[3]?.path, "/v1/billing/invoices?limit=1&startingAfter=in_x");
   assert.deepEqual(await agental.card(), card);
   assert.deepEqual([sent[4]?.method, sent[4]?.path], ["GET", "/v1/billing/card"]);
+  const details = await agental.billingDetails();
+  assert.equal(details.details?.taxIds[0]?.value, "BG123456789");
+  assert.deepEqual([sent[5]?.method, sent[5]?.path], ["GET", "/v1/billing/details"]);
 });
 
 test("a desktop is turned on with the screen it is given, read and turned off, each by the call the API has for it", async () => {

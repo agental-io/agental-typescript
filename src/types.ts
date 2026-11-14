@@ -168,6 +168,7 @@ export type BillingInvoices = Schemas["BillingInvoices"];
 export type BillingInvoice = Schemas["BillingInvoices"]["invoices"][number];
 /** The card the account pays with now, or null where it has none: brand, last four, expiry and wallet only. */
 export type BillingCard = Schemas["BillingCard"];
+export type BillingDetails = Schemas["BillingDetails"];
 /** Whether mail is on for a sandbox, and the domain its addresses end in. */
 export type SandboxEmail = Schemas["SandboxEmail"];
 /** A message as a list gives it: who it is from and for, what was made of its sender, and where a sent one has got to. */

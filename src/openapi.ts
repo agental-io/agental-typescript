@@ -2337,6 +2337,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/billing/details": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getBillingDetails"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/cli-sign-ins": {
         parameters: {
             query?: never;
@@ -5287,6 +5303,35 @@ export interface components {
                 expYear: number | null;
                 /** @description apple_pay, google_pay or another wallet it is kept in; null for a card typed in. */
                 wallet: string | null;
+            } | null;
+        };
+        BillingDetails: {
+            /** @description Null where the account has bought nothing and saved no card yet, or the payment provider has no customer for it. */
+            details: {
+                /** @description Where invoices and receipts are sent. */
+                email: string | null;
+                /** @description The name on invoices: a company's, or a person's. */
+                name: string | null;
+                address: {
+                    line1: string | null;
+                    line2: string | null;
+                    city: string | null;
+                    postalCode: string | null;
+                    state: string | null;
+                    /**
+                     * @description Two letters, as BG.
+                     * @example BG
+                     */
+                    country: string | null;
+                } | null;
+                taxIds: {
+                    /** @example eu_vat */
+                    type: string;
+                    /** @example BG123456789 */
+                    value: string;
+                    /** @description verified, pending or unverified, as the tax authority answered; null where it is not checked. */
+                    verification: string | null;
+                }[];
             } | null;
         };
         CliSignIn: {
@@ -16595,6 +16640,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BillingCard"];
+                };
+            };
+            /** @description billing_not_configured: nothing is sold here. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getBillingDetails: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Who the account's invoices are made out to: the email they go to, the name and address on them, and its tax ids, as an EU VAT number. Read from the payment provider each time, and changed on its page, POST /v1/billing/portal; the next invoice carries them. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BillingDetails"];
+                };
+            };
+            /** @description forbidden: only an owner of a team sees who its invoices are made out to. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description billing_not_configured: nothing is sold here. */

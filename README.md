@@ -348,9 +348,10 @@ An account starts on the free plan: nothing a month, and what it runs is paid fr
 const page = await agental.invoices({ limit: 10 });
 for await (const invoice of agental.allInvoices()) console.log(invoice.number, invoice.status, invoice.totalMicros);
 const { card } = await agental.card();
+const { details } = await agental.billingDetails();
 ```
 
-`invoices()` gives the account's invoices from the payment provider, newest first, 25 to a page unless `limit` says otherwise: a plan's months, top-ups and auto-reloads, each with its number, state, what it was for, what it came to in millionths, and its page and PDF (`null` for an admin). Pass a page's `next` as `startingAfter` for the page after it, or let `allInvoices()` read them all. `card()` gives the card the account pays with now: brand, last four, expiry and wallet, or `null` where none is saved.
+`invoices()` gives the account's invoices from the payment provider, newest first, 25 to a page unless `limit` says otherwise: a plan's months, top-ups and auto-reloads, each with its number, state, what it was for, what it came to in millionths, and its page and PDF (`null` for an admin). Pass a page's `next` as `startingAfter` for the page after it, or let `allInvoices()` read them all. `card()` gives the card the account pays with now: brand, last four, expiry and wallet, or `null` where none is saved. `billingDetails()` gives who the invoices are made out to: the email they go to, the name and address on them and the tax ids, or `null` before the account has bought anything. It is the owner's to read: an admin's call is refused with 403.
 
 The free plan makes tiny and small sandboxes, the $100 plan medium ones too, and the $500 and $2000 plans every size: `prices.tiers` lists the plans, and each plan's `sizes` says which. A create, fork or template start of a size the plan does not make throws an `ApiError` with the status 402 and the code `size_not_on_plan`, whose message names the plan that makes it. A sandbox made before a change of plan still starts at its own size.
 
