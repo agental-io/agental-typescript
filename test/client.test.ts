@@ -1673,6 +1673,7 @@ function apiKey(changes: Partial<ApiKey> = {}): ApiKey {
     actions: ["sandbox.read", "sandbox.create", "exec"],
     sandboxIds: [],
     templateIds: ["tpl_coding_agent"],
+    madeOnly: false,
     expiresAt: null,
     allowFrom: ["203.0.113.0/24"],
     lastUsedAt: null,

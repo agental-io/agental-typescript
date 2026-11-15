@@ -4597,8 +4597,10 @@ export interface components {
                  *     ]
                  */
                 actions: ("sandbox.read" | "sandbox.create" | "sandbox.fork" | "sandbox.update" | "sandbox.auto-stop" | "sandbox.stop" | "sandbox.resume" | "sandbox.delete" | "sandbox.delete-own" | "exec" | "file.read" | "file.write" | "agent.prompt" | "ssh" | "desktop" | "host" | "network.write" | "secret.read" | "secret.write" | "email.read" | "email.send" | "email.manage" | "snapshot.read" | "snapshot.write" | "template.read" | "template.write" | "key.manage" | "account.read" | "account.admin" | "members.read" | "members.admin" | "*")[];
-                /** @description The sandboxes the key is limited to, with templateIds. Empty, with templateIds empty too, is every sandbox of the account. */
+                /** @description The sandboxes the key is limited to, with templateIds. Empty, with templateIds empty too and madeOnly false, is every sandbox of the account. */
                 sandboxIds: string[];
+                /** @description True for a key that reaches only the sandboxes it made, and the snapshots of them. */
+                madeOnly: boolean;
                 /** @description The templates the key is limited to: it reaches them and every sandbox on them. Empty is every template, and, with sandboxIds empty too, every sandbox. */
                 templateIds: string[];
                 /** @description When the key stops working. Null is never. */
@@ -4967,8 +4969,10 @@ export interface components {
              *     ]
              */
             actions: ("sandbox.read" | "sandbox.create" | "sandbox.fork" | "sandbox.update" | "sandbox.auto-stop" | "sandbox.stop" | "sandbox.resume" | "sandbox.delete" | "sandbox.delete-own" | "exec" | "file.read" | "file.write" | "agent.prompt" | "ssh" | "desktop" | "host" | "network.write" | "secret.read" | "secret.write" | "email.read" | "email.send" | "email.manage" | "snapshot.read" | "snapshot.write" | "template.read" | "template.write" | "key.manage" | "account.read" | "account.admin" | "members.read" | "members.admin" | "*")[];
-            /** @description The sandboxes the key is limited to, with templateIds. Empty, with templateIds empty too, is every sandbox of the account. */
+            /** @description The sandboxes the key is limited to, with templateIds. Empty, with templateIds empty too and madeOnly false, is every sandbox of the account. */
             sandboxIds: string[];
+            /** @description True for a key that reaches only the sandboxes it made, and the snapshots of them. */
+            madeOnly: boolean;
             /** @description The templates the key is limited to: it reaches them and every sandbox on them. Empty is every template, and, with sandboxIds empty too, every sandbox. */
             templateIds: string[];
             /** @description When the key stops working. Null is never. */
@@ -5013,6 +5017,8 @@ export interface components {
              *     ]
              */
             templateIds?: string[];
+            /** @description Limits the key to the sandboxes it makes itself, and their snapshots: every other sandbox of the account answers it 404. Not with sandboxIds or templateIds. Templates are not limited by it. */
+            madeOnly?: boolean;
             /**
              * Format: date-time
              * @description When the key stops working, and is refused with 401 key_expired. Left out, never.
