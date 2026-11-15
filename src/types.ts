@@ -83,6 +83,16 @@ export type BrowserState = Schemas["BrowserState"];
 export type SshState = Schemas["SshState"];
 /** A key that may log in to a sandbox as root: its id, fingerprint, type and comment. */
 export type SshKey = Schemas["SshKey"];
+/** A file read from a sandbox: its path, its size, when it was last changed (null for a sandbox made before that could be read), and its text or base64. */
+export type FileContents = Schemas["FileContents"];
+/** A file written into a sandbox: its path, its size, and when it was last changed. */
+export type FileWritten = Schemas["FileWritten"];
+/** A folder in a sandbox and what it holds, by name. */
+export type Folder = Schemas["Folder"];
+/** One thing in a folder: a file, a folder, a link or something else, with its size and when it was last changed. */
+export type FolderEntry = Schemas["FolderEntry"];
+/** A shell kept in a sandbox: its id and number, what runs in its foreground and where, whether a terminal has it open, the bytes it has printed, and how it ended (null while it runs). */
+export type KeptTerminal = Schemas["SandboxKeptTerminal"];
 /** Who a key or session belongs to: the account, its role, and whether it is closed. */
 export type Me = operations["getMe"]["responses"][200]["content"]["application/json"];
 export type Operation = Schemas["Operation"];

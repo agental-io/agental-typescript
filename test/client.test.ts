@@ -47,6 +47,7 @@ function sandbox(changes: Partial<SandboxInfo> = {}): SandboxInfo {
     name: "agent-1",
     region: "main",
     size: "small",
+    pendingSize: null,
     status: "running",
     hostId: null,
     activity: null,
@@ -268,6 +269,42 @@ test("a stop sends no body, and keepMemory when it is asked for, and the sandbox
   await box.stop({ keepMemory: true });
   assert.deepEqual([sent[2]?.method, sent[2]?.path, sent[2]?.body], ["POST", "/v1/sandboxes/sbx_0123456789abcdef/stop", { keepMemory: true }]);
   assert.equal(box.info.memoryKept, true);
+});
+
+test("a resize sends the size, and restart only when it is asked for, and the sandbox says the size that waits", async () => {
+  const { agental, sent } = scripted(
+    json(200, sandbox()),
+    json(200, sandbox({ pendingSize: "medium" })),
+    json(200, sandbox({ size: "medium" })),
+    refusal(409, "size_smaller"),
+  );
+  const box = await agental.sandboxes.get("sbx_0123456789abcdef");
+  assert.equal(box.pendingSize, null);
+  await box.resize("medium");
+  assert.deepEqual([sent[1]?.method, sent[1]?.path, sent[1]?.body], ["POST", "/v1/sandboxes/sbx_0123456789abcdef/resize", { size: "medium" }]);
+  assert.deepEqual([box.size, box.pendingSize], ["small", "medium"]);
+  await box.resize("medium", { restart: true });
+  assert.deepEqual(sent[2]?.body, { size: "medium", restart: true });
+  assert.deepEqual([box.size, box.pendingSize], ["medium", null]);
+  await assert.rejects(box.resize("tiny"), (error: unknown) => error instanceof ApiError && error.status === 409 && error.code === "size_smaller");
+  assert.equal(box.size, "medium");
+});
+
+test("a resize that restarts is sent once, with its burst cap, and throws when the sandbox is not running again", async () => {
+  const { agental, sent } = scripted(
+    json(200, sandbox()),
+    refusal(500, "host_error"),
+    json(200, sandbox({ size: "medium" }), { "agental-burst-fee": "1200" }),
+    json(200, sandbox({ size: "large", status: "stopped", error: "the box had no room" })),
+  );
+  const box = await agental.sandboxes.get("sbx_0123456789abcdef");
+  await assert.rejects(box.resize("medium", { restart: true }), (error: unknown) => error instanceof ApiError && error.code === "host_error");
+  assert.equal(sent.length, 2);
+  await box.resize("medium", { restart: true, maxBurstFeeMicros: 5000 });
+  assert.equal(sent[2]?.headers.get("agental-max-burst-fee"), "5000");
+  assert.deepEqual([box.size, box.burstFeeMicros], ["medium", 1200]);
+  await assert.rejects(box.resize("large", { restart: true }), (error: unknown) => error instanceof AgentalError && /is stopped, not running again\. the box had no room/.test(error.message));
+  assert.equal(box.status, "stopped");
 });
 
 test("a stop that keeps memory and is answered 202 reads the sandbox until it has stopped", async () => {

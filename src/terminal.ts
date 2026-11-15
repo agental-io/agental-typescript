@@ -20,6 +20,8 @@ export const TERMINAL_CLOSE = {
   accessEnded: 4003,
   /** Nothing was typed in it for 30 minutes. */
   idle: 4008,
+  /** A kept shell was opened again elsewhere (another terminal(), the console, the CLI): it runs on there. */
+  elsewhere: 4009,
   /** It could not be opened, or its sandbox stopped answering. error says why when the API said. */
   failed: 4011,
 } as const;
@@ -43,14 +45,25 @@ export interface TerminalOptions {
   cols?: number;
   /** Its height in rows, 1 to 1000. Default 24. */
   rows?: number;
+  /**
+   * Keep the shell: it runs on when the terminal is closed, with the last 256 KiB of what it
+   * printed, until it exits, closeTerminal() ends it, or the sandbox stops. A sandbox whose
+   * agent is from before kept shells opens one that is not kept: kept is then null.
+   */
+  keep?: boolean;
+  /** A kept shell's id, as terminals() lists it, to open it again: what it kept comes first. A terminal that had it is closed with 4009. Not taken with keep. */
+  attach?: string;
 }
+
+/** A kept shell's id. */
+export const KEPT_TERMINAL_ID = /^pty_[0-9a-f]{16}$/;
 
 /** How a terminal ended. */
 export interface TerminalExit {
   /**
    * What the shell exited with, when it ended by itself (closeCode 1000). Null when the
    * terminal was closed before the shell said: by close(), or by the API (closeCode 4003,
-   * 4008, 4011), or because the connection was lost.
+   * 4008, 4009, 4011), or because the connection was lost.
    */
   exitCode: number | null;
   /** The signal that ended the shell, 0 when none did. */
@@ -105,6 +118,20 @@ export function terminalSize(options: TerminalOptions): { cols: number; rows: nu
   return { cols: size(options.cols ?? 80, "cols"), rows: size(options.rows ?? 24, "rows") };
 }
 
+/** What a ticket is asked with besides its size: keep, or the kept shell to open again. */
+export function terminalKeep(options: TerminalOptions): { keep?: true; terminal?: string } {
+  if (options.attach !== undefined) {
+    if (options.keep === true) {
+      throw new AgentalError("A terminal is a new one, kept or not, or a kept one opened again: give keep or attach, not both.");
+    }
+    if (!KEPT_TERMINAL_ID.test(options.attach)) {
+      throw new AgentalError(`attach takes a kept shell's id, as pty_0123456789abcdef, not ${JSON.stringify(String(options.attach).slice(0, 100))}.`);
+    }
+    return { terminal: options.attach };
+  }
+  return options.keep === true ? { keep: true } : {};
+}
+
 const encoder = new TextEncoder();
 
 /**
@@ -112,7 +139,8 @@ const encoder = new TextEncoder();
  * iterating it, each piece as bytes as the shell wrote them; what is typed is sent with
  * write(), and a new size with resize(). It ends when the shell does, when close() is called,
  * or when the API closes it, and then exited says how. Closing it hangs the shell up: what
- * runs in it is sent SIGHUP, as when an SSH session ends.
+ * runs in it is sent SIGHUP, as when an SSH session ends. A kept one (opened with keep or
+ * attach) runs on instead, to be opened again by its id: kept says which it is.
  *
  * Output is kept until it is read: a caller that stops reading should close() it.
  */
@@ -127,6 +155,7 @@ export class Terminal implements AsyncIterable<Uint8Array> {
   private ended: TerminalExit | null = null;
   private started = false;
   private startedListeners: Array<() => void> = [];
+  private keptAs: { id: string; n: number } | null = null;
 
   private constructor(socket: WebSocketLike) {
     this.socket = socket;
@@ -181,6 +210,14 @@ export class Terminal implements AsyncIterable<Uint8Array> {
     return terminal;
   }
 
+  /**
+   * The kept shell this is, once it has started: its id, to open it again with attach, and its
+   * number in the sandbox. Null before then, and for a shell that is not kept.
+   */
+  get kept(): { id: string; n: number } | null {
+    return this.keptAs;
+  }
+
   /** Whether the shell has started. What is typed before it has is kept, up to 64 KiB, and given to it once it has. */
   get hasStarted(): boolean {
     return this.started;
@@ -216,7 +253,7 @@ export class Terminal implements AsyncIterable<Uint8Array> {
     }
   }
 
-  /** Closes it, which hangs the shell up. exited resolves once it has closed. */
+  /** Closes it, which hangs the shell up, unless it is kept: then it runs on. exited resolves once it has closed. */
   close(): void {
     if (!this.ended) {
       this.socket.close(1000, "closed");
@@ -255,6 +292,11 @@ export class Terminal implements AsyncIterable<Uint8Array> {
         return;
       }
       if (message["type"] === "started") {
+        const id = message["terminal"];
+        const n = message["n"];
+        if (typeof id === "string" && KEPT_TERMINAL_ID.test(id) && typeof n === "number" && Number.isInteger(n) && n >= 1) {
+          this.keptAs = { id, n };
+        }
         this.started = true;
         for (const listener of this.startedListeners.splice(0)) {
           listener();

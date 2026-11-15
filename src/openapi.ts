@@ -251,6 +251,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/sandboxes/{id}/resize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["resizeSandbox"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/sandboxes/{id}/exec": {
         parameters: {
             query?: never;
@@ -442,6 +458,38 @@ export interface paths {
         get: operations["readFile"];
         put: operations["writeFile"];
         post?: never;
+        delete: operations["deleteFile"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sandboxes/{id}/files/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["moveFile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sandboxes/{id}/folders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listFolder"];
+        put?: never;
+        post: operations["makeFolder"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1346,9 +1394,43 @@ export interface paths {
         /** @description Whether a terminal can be opened on the sandbox now. A WebSocket handshake to this address opens one instead, with a ticket from POST /v1/sandboxes/{id}/terminal. */
         get: operations["getSandboxTerminal"];
         put?: never;
-        /** @description A ticket to open a terminal on the sandbox: a login shell in it, as root in /root, with what a command runs with. Open a WebSocket to path on this API's address within 30 seconds, with the subprotocols agental.terminal.v1 and ticket.<ticket>. Send challenge, the base64url SHA-256 (unpadded) of a verifier of 43 to 128 base64url characters that you keep, as OAuth's PKCE does with S256, and add the subprotocol verifier.<verifier>: the ticket then opens a terminal only with it, from any address. Without a challenge, it opens one only from the address it was asked from. Send what is typed as binary messages, and {"type":"resize","cols":n,"rows":n} as text. The terminal's output comes as binary messages; {"type":"started"}, {"type":"exit","code","signal","timedOut"} and {"type":"error","code","message"} come as text. It is closed when the shell ends (1000), when what let it be opened no longer does, as a key taken away, a session ended or the sandbox stopped (4003), after 30 minutes with nothing typed (4008), and when it could not be opened or its sandbox stopped answering (4011). Closing it hangs the shell up: what runs in it is sent SIGHUP, as when an SSH session ends. */
+        /** @description A ticket to open a terminal on the sandbox: a login shell in it, as root in /root, with what a command runs with. Open a WebSocket to path on this API's address within 30 seconds, with the subprotocols agental.terminal.v1 and ticket.<ticket>. Send challenge, the base64url SHA-256 (unpadded) of a verifier of 43 to 128 base64url characters that you keep, as OAuth's PKCE does with S256, and add the subprotocol verifier.<verifier>: the ticket then opens a terminal only with it, from any address. Without a challenge, it opens one only from the address it was asked from. Send what is typed as binary messages, and {"type":"resize","cols":n,"rows":n} as text. The terminal's output comes as binary messages; {"type":"started"}, {"type":"exit","code","signal","timedOut"} and {"type":"error","code","message"} come as text. It is closed when the shell ends (1000), when what let it be opened no longer does, as a key taken away, a session ended or the sandbox stopped (4003), after 30 minutes with nothing typed (4008), and when it could not be opened or its sandbox stopped answering (4011). Closing it hangs the shell up: what runs in it is sent SIGHUP, as when an SSH session ends. Asked with keep, the shell runs on instead, and is opened again with its id as terminal; its started message names it as terminal and n. A kept shell opened elsewhere closes this one with 4009. */
         post: operations["openSandboxTerminal"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sandboxes/{id}/terminals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description The shells kept in the sandbox (opened with keep), oldest first: what runs in each one's foreground and where, whether a WebSocket has it open, and how it ended. A stopped sandbox keeps none. */
+        get: operations["listSandboxTerminals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sandboxes/{id}/terminals/{terminalId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Closes a kept shell: what runs in it is sent SIGHUP, as when an SSH session ends, and it is no longer listed. A WebSocket that has it open is sent its exit. */
+        delete: operations["closeSandboxTerminal"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1700,6 +1782,22 @@ export interface paths {
         get: operations["getHeard"];
         put: operations["setHeard"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/console/misses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["reportConsoleMiss"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3122,6 +3220,11 @@ export interface components {
             memoryKept: boolean;
             /** @description Why the memory its last stop kept was not put back by its last start, which started it from its disk: as after an upgrade of the server it is on, which the memory cannot be put back across. Null when it was put back, or none was kept. */
             memoryLost: string | null;
+            /**
+             * @description A larger size its next start gives it, asked for by POST /v1/sandboxes/{id}/resize while it ran without restart: it runs, and is billed, at its size until it is stopped and started. Null when none waits.
+             * @enum {string|null}
+             */
+            pendingSize: "tiny" | "small" | "medium" | "large" | null;
             network: components["schemas"]["SandboxNetwork"];
             /** @description What it is doing, as last read: null when it is not running, not read yet, or where GET /v1/policy says metrics is false. */
             activity: {
@@ -3550,15 +3653,62 @@ export interface components {
             encoding: "text" | "base64";
             text?: string;
             base64?: string;
+            bytes: number;
+            /** @description When the file was last changed, to send back as ifModifiedAt. Null for a sandbox made before this could be read. */
+            modifiedAt: string | null;
         };
         FileWritten: {
             path: string;
             bytes: number;
+            /** @description When it was last changed, to the nanosecond, as 2026-11-15T10:04:05.123456789Z. */
+            modifiedAt: string | null;
         };
         FileWrite: {
+            /** @description Relative to the work folder, /opt/agental, or absolute: anywhere on the sandbox's machine, as root sees it. Outside the work folder, an API key needs the action exec as well. */
             path: string;
             text?: string;
             base64?: string;
+            /** @description The modifiedAt the file was read with: the write is refused 409 file_changed if the file was changed or deleted since. */
+            ifModifiedAt?: string;
+        };
+        FileMoved: {
+            from: string;
+            to: string;
+        };
+        FileMove: {
+            /** @description Relative to the work folder, /opt/agental, or absolute: anywhere on the sandbox's machine, as root sees it. Outside the work folder, an API key needs the action exec as well. */
+            from: string;
+            /** @description Relative to the work folder, /opt/agental, or absolute: anywhere on the sandbox's machine, as root sees it. Outside the work folder, an API key needs the action exec as well. */
+            to: string;
+        };
+        Folder: {
+            path: string;
+            entries: components["schemas"]["FolderEntry"][];
+            /** @description The folder holds more than the first 10,000 entries by name, listed here. */
+            truncated: boolean;
+        };
+        FolderEntry: {
+            name: string;
+            /** @enum {string} */
+            kind: "file" | "folder" | "link" | "other";
+            /** @description A file's size; 0 for a folder. */
+            bytes: number;
+            /** @description When it was last changed, to the nanosecond, as 2026-11-15T10:04:05.123456789Z. */
+            modifiedAt: string;
+            /** @description A link's: what it points to. */
+            target?: string;
+            /**
+             * @description A link's, outside the work folder: what it leads to. None where it leads nowhere.
+             * @enum {string}
+             */
+            leadsTo?: "file" | "folder" | "link" | "other";
+        };
+        FolderMade: {
+            path: string;
+        };
+        FolderMake: {
+            /** @description Relative to the work folder, /opt/agental, or absolute: anywhere on the sandbox's machine, as root sees it. Outside the work folder, an API key needs the action exec as well. */
+            path: string;
         };
         StartedCommand: {
             id: string;
@@ -4071,6 +4221,42 @@ export interface components {
              * @example E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM
              */
             challenge?: string;
+            /** @description Keep the shell: it runs on when the WebSocket closes, with the last 256 KiB of its output, until it is closed (DELETE /v1/sandboxes/{id}/terminals/{terminalId}), it exits, or the sandbox stops. GET /v1/sandboxes/{id}/terminals lists the kept ones. Without it, closing the WebSocket hangs the shell up. A sandbox whose agent is from before kept shells opens one that is not kept: its started message then names no terminal. */
+            keep?: boolean;
+            /**
+             * @description A kept shell's id, to open it again: what it kept is sent first, then the terminal as it goes on. A WebSocket that had it is closed with 4009. Not taken with keep.
+             * @example pty_0123456789abcdef
+             */
+            terminal?: string;
+        };
+        SandboxKeptTerminals: {
+            terminals: components["schemas"]["SandboxKeptTerminal"][];
+        };
+        SandboxKeptTerminal: {
+            /** @example pty_0123456789abcdef */
+            id: string;
+            /** @description Its number in the sandbox, from 1, in the order the shells were opened. */
+            n: number;
+            startedAt: string;
+            /**
+             * @description What runs in its foreground now (a command line, or the shell's own name at its prompt). Null once it has ended, or where it cannot be read.
+             * @example npm run build
+             */
+            running: string | null;
+            /**
+             * @description The foreground program's working directory.
+             * @example /root/app
+             */
+            cwd: string | null;
+            /** @description Whether a WebSocket has it open now. */
+            attached: boolean;
+            /** @description The bytes it has printed: more than when last looked at means new output. */
+            output: number;
+            /** @description How it ended; null while it runs. An ended shell stays listed, with its output, until it is closed. */
+            exit: {
+                code: number;
+                signal: number;
+            } | null;
         };
         Schedule: {
             /** @example sch_0123456789abcdef */
@@ -7163,6 +7349,79 @@ export interface operations {
             };
         };
     };
+    resizeSandbox: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description The most this start may cost in burst fees, in millionths of a US dollar: 0 refuses any fee. A start that would cost more is refused with 429 burst_fee_too_high, which says when it would cost nothing. Left out, it pays what the account's monthly budget allows. See GET /v1/burst. */
+                "agental-max-burst-fee"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * @description The size it is to have: larger than its own, which gives it more vCPUs, memory and disk, with its files in place. Its own size takes away a size that waits for its next start. GET /v1/sizes lists them.
+                     * @enum {string}
+                     */
+                    size: "tiny" | "small" | "medium" | "large";
+                    /** @description For a running sandbox: true stops it and starts it again at the new size now, and every process in it ends, as on a stop; its files stay. Left out, it keeps running at its size, and the new one waits as pendingSize for its next start. A key needs sandbox.stop and sandbox.resume as well to restart one. A stopped sandbox takes the size at once, and its next start boots it at it. */
+                    restart?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description The sandbox, with its new size, or with pendingSize, the size its next start gives it. A stopped one is billed its new size's stopped price from now, and every start is billed the price of the size it runs at. Memory its last stop kept is let go, and memoryLost says why: a machine of another size cannot take it back. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Sandbox"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description size_not_on_plan: the plan does not make sandboxes of this size, and the message names the plan that does. Nothing was changed. */
+            402: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description size_smaller: the size is smaller than its own; a smaller size has a smaller disk, which is not made smaller. under_way: it is being started or stopped. invalid_state: it is neither running nor stopped. Nothing was changed. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     execCommand: {
         parameters: {
             query?: never;
@@ -7975,6 +8234,7 @@ export interface operations {
     readFile: {
         parameters: {
             query: {
+                /** @description Relative to the work folder, /opt/agental, or absolute: anywhere on the sandbox's machine, as root sees it. Outside the work folder, an API key needs the action exec as well. */
                 path: string;
                 encoding?: "text" | "base64";
             };
@@ -8048,7 +8308,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description File written into the sandbox directory. */
+            /** @description File written. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -8084,11 +8344,126 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            /** @description file_changed: the file was changed or deleted after the ifModifiedAt it was read with. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
-    downloadArtifact: {
+    deleteFile: {
         parameters: {
             query: {
+                /** @description Relative to the work folder, /opt/agental, or absolute: anywhere on the sandbox's machine, as root sees it. Outside the work folder, an API key needs the action exec as well. */
+                path: string;
+                /** @description true deletes a folder with everything in it. A symlink is deleted, never what it leads to. */
+                recursive?: "true" | "false";
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description folder_not_empty: a folder with things in it, without recursive=true. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    moveFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FileMove"];
+            };
+        };
+        responses: {
+            /** @description Moved, or renamed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FileMoved"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description file_exists: something is at to already. Nothing is replaced. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listFolder: {
+        parameters: {
+            query: {
+                /** @description Relative to the work folder, /opt/agental, or absolute: anywhere on the sandbox's machine, as root sees it. Outside the work folder, an API key needs the action exec as well. */
                 path: string;
             };
             header?: never;
@@ -8099,7 +8474,103 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Raw file bytes from the sandbox directory. */
+            /** @description What the folder holds, by name. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Folder"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description sandbox_agent_outdated: the sandbox was made before folders could be listed. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    makeFolder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FolderMake"];
+            };
+        };
+        responses: {
+            /** @description The folder, made with any missing above it. One there already is no error. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FolderMade"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    downloadArtifact: {
+        parameters: {
+            query: {
+                /** @description Relative to the work folder, /opt/agental, or absolute: anywhere on the sandbox's machine, as root sees it. Outside the work folder, an API key needs the action exec as well. */
+                path: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Raw file bytes from the sandbox. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -12306,6 +12777,94 @@ export interface operations {
             };
         };
     };
+    listSandboxTerminals: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The kept shells. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SandboxKeptTerminals"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    closeSandboxTerminal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                terminalId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Closed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description sandbox_not_running: start it first. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     listSchedules: {
         parameters: {
             query?: never;
@@ -13758,6 +14317,51 @@ export interface operations {
                 };
             };
             /** @description session_required: an API key cannot do this. A person signed in can, in the console. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    reportConsoleMiss: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The address the console's 404 page was shown at, as the browser shows it. */
+                    path: string;
+                    /** @description The console page the person was on before, where they came from one. */
+                    cameFrom?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Counted, or let go where the address is not one kept. The answer is the same either way. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid API key or session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description session_required: only the console, signed in, reports a missing page. */
             403: {
                 headers: {
                     [name: string]: unknown;

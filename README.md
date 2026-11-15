@@ -95,13 +95,22 @@ await sandbox.schedules.update(tick.id, { enabled: false }); // paused
 
 ## Files
 
-Paths are relative to the work folder, `/opt/agental`. A file can be up to 10 MB.
+A path is relative to the work folder, `/opt/agental`, or absolute: anywhere on the machine, as root sees it. A file can be up to 10 MB.
 
 ```ts
 await sandbox.files.write("notes.txt", "hi");
 await sandbox.files.read("notes.txt"); // "hi"
 await sandbox.files.write("logo.png", bytes); // a Uint8Array
 await sandbox.files.readBytes("logo.png");
+await sandbox.files.read("/etc/hostname");
+
+const file = await sandbox.files.get("notes.txt"); // { path, bytes, modifiedAt, text }
+await sandbox.files.write("notes.txt", "ho", { ifModifiedAt: file.modifiedAt }); // file_changed if it was changed since
+
+await sandbox.files.list("/var/log"); // { path, entries: [{ name, kind, bytes, modifiedAt }], truncated }
+await sandbox.files.makeFolder("out/today");
+await sandbox.files.move("notes.txt", "out/today/notes.txt"); // file_exists if something is there
+await sandbox.files.delete("out", { recursive: true });
 ```
 
 ## Stop, start, fork, snapshot
@@ -188,7 +197,23 @@ for await (const chunk of terminal) process.stdout.write(chunk); // Uint8Array, 
 const { exitCode, closeCode } = await terminal.exited; // 3, 1000
 ```
 
-It needs a key with the `exec` action, and the sandbox running. It is opened with the runtime's own `WebSocket` (Node 22 and later, browsers, Deno, Bun); in Node 20 pass `new Agental({ WebSocket })` from the `ws` package. The API closes it when the shell ends (`closeCode` 1000, with `exitCode`), when the key or the sandbox no longer lets it be open (4003), after 30 minutes with nothing typed (4008), and when its sandbox stops answering (4011); `error` says why when the API did. `close()`, or leaving the `for await`, hangs the shell up, as an SSH session's end does: start what must outlive it with `nohup` or `setsid`. The command's `agental shell <sandbox-id>` opens one in your own terminal.
+It needs a key with the `exec` action, and the sandbox running. It is opened with the runtime's own `WebSocket` (Node 22 and later, browsers, Deno, Bun); in Node 20 pass `new Agental({ WebSocket })` from the `ws` package. The API closes it when the shell ends (`closeCode` 1000, with `exitCode`), when the key or the sandbox no longer lets it be open (4003), after 30 minutes with nothing typed (4008), and when its sandbox stops answering (4011); `error` says why when the API did. `close()`, or leaving the `for await`, hangs the shell up, as an SSH session's end does, unless the shell is kept. The command's `agental shell <sandbox-id>` opens one in your own terminal.
+
+A kept shell runs on when its terminal closes, until it exits, is closed, or the sandbox stops, and is opened again by its id, with the last 256 KiB it printed first:
+
+```ts
+const first = await sandbox.terminal({ keep: true });
+first.write("npm run dev\n");
+await first.whenStarted();
+const { id, n } = first.kept!; // "pty_…", 1; null on a sandbox whose agent is from before kept shells
+first.close(); // npm run dev runs on
+
+await sandbox.terminals(); // [{ id, n, running: "npm run dev", cwd: "/root/app", attached: false, exit: null, … }]
+const again = await sandbox.terminal({ attach: id });
+await sandbox.closeTerminal(id); // ends it: what runs in it is sent SIGHUP
+```
+
+Opening a kept shell again closes the terminal that had it with 4009 (`TERMINAL_CLOSE.elsewhere`): it runs on in the new one.
 
 ## Desktop
 

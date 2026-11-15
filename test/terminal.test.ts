@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
 
-import { Agental, AgentalError, ConnectionError, TERMINAL_PROTOCOL, type SandboxInfo, type WebSocketConstructor } from "../src/index.js";
+import { Agental, AgentalError, ApiError, ConnectionError, TERMINAL_CLOSE, TERMINAL_PROTOCOL, type KeptTerminal, type SandboxInfo, type WebSocketConstructor } from "../src/index.js";
 
 // A sandbox's terminal: the ticket asked for with POST, then a WebSocket opened with it as a
 // subprotocol, never in its URL. The WebSocket is a stand-in that notes what is sent and says
@@ -78,8 +78,14 @@ class FakeSocket {
   }
 }
 
+const KEPT: KeptTerminal[] = [
+  { id: "pty_00000000000000a1", n: 1, startedAt: "2026-11-15T00:00:00.000Z", running: "npm run dev", cwd: "/root/app", attached: false, output: 4096, exit: null },
+];
+const deleted: string[] = [];
+
 function client(baseUrl = "https://api.test/"): { agental: Agental; posted: Array<{ url: string; body: unknown; auth: string | null }> } {
   FakeSocket.made = [];
+  deleted.length = 0;
   FakeSocket.refuse = false;
   FakeSocket.answerProtocol = TERMINAL_PROTOCOL;
   const posted: Array<{ url: string; body: unknown; auth: string | null }> = [];
@@ -90,8 +96,15 @@ function client(baseUrl = "https://api.test/"): { agental: Agental; posted: Arra
     WebSocket: FakeSocket as unknown as WebSocketConstructor,
     fetch: async (input, init) => {
       const url = String(input);
+      if (init?.method === "GET" && url.endsWith("/terminals")) {
+        return Response.json({ terminals: KEPT });
+      }
       if (init?.method === "GET") {
         return Response.json(SANDBOX);
+      }
+      if (init?.method === "DELETE") {
+        deleted.push(url);
+        return url.endsWith(KEPT[0]!.id) ? new Response(null, { status: 204 }) : Response.json({ error: { code: "terminal_not_found", message: "Sandbox sbx_0123456789abcdef keeps no terminal." } }, { status: 404 });
       }
       posted.push({ url, body: JSON.parse(String(init?.body)), auth: new Headers(init?.headers).get("authorization") });
       return Response.json(
@@ -226,6 +239,56 @@ test("a refused handshake, or one answered without the terminal's protocol, is a
   await assert.rejects(sandbox.terminal(), /not agental\.terminal\.v1/);
   // Closed with a code a runtime's WebSocket takes, so that the shell is hung up.
   assert.deepEqual(FakeSocket.made.at(-1)!.closedWith, { code: 1000, reason: "not a terminal" });
+});
+
+test("a kept shell is asked for with keep, names itself once started, and is opened again with attach", async () => {
+  const { agental, posted } = client();
+  const sandbox = await agental.sandboxes.get("sbx_0123456789abcdef");
+  const first = await sandbox.terminal({ keep: true });
+  assert.equal((posted[0]!.body as { keep?: boolean }).keep, true);
+  assert.equal(first.kept, null, "not before it has started");
+  FakeSocket.made[0]!.say({ type: "started", terminal: "pty_00000000000000a1", n: 1 });
+  await first.whenStarted();
+  assert.deepEqual(first.kept, { id: "pty_00000000000000a1", n: 1 });
+  first.close();
+
+  const again = await sandbox.terminal({ attach: "pty_00000000000000a1" });
+  const body = posted[1]!.body as Record<string, unknown>;
+  assert.equal(body["terminal"], "pty_00000000000000a1");
+  assert.equal(body["keep"], undefined);
+  // Opened elsewhere: the API closes this one with 4009, and the shell runs on there.
+  FakeSocket.made[1]!.say({ type: "error", code: "opened_elsewhere", message: "This terminal was opened elsewhere. It runs on there." });
+  FakeSocket.made[1]!.end(TERMINAL_CLOSE.elsewhere, "opened elsewhere");
+  const exit = await again.exited;
+  assert.equal(exit.closeCode, 4009);
+  assert.equal(exit.exitCode, null);
+  assert.equal(exit.error?.code, "opened_elsewhere");
+
+  // A shell that is not kept, as on a sandbox whose agent is from before kept shells, names none.
+  const plain = await sandbox.terminal({ keep: true });
+  FakeSocket.made[2]!.say({ type: "started" });
+  await plain.whenStarted();
+  assert.equal(plain.kept, null);
+  plain.close();
+});
+
+test("keep and attach are checked before a ticket is asked for", async () => {
+  const { agental, posted } = client();
+  const sandbox = await agental.sandboxes.get("sbx_0123456789abcdef");
+  await assert.rejects(sandbox.terminal({ keep: true, attach: "pty_00000000000000a1" }), /keep or attach, not both/);
+  await assert.rejects(sandbox.terminal({ attach: "../x" }), /attach takes a kept shell's id/);
+  assert.equal(posted.length, 0);
+});
+
+test("terminals() lists the kept shells, and closeTerminal() ends one by its id", async () => {
+  const { agental } = client();
+  const sandbox = await agental.sandboxes.get("sbx_0123456789abcdef");
+  assert.deepEqual(await sandbox.terminals(), KEPT);
+  await sandbox.closeTerminal("pty_00000000000000a1");
+  assert.deepEqual(deleted, ["https://api.test/v1/sandboxes/sbx_0123456789abcdef/terminals/pty_00000000000000a1"]);
+  await assert.rejects(sandbox.closeTerminal("pty_00000000000000b2"), (error: unknown) => error instanceof ApiError && error.code === "terminal_not_found" && error.status === 404);
+  await assert.rejects(sandbox.closeTerminal("1"), /closeTerminal takes a kept shell's id/);
+  assert.equal(deleted.length, 2);
 });
 
 test("the size is checked before a ticket is asked for", async () => {

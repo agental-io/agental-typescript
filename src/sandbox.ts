@@ -1,7 +1,7 @@
 import { AgentalError, ApiError, ConnectionError, TimeoutError } from "./errors.js";
 import { sleep, tagSegment, type Http } from "./http.js";
 import { Secrets, type Template } from "./template.js";
-import { Terminal, terminalPkce, terminalSize, type TerminalOptions, type TerminalTicket } from "./terminal.js";
+import { KEPT_TERMINAL_ID, Terminal, terminalKeep, terminalPkce, terminalSize, type TerminalOptions, type TerminalTicket } from "./terminal.js";
 import type {
   BrowserState,
   CreateSchedule,
@@ -19,6 +19,7 @@ import type {
   EmailMessageSummary,
   ExecResult,
   HostRoute,
+  KeptTerminal,
   Operation,
   SandboxAutoStop,
   SandboxEmail,
@@ -34,6 +35,9 @@ import type {
   Snapshot,
   Egress,
   EgressInput,
+  FileContents,
+  FileWritten,
+  Folder,
 } from "./types.js";
 
 /** A create answers when the machine is ready, usually in under a minute. The API says to allow it three. */
@@ -168,6 +172,22 @@ export interface WaitOptions {
   wait?: boolean;
   /** How long to wait, in milliseconds. Default 600000. */
   timeoutMs?: number;
+}
+
+/** How to resize a sandbox. */
+export interface ResizeOptions {
+  /**
+   * For a running sandbox: true stops it and starts it again at the new size now, and every
+   * process in it ends, as on a stop; its files stay. Left out, it keeps running at its size,
+   * and the new one waits as pendingSize for its next start. An API key needs sandbox.stop and
+   * sandbox.resume as well to restart one. A stopped sandbox takes the size at once either way.
+   */
+  restart?: boolean;
+  /**
+   * With restart: the most its start may cost in burst fees, in millionths of a US dollar, as
+   * for start(). burstFeeMicros says what it paid afterwards.
+   */
+  maxBurstFeeMicros?: number;
 }
 
 /** How to stop a sandbox. */
@@ -308,28 +328,67 @@ export async function makeSandbox(
   });
 }
 
-/** The files in a sandbox's work folder, /opt/agental. Paths are relative to it. */
+/**
+ * The files on a sandbox's machine. A path is relative to the work folder, /opt/agental, or
+ * absolute: anywhere on the machine, as root sees it.
+ */
 export class Files {
   constructor(
     private readonly http: Http,
     private readonly path: string,
+    private readonly folders: string,
   ) {}
 
   /** The text of a file. One that is not UTF-8 is refused: read it with readBytes. */
   async read(path: string): Promise<string> {
-    const { body } = await this.http.json<{ text?: string }>({ method: "GET", path: this.path, query: { path }, replay: true });
-    return body.text ?? "";
+    return (await this.get(path)).text ?? "";
   }
 
   async readBytes(path: string): Promise<Uint8Array> {
-    const { body } = await this.http.json<{ base64?: string }>({ method: "GET", path: this.path, query: { path, encoding: "base64" }, replay: true });
-    return fromBase64(body.base64 ?? "");
+    return fromBase64((await this.get(path, { encoding: "base64" })).base64 ?? "");
   }
 
-  /** Writes a file of up to 10 MB, making the folders it needs. */
-  async write(path: string, contents: string | Uint8Array): Promise<{ path: string; bytes: number }> {
-    const body = typeof contents === "string" ? { path, text: contents } : { path, base64: toBase64(contents) };
-    return (await this.http.json<{ path: string; bytes: number }>({ method: "PUT", path: this.path, body, replay: true })).body;
+  /** A file with its size and when it was last changed: modifiedAt is what write takes as ifModifiedAt. */
+  async get(path: string, options: { encoding?: "text" | "base64" } = {}): Promise<FileContents> {
+    const query = options.encoding ? { path, encoding: options.encoding } : { path };
+    return (await this.http.json<FileContents>({ method: "GET", path: this.path, query, replay: true })).body;
+  }
+
+  /**
+   * Writes a file of up to 10 MB, making the folders it needs. With ifModifiedAt, the modifiedAt
+   * the file was read with, it is refused with file_changed if the file was changed or deleted since.
+   */
+  async write(path: string, contents: string | Uint8Array, options: { ifModifiedAt?: string } = {}): Promise<FileWritten> {
+    const body = {
+      path,
+      ...(typeof contents === "string" ? { text: contents } : { base64: toBase64(contents) }),
+      ...(options.ifModifiedAt === undefined ? {} : { ifModifiedAt: options.ifModifiedAt }),
+    };
+    // Sent again after a lost answer, a write made on a time would be refused by its own change.
+    return (await this.http.json<FileWritten>({ method: "PUT", path: this.path, body, replay: options.ifModifiedAt === undefined })).body;
+  }
+
+  /** What a folder holds, by name: its first 10,000 entries, and truncated if there are more. */
+  async list(path: string): Promise<Folder> {
+    return (await this.http.json<Folder>({ method: "GET", path: this.folders, query: { path }, replay: true })).body;
+  }
+
+  /** Makes a folder, and any missing above it. One there already is no error. */
+  async makeFolder(path: string): Promise<{ path: string }> {
+    return (await this.http.json<{ path: string }>({ method: "POST", path: this.folders, body: { path }, replay: true })).body;
+  }
+
+  /** Moves or renames a file or folder. Something at to already is refused with file_exists, and nothing is replaced. */
+  async move(from: string, to: string): Promise<{ from: string; to: string }> {
+    return (await this.http.json<{ from: string; to: string }>({ method: "POST", path: `${this.path}/move`, body: { from, to } })).body;
+  }
+
+  /**
+   * Deletes a file, a link (never what it leads to) or an empty folder. A folder with things in it
+   * is refused with folder_not_empty, unless recursive says to delete it with everything in it.
+   */
+  async delete(path: string, options: { recursive?: boolean } = {}): Promise<void> {
+    await this.http.send({ method: "DELETE", path: this.path, query: { path, ...(options.recursive ? { recursive: "true" } : {}) } });
   }
 }
 
@@ -784,7 +843,7 @@ export class Sandbox {
     this.info = info;
     this.burstFeeMicros = burstFeeMicros;
     this.path = `/v1/sandboxes/${encodeURIComponent(info.id)}`;
-    this.files = new Files(http, `${this.path}/files`);
+    this.files = new Files(http, `${this.path}/files`, `${this.path}/folders`);
     this.commands = new Commands(http, `${this.path}/commands`);
     this.schedules = new Schedules(http, `${this.path}/schedules`);
     this.email = new Email(http, `${this.path}/email`);
@@ -804,6 +863,11 @@ export class Sandbox {
 
   get size(): Size {
     return this.info.size;
+  }
+
+  /** The size its next start gives it, as last read, or null when none waits. */
+  get pendingSize(): Size | null {
+    return this.info.pendingSize ?? null;
   }
 
   /** As it was last read: running, stopped, or on its way to one of them. */
@@ -971,14 +1035,46 @@ export class Sandbox {
    *     for await (const chunk of terminal) process.stdout.write(chunk);
    *     console.log((await terminal.exited).exitCode);
    *
+   * With keep, the shell runs on when the terminal closes, and attach opens it again by its id,
+   * with what it printed meanwhile:
+   *
+   *     const first = await sandbox.terminal({ keep: true });
+   *     first.write("npm run dev\n");
+   *     await first.whenStarted();
+   *     const { id } = first.kept!;
+   *     first.close(); // it runs on
+   *     const again = await sandbox.terminal({ attach: id });
+   *
    * It is opened with the runtime's WebSocket: in Node 20, pass new Agental({ WebSocket }).
    */
   async terminal(options: TerminalOptions = {}): Promise<Terminal> {
     const { cols, rows } = terminalSize(options);
+    const keep = terminalKeep(options);
     const WebSocket = this.http.WebSocket;
     const { verifier, challenge } = await terminalPkce();
-    const { ticket, path } = (await this.http.json<TerminalTicket>({ method: "POST", path: `${this.path}/terminal`, body: { cols, rows, challenge } })).body;
+    const { ticket, path } = (await this.http.json<TerminalTicket>({ method: "POST", path: `${this.path}/terminal`, body: { cols, rows, challenge, ...keep } })).body;
     return await Terminal.open(WebSocket, this.http.webSocketUrl(path), ticket, verifier);
+  }
+
+  /**
+   * The shells kept in it (opened with keep), oldest first: what runs in each one's foreground
+   * and where, whether a terminal has it open, and how it ended. A stopped sandbox keeps none.
+   * It needs the key action exec.
+   */
+  async terminals(): Promise<KeptTerminal[]> {
+    return (await this.http.json<{ terminals: KeptTerminal[] }>({ method: "GET", path: `${this.path}/terminals`, replay: true })).body.terminals;
+  }
+
+  /**
+   * Ends a kept shell by its id: what runs in it is sent SIGHUP, and it is no longer listed. A
+   * terminal that has it open is sent its exit. A shell it does not keep is an ApiError 404,
+   * terminal_not_found; a stopped sandbox, 409 sandbox_not_running.
+   */
+  async closeTerminal(terminalId: string): Promise<void> {
+    if (!KEPT_TERMINAL_ID.test(terminalId)) {
+      throw new AgentalError(`closeTerminal takes a kept shell's id, as pty_0123456789abcdef, not ${JSON.stringify(String(terminalId).slice(0, 100))}.`);
+    }
+    await this.http.send({ method: "DELETE", path: `${this.path}/terminals/${terminalId}`, replay: true });
   }
 
   /** Runs a command and gives its output as it arrives, then what it exited with. */
@@ -1025,6 +1121,30 @@ export class Sandbox {
       }
       await sleep(this.http.pollIntervalMs);
       await this.refresh();
+    }
+    return this;
+  }
+
+  /**
+   * Gives it a larger size, with more vCPUs, memory and disk, and its files in place. A
+   * stopped sandbox takes it at once, and its next start boots it at it. A running one keeps
+   * running at its size, and the new one waits as pendingSize for its next start, unless
+   * restart: then it is stopped and started again at the new size now. Its own size takes a
+   * waiting one away. A smaller size is refused with size_smaller, one its plan does not make
+   * with size_not_on_plan. Memory its last stop kept is let go: info.memoryLost says why. A
+   * restart is not sent again by itself, and one that leaves a sandbox that ran not running
+   * throws AgentalError, with info read as it was answered.
+   */
+  async resize(size: Size, options: ResizeOptions = {}): Promise<this> {
+    const restart = options.restart === true;
+    const wasRunning = this.info.status === "running";
+    const body = { size, ...(options.restart === undefined ? {} : { restart: options.restart }) };
+    // A restart is not sent again by itself: one sent again after its start failed would be answered with the sandbox stopped.
+    const answer = await this.http.json<SandboxInfo>({ method: "POST", path: `${this.path}/resize`, body, headers: burstHeaders(options), replay: !restart });
+    this.info = answer.body;
+    this.burstFeeMicros = burstFeeOf(answer.headers);
+    if (restart && wasRunning && this.info.status !== "running") {
+      throw new AgentalError(`Sandbox ${this.id} was stopped to be restarted as a ${this.info.size}, and is ${this.info.status}, not running again.${this.info.error ? ` ${this.info.error}` : ""} start() starts it.`);
     }
     return this;
   }
