@@ -521,7 +521,7 @@ export class Agental {
     return (await this.http.json<HostRoute>({ method: "POST", path: `/v1/host-routes/${encodeURIComponent(routeId)}/hide`, replay: true })).body;
   }
 
-  /** The sizes on offer, and how much room there is. */
+  /** The sizes on offer, the regions, and how many of your sandboxes are creating, running or stopped. */
   async limits(): Promise<Catalog> {
     return (await this.http.json<Catalog>({ method: "GET", path: "/v1/limits", replay: true })).body;
   }

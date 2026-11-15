@@ -43,7 +43,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Returns the fixed sandbox sizes with their vCPUs, memory and disk, the regions sandboxes can be created in, the default region, and whether sandboxes run in their own virtual machines. */
+        /** @description Returns the fixed sandbox sizes with their vCPUs, memory and disk, the regions sandboxes can be created in, the default region, how many of your sandboxes are creating, running or stopped, and whether sandboxes run in their own virtual machines. */
         get: operations["listSizes"];
         put?: never;
         post?: never;
@@ -1179,6 +1179,7 @@ export interface paths {
         get: operations["getMe"];
         put?: never;
         post?: never;
+        /** @description Erases a closed account now instead of at its eraseAt: its sandboxes, snapshots, mail, templates, settings and sign-in, and everything that identifies the person. This cannot be undone. Usage, payments and credit are kept under the account's id alone, for accounting. Send the header X-Agental-Confirm-Delete with the account's email address. The session cookie is cleared. Only a person signed in can erase an account. */
         delete: operations["eraseAccount"];
         options?: never;
         head?: never;
@@ -1224,7 +1225,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Returns the sandbox sizes with their resources, the regions, and the number of active sandboxes on the deployment. Same as GET /v1/sizes. */
+        /** @description Returns the sandbox sizes with their resources, the regions, and how many of your sandboxes are creating, running or stopped. Same as GET /v1/sizes. */
         get: operations["getLimits"];
         put?: never;
         post?: never;
@@ -1791,6 +1792,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** @description Downloads, as a JSON attachment, everything agental keeps about the account and the person behind it: the account, its sessions with the IP address and browser each started from, API keys, billing, payments, usage, and the sandboxes, templates and other things it created. Secrets are listed by name only, never with values. Files inside sandboxes are not included: read them through the rest of the API. */
         get: operations["exportAccount"];
         put?: never;
         post?: never;
@@ -1809,6 +1811,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** @description Closes the account of the person signed in. The plan ends, API keys and every other session end, mail is turned off on every sandbox, and running sandboxes are stopped with their disks kept. The account can be reopened until eraseAt, 30 days later, when it is erased. Closing an account that is already closed changes nothing. Only a person signed in can close an account, not an API key. */
         post: operations["closeAccount"];
         delete?: never;
         options?: never;
@@ -1825,6 +1828,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** @description Reopens a closed account before it is erased. Its sandboxes are as they were left; its plan, API keys and mail are not restored. Only a person signed in can reopen an account. */
         post: operations["reopenAccount"];
         delete?: never;
         options?: never;
@@ -2232,9 +2236,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** @description Lists the API keys of the organization the caller acts in, oldest first. In a team, owners and admins see every key; a member sees only their own. Secrets are never returned. */
         get: operations["listApiKeys"];
         put?: never;
-        /** @description Makes a key that may do what it is given and nothing else: a preset, or actions named. A key used to make one makes only a weaker one: no action it lacks, no sandbox or template it does not reach, no later expiry, and addresses inside its own. The key is made in the organization the caller acts in, a team or the person's own, and acts in it for good. A person signed in to the site whose account has two-factor sign-in on sends a code from the app too, as code. */
+        /** @description Creates an API key that can do only what it is granted: a preset, or a list of actions. A key used to create another can only create a weaker one: no action it lacks, no sandbox or template it cannot reach, no later expiry, and allowed addresses inside its own. The key is created in the organization the caller acts in (a team or the person's own) and acts in it permanently. The secret is returned only in this response. A person signed in to the site with two-factor sign-in on must also send code. */
         post: operations["createApiKey"];
         delete?: never;
         options?: never;
@@ -2249,9 +2254,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** @description Returns one API key: its permissions, limits, expiry and last use. The secret is never returned. */
         get: operations["getApiKey"];
         put?: never;
         post?: never;
+        /** @description Deletes (revokes) an API key. Requests made with it are rejected from its next request on. Sandboxes it created stay with the account. */
         delete: operations["deleteApiKey"];
         options?: never;
         head?: never;
@@ -2266,7 +2273,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** @description Replaces the addresses the key may be used from, from its next request. It is the only thing about a key that changes after it is made. An empty list is anywhere. A key used to change one, itself included, may set only addresses inside its own. While the account has two-factor sign-in on, a person signed in sends a code with a list that lets the key be used from more places. */
+        /** @description Replaces the list of addresses the key may be used from, effective from its next request. It is the only property of a key that can change after creation. An empty list allows any address. A key used to make the change, including the key itself, can only set addresses inside its own list. Only the person who created the key can change it. While the account has two-factor sign-in on, a person signed in must send code with a list that widens where the key can be used. */
         put: operations["setApiKeyAllowFrom"];
         post?: never;
         delete?: never;
@@ -2282,6 +2289,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** @description Returns what this deployment offers and the limits that apply to every account: sign-up mode, sandbox limits, which features are on (SSH, desktop, browser, mail, metrics and others) and the ways to sign in. Needs no authentication. */
         get: operations["getPolicy"];
         put?: never;
         post?: never;
@@ -2394,6 +2402,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** @description Returns the price list: each size's list price per hour and stopped prices, the plans with their included credits and limits, burst fees, top-up amounts and bonuses, and the free plan's terms. Amounts are in millionths of a US dollar. Needs no authentication. */
         get: operations["listBillingPlans"];
         put?: never;
         post?: never;
@@ -2410,6 +2419,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** @description Returns where the caller's account stands: its plan, what it has used this month, what is left of its top-ups, any amount owed, its auto-reload, and whether it can run a sandbox. Amounts are in millionths of a US dollar. */
         get: operations["getBilling"];
         put?: never;
         post?: never;
@@ -2428,6 +2438,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** @description Starts a purchase and returns the payment page to send the browser to: save a card for the free plan (nothing is charged), subscribe to a plan, or buy a top-up of credits that do not expire. Send exactly one of plan, card or topUp. An account that already has a plan and picks another is switched without a payment page (url is null, changed is true); see the response for how the month's credits are split. */
         post: operations["createBillingCheckout"];
         delete?: never;
         options?: never;
@@ -2443,6 +2454,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
+        /** @description Turns auto-reload on or off: when the account's credits run out, its saved card is charged for a top-up of the chosen size. Send dollars as null to turn it off. */
         put: operations["setBillingAutoReload"];
         post?: never;
         delete?: never;
@@ -2460,6 +2472,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** @description Returns a link to the payment provider's billing portal, where the account sees its invoices, changes its card and billing details, and cancels its plan. */
         post: operations["createBillingPortal"];
         delete?: never;
         options?: never;
@@ -2474,6 +2487,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** @description Lists the account's invoices, newest first, read live from the payment provider (agental stores none): plan months, top-ups and auto-reloads, without drafts. Amounts are in millionths of the invoice's currency. */
         get: operations["listBillingInvoices"];
         put?: never;
         post?: never;
@@ -2490,6 +2504,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** @description Returns the card the account pays with (the one charged for plan months, top-ups and auto-reloads): brand, last four digits and expiry only, read live from the payment provider. Change it in the billing portal (POST /v1/billing/portal). */
         get: operations["getBillingCard"];
         put?: never;
         post?: never;
@@ -2506,6 +2521,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** @description Returns who the account's invoices are made out to: the email they are sent to, the name and address on them, and tax ids such as an EU VAT number. Read live from the payment provider; change them in the billing portal (POST /v1/billing/portal), and the next invoice uses them. In a team, only an owner can read them. */
         get: operations["getBillingDetails"];
         put?: never;
         post?: never;
@@ -2991,6 +3007,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** @description Returns where the caller's account stands against its plan: how many sandboxes it runs and may run at once, its burst meter against its free burst, its burst fees this month against its budget, and what starting one sandbox of each size would cost now. With size (and count), it also quotes starting that many of that size. */
         get: operations["getBurst"];
         put?: never;
         post?: never;
@@ -3008,6 +3025,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
+        /** @description Sets the account's monthly budget for burst fees: a start whose fee would take this month's fees past it is refused with 429 burst_budget_reached. In a team, only an owner can set it. */
         put: operations["setHeadroomBudget"];
         post?: never;
         delete?: never;
@@ -3024,6 +3042,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
+        /** @description Sets the account's monthly budget for burst fees: a start whose fee would take this month's fees past it is refused with 429 burst_budget_reached. Same as PUT /v1/headroom/budget, which the CLI and SDKs use. In a team, only an owner can set it. */
         put: operations["setBurstBudget"];
         post?: never;
         delete?: never;
@@ -3039,7 +3058,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @deprecated */
+        /**
+         * @deprecated
+         * @description Deprecated: use GET /v1/burst. Returns the account's limits in the old tier shape, derived from its burst state: the free burst fills the tier's amounts, and the burst meter what was started.
+         */
         get: operations["getTier"];
         put?: never;
         post?: never;
@@ -3056,6 +3078,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** @description Returns how close the caller's account runs to its plan's limits: its state now and, over a time range (by default today in UTC), its running sandboxes against its running count, its burst meter against its free burst, each burst with who started what in it, the creates and starts that were refused and why, and how fast sandboxes started. A burst is a stretch when the meter was over the free burst, so every start in it paid a fee. */
         get: operations["getHeadroom"];
         put?: never;
         post?: never;
@@ -3169,7 +3192,7 @@ export interface components {
              *     ]
              */
             regions: string[];
-            /** @description Sandboxes on the deployment now that are creating, running or stopped. */
+            /** @description Your sandboxes now that are creating, running or stopped: those of the organization the request acts in, as its account limit counts them. Not the deployment's. */
             used: number;
             sizes: {
                 /** @enum {string} */
@@ -4675,42 +4698,42 @@ export interface components {
                 /** @example key_38b536dc2eabdb52 */
                 id: string;
                 name: string;
-                /** @description The first characters of the secret, to tell keys apart by. Null for a key from before they were kept. */
+                /** @description The first characters of the secret, to tell keys apart. Null for keys created before prefixes were stored. */
                 prefix: string | null;
                 createdAt: string;
                 /**
-                 * @description The preset the key was made with. Null for one made with its actions named.
+                 * @description The preset the key was created with. Null for a key created with explicit actions.
                  * @enum {string|null}
                  */
                 preset: "read-only" | "full-sandbox" | "ci" | "admin" | null;
                 /**
-                 * @description What the key may do, as it was made: a preset is written out into its actions then, so a preset that grows later does not widen it. * is everything.
+                 * @description The actions the key may perform, fixed at creation: a preset is expanded into its actions then, so a preset that grows later does not widen the key. * is every action.
                  * @example [
                  *       "sandbox.read",
                  *       "exec"
                  *     ]
                  */
                 actions: ("sandbox.read" | "sandbox.create" | "sandbox.fork" | "sandbox.update" | "sandbox.auto-stop" | "sandbox.stop" | "sandbox.resume" | "sandbox.delete" | "sandbox.delete-own" | "exec" | "file.read" | "file.write" | "agent.prompt" | "ssh" | "desktop" | "host" | "network.write" | "secret.read" | "secret.write" | "email.read" | "email.send" | "email.manage" | "snapshot.read" | "snapshot.write" | "template.read" | "template.write" | "key.manage" | "account.read" | "account.admin" | "members.read" | "members.admin" | "*")[];
-                /** @description The sandboxes the key is limited to, with templateIds. Empty, with templateIds empty too and madeOnly false, is every sandbox of the account. */
+                /** @description The sandboxes the key is limited to, together with templateIds. Empty, with templateIds also empty and madeOnly false, means every sandbox of the account. */
                 sandboxIds: string[];
-                /** @description True for a key that reaches only the sandboxes it made, and the snapshots of them. */
+                /** @description True for a key that can reach only the sandboxes it created and their snapshots. */
                 madeOnly: boolean;
-                /** @description The templates the key is limited to: it reaches them and every sandbox on them. Empty is every template, and, with sandboxIds empty too, every sandbox. */
+                /** @description The templates the key is limited to: it can reach them and every sandbox created from them. Empty means every template and, with sandboxIds also empty, every sandbox. */
                 templateIds: string[];
-                /** @description When the key stops working. Null is never. */
+                /** @description When the key expires. Null means never. */
                 expiresAt: string | null;
-                /** @description The addresses and ranges the key may be used from. Empty is anywhere. */
+                /** @description The addresses and ranges the key may be used from. Empty means any address. */
                 allowFrom: string[];
-                /** @description When the key was last used, to the minute: it is written once a minute at most. Null if never. */
+                /** @description When the key was last used, accurate to the minute (it is updated at most once a minute). Null if never used. */
                 lastUsedAt: string | null;
-                /** @description The address it was last used from. */
+                /** @description The IP address it was last used from. */
                 lastUsedFrom: string | null;
                 /**
-                 * @description The organization the key acts in: the one it was made in, for good. Null for a key of whoever runs the service.
+                 * @description The organization the key acts in: the one it was created in, permanently. Null for a service operator's key.
                  * @example org_5f0c2a9e1b7d3c46
                  */
                 organizationId: string | null;
-                /** @description The account that made it. In a team, its owners and admins see every key of the team, and a member only those they made. */
+                /** @description The account that created it. In a team, owners and admins see every key of the team; a member sees only the keys they created. */
                 createdBy: string | null;
             }[];
             invitesSent: {
@@ -5044,89 +5067,92 @@ export interface components {
             };
         };
         CreatedApiKey: components["schemas"]["ApiKey"] & {
-            /** @description The key itself. It is shown this once, and only its hash is kept. */
+            /** @description The key itself. It is returned only this once; agental stores only its hash. */
             secret: string;
         };
         ApiKey: {
             /** @example key_38b536dc2eabdb52 */
             id: string;
             name: string;
-            /** @description The first characters of the secret, to tell keys apart by. Null for a key from before they were kept. */
+            /** @description The first characters of the secret, to tell keys apart. Null for keys created before prefixes were stored. */
             prefix: string | null;
             createdAt: string;
-            /** @description True for a key of whoever runs the service, which sees every account. */
+            /** @description True for a service operator's key, which sees every account. */
             seesAll: boolean;
             /**
-             * @description The preset the key was made with. Null for one made with its actions named.
+             * @description The preset the key was created with. Null for a key created with explicit actions.
              * @enum {string|null}
              */
             preset: "read-only" | "full-sandbox" | "ci" | "admin" | null;
             /**
-             * @description What the key may do, as it was made: a preset is written out into its actions then, so a preset that grows later does not widen it. * is everything.
+             * @description The actions the key may perform, fixed at creation: a preset is expanded into its actions then, so a preset that grows later does not widen the key. * is every action.
              * @example [
              *       "sandbox.read",
              *       "exec"
              *     ]
              */
             actions: ("sandbox.read" | "sandbox.create" | "sandbox.fork" | "sandbox.update" | "sandbox.auto-stop" | "sandbox.stop" | "sandbox.resume" | "sandbox.delete" | "sandbox.delete-own" | "exec" | "file.read" | "file.write" | "agent.prompt" | "ssh" | "desktop" | "host" | "network.write" | "secret.read" | "secret.write" | "email.read" | "email.send" | "email.manage" | "snapshot.read" | "snapshot.write" | "template.read" | "template.write" | "key.manage" | "account.read" | "account.admin" | "members.read" | "members.admin" | "*")[];
-            /** @description The sandboxes the key is limited to, with templateIds. Empty, with templateIds empty too and madeOnly false, is every sandbox of the account. */
+            /** @description The sandboxes the key is limited to, together with templateIds. Empty, with templateIds also empty and madeOnly false, means every sandbox of the account. */
             sandboxIds: string[];
-            /** @description True for a key that reaches only the sandboxes it made, and the snapshots of them. */
+            /** @description True for a key that can reach only the sandboxes it created and their snapshots. */
             madeOnly: boolean;
-            /** @description The templates the key is limited to: it reaches them and every sandbox on them. Empty is every template, and, with sandboxIds empty too, every sandbox. */
+            /** @description The templates the key is limited to: it can reach them and every sandbox created from them. Empty means every template and, with sandboxIds also empty, every sandbox. */
             templateIds: string[];
-            /** @description When the key stops working. Null is never. */
+            /** @description When the key expires. Null means never. */
             expiresAt: string | null;
-            /** @description The addresses and ranges the key may be used from. Empty is anywhere. */
+            /** @description The addresses and ranges the key may be used from. Empty means any address. */
             allowFrom: string[];
-            /** @description When the key was last used, to the minute: it is written once a minute at most. Null if never. */
+            /** @description When the key was last used, accurate to the minute (it is updated at most once a minute). Null if never used. */
             lastUsedAt: string | null;
-            /** @description The address it was last used from. */
+            /** @description The IP address it was last used from. */
             lastUsedFrom: string | null;
             /**
-             * @description The organization the key acts in: the one it was made in, for good. Null for a key of whoever runs the service.
+             * @description The organization the key acts in: the one it was created in, permanently. Null for a service operator's key.
              * @example org_5f0c2a9e1b7d3c46
              */
             organizationId: string | null;
-            /** @description The account that made it. In a team, its owners and admins see every key of the team, and a member only those they made. */
+            /** @description The account that created it. In a team, owners and admins see every key of the team; a member sees only the keys they created. */
             createdBy: string | null;
         };
         CreateApiKey: {
-            /** @example ci-github */
+            /**
+             * @description A name for the key, 1 to 64 characters, unique among the keys you created.
+             * @example ci-github
+             */
             name: string;
             /**
-             * @description read-only: every read but secrets and mail. full-sandbox: sandbox.read, exec, file.read, file.write, agent.prompt, ssh, desktop, host, snapshot.read, snapshot.write and sandbox.stop. ci: full-sandbox, and sandbox.create, sandbox.fork, sandbox.resume and sandbox.delete-own. admin: * , everything. Send this or actions, not both.
+             * @description read-only: sandbox.read, file.read, snapshot.read, template.read and account.read (which includes members.read); no secrets and no mail. full-sandbox: sandbox.read, sandbox.auto-stop, exec, file.read, file.write, agent.prompt, ssh, desktop, host, snapshot.read, snapshot.write and sandbox.stop. ci: full-sandbox plus sandbox.create, sandbox.fork, sandbox.resume and sandbox.delete-own. admin: *, every action. Send either preset or actions, not both.
              * @example ci
              * @enum {string}
              */
             preset?: "read-only" | "full-sandbox" | "ci" | "admin";
             /**
-             * @description The actions the key may do, named. Send this or preset, not both.
+             * @description The actions the key may perform. Send either actions or preset, not both.
              * @example [
              *       "email.read",
              *       "email.send"
              *     ]
              */
             actions?: ("sandbox.read" | "sandbox.create" | "sandbox.fork" | "sandbox.update" | "sandbox.auto-stop" | "sandbox.stop" | "sandbox.resume" | "sandbox.delete" | "sandbox.delete-own" | "exec" | "file.read" | "file.write" | "agent.prompt" | "ssh" | "desktop" | "host" | "network.write" | "secret.read" | "secret.write" | "email.read" | "email.send" | "email.manage" | "snapshot.read" | "snapshot.write" | "template.read" | "template.write" | "key.manage" | "account.read" | "account.admin" | "members.read" | "members.admin" | "*")[];
-            /** @description Limits the key to these sandboxes, and to those on templateIds. It always reaches the sandboxes it makes. Every other sandbox, snapshot and route of the account answers it 404. */
+            /** @description Limits the key to these sandboxes, plus those created from templateIds. It can always reach the sandboxes it creates. Every other sandbox, snapshot and route of the account returns 404 to it. */
             sandboxIds?: string[];
             /**
-             * @description Limits the key to these templates and the sandboxes on them, and to those in sandboxIds. A sandbox it makes without naming a template goes on the account's default template when that is on the list, else on the one template on the list; with several on the list and not the default, it has to name one.
+             * @description Limits the key to these templates and the sandboxes created from them, plus those in sandboxIds. A sandbox it creates without naming a template uses the account's default template if that is listed, otherwise the only listed template; if several are listed and the default is not one of them, the create must name a template.
              * @example [
              *       "tpl_coding_agent"
              *     ]
              */
             templateIds?: string[];
-            /** @description Limits the key to the sandboxes it makes itself, and their snapshots: every other sandbox of the account answers it 404. Not with sandboxIds or templateIds. Templates are not limited by it. */
+            /** @description Limits the key to the sandboxes it creates itself and their snapshots: every other sandbox of the account returns 404 to it. Cannot be combined with sandboxIds or templateIds. It does not limit templates. */
             madeOnly?: boolean;
             /**
              * Format: date-time
-             * @description When the key stops working, and is refused with 401 key_expired. Left out, never.
+             * @description When the key expires; after that it is rejected with 401 key_expired. Omitted, it never expires.
              * @example 2026-11-15T00:00:00Z
              */
             expiresAt?: string;
             /**
-             * @description IPv4 and IPv6 addresses and ranges the key may be used from, 100 at most: an address alone is that one computer, and a range is written as 203.0.113.0/24 or 2001:db8::/48. An IPv4 address written the IPv6 way, as ::ffff:203.0.113.7, is that IPv4 address. Empty, or left out, is anywhere. A request from any other address is refused with 403 key_address_forbidden. A sandbox reaches the API from its server's shared IPv4 address, which changes when it moves, so limit a key used inside a sandbox with sandboxIds instead. On a network with IPv6 the API sees your IPv6 address, so a list of IPv4 addresses alone refuses you there.
+             * @description IPv4 and IPv6 addresses and CIDR ranges the key may be used from, at most 100: a single address, or a range such as 203.0.113.0/24 or 2001:db8::/48. An IPv4-mapped IPv6 address, such as ::ffff:203.0.113.7, counts as that IPv4 address. Empty or omitted means any address. A request from any other address is rejected with 403 key_address_forbidden. A sandbox calls the API from its server's shared IPv4 address, which changes when the sandbox moves, so restrict a key used inside a sandbox with sandboxIds instead. On a network with IPv6 the API sees your IPv6 address, so a list of only IPv4 addresses rejects you there.
              * @example [
              *       "203.0.113.0/24",
              *       "2001:db8::/48"
@@ -5134,14 +5160,14 @@ export interface components {
              */
             allowFrom?: string[];
             /**
-             * @description For a person signed in to the site whose account has two-factor sign-in on: the six digits the authenticator app shows now, or one of the backup codes, which is then used up. A key outlives the session that made it, so it is not made without one. A call made with an API key needs none, and its code is not read.
+             * @description Required when the caller is a person signed in to the site whose account has two-factor sign-in on: the six digits the authenticator app shows now, or a backup code, which is then used up. It is required because a key outlives the session that created it. Calls made with an API key need no code, and any code sent is ignored.
              * @example 482913
              */
             code?: string;
         };
         SetApiKeyAllowFrom: {
             /**
-             * @description IPv4 and IPv6 addresses and ranges the key may be used from, 100 at most: an address alone is that one computer, and a range is written as 203.0.113.0/24 or 2001:db8::/48. An IPv4 address written the IPv6 way, as ::ffff:203.0.113.7, is that IPv4 address. Empty, or left out, is anywhere. A request from any other address is refused with 403 key_address_forbidden. A sandbox reaches the API from its server's shared IPv4 address, which changes when it moves, so limit a key used inside a sandbox with sandboxIds instead. On a network with IPv6 the API sees your IPv6 address, so a list of IPv4 addresses alone refuses you there.
+             * @description IPv4 and IPv6 addresses and CIDR ranges the key may be used from, at most 100: a single address, or a range such as 203.0.113.0/24 or 2001:db8::/48. An IPv4-mapped IPv6 address, such as ::ffff:203.0.113.7, counts as that IPv4 address. Empty or omitted means any address. A request from any other address is rejected with 403 key_address_forbidden. A sandbox calls the API from its server's shared IPv4 address, which changes when the sandbox moves, so restrict a key used inside a sandbox with sandboxIds instead. On a network with IPv6 the API sees your IPv6 address, so a list of only IPv4 addresses rejects you there.
              * @example [
              *       "203.0.113.0/24",
              *       "2001:db8::/48"
@@ -5149,7 +5175,7 @@ export interface components {
              */
             allowFrom: string[];
             /**
-             * @description For a person signed in to the site whose account has two-factor sign-in on, and a list that lets the key be used from more places: an address outside the list it had, or anywhere in place of a list. The six digits the authenticator app shows now, or one of the backup codes, which is then used up. A list that only narrows it needs none, and so does a call made with an API key.
+             * @description Required when the caller is a person signed in to the site whose account has two-factor sign-in on, and the new list widens where the key can be used (an address outside the old list, or any address instead of a list): the six digits the authenticator app shows now, or a backup code, which is then used up. A list that only narrows needs no code, nor does a call made with an API key.
              * @example 482913
              */
             code?: string;
@@ -5334,7 +5360,7 @@ export interface components {
                  */
                 feeCapHours: number;
                 /**
-                 * @description What an account spends on burst fees in a month at most unless it sets another budget: PUT /v1/burst/budget.
+                 * @description What an account spends on burst fees in a month at most unless it sets another budget: PUT /v1/headroom/budget.
                  * @example 50000000
                  */
                 defaultBudgetMicros: number;
@@ -6088,7 +6114,7 @@ export interface components {
         };
         BurstBudget: {
             /**
-             * @description The most the account spends on burst fees in a month, in millionths of a US dollar: 0 refuses every start that would cost one. null gives it the default again.
+             * @description The most the account may spend on burst fees in a month, in millionths of a US dollar (50000000 is $50): 0 refuses every start that would incur a fee. null restores the default.
              * @example 50000000
              */
             budgetMicros: number | null;
@@ -11883,14 +11909,14 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The closed account is erased now rather than on its eraseAt: its sandboxes, snapshots, mail, templates, settings and sign-in, and everything that names the person. Usage, payments and credit are kept under the account's id alone, for accounting. Requires X-Agental-Confirm-Delete equal to the account's email address. The session cookie is cleared. */
+            /** @description The account is erased. */
             204: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            /** @description confirm_delete_required. Nothing was erased. */
+            /** @description confirm_delete_required: X-Agental-Confirm-Delete is missing or is not the account's email address. Nothing was erased. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -11908,7 +11934,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description session_required: an API key cannot do this. A person signed in can, from Settings in the console. */
+            /** @description session_required: an API key cannot do this; a person signed in can, from Settings in the console. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -12605,7 +12631,7 @@ export interface operations {
                      */
                     url: string;
                     /**
-                     * @description The events to send, at most 20 entries: sandbox.created, sandbox.started, sandbox.stopped, sandbox.archived, sandbox.error, sandbox.moved, sandbox.deleted, sandbox.auto_stop_set, sandbox.labels_changed, sandbox.scheduled_run, sandbox.schedule_paused, sandbox.low_cpu, prompt.created, email.received, email.delivered, email.bounced, member.invited, member.joined, member.removed, member.role_changed, key.revoked, template.created, template.updated, template.secrets_changed (named, never with a value), template.labels_changed, template.deleted, and Headroom's headroom.burst_started, headroom.burst_ended, headroom.refused, headroom.running_count_reached, headroom.budget_threshold and headroom.budget_reached, which concern the organization rather than a sandbox. A group name with .*, as headroom.* or sandbox.*, means every event in the group, including ones added later; * alone means every event, the default. A * anywhere else is rejected. An event has the same id in every webhook it is sent to, and sandbox.* and headroom.* events are also sent as log records to the collector set with PUT /v1/telemetry.
+                     * @description The events to send, at most 20 entries: sandbox.created, sandbox.started, sandbox.stopped, sandbox.archived, sandbox.error, sandbox.moved, sandbox.deleted, sandbox.auto_stop_set, sandbox.labels_changed, sandbox.scheduled_run, sandbox.schedule_paused, sandbox.low_cpu, prompt.created, email.received, email.delivered, email.bounced, member.invited, member.joined, member.removed, member.role_changed, key.revoked, template.created, template.updated, template.secrets_changed (named, never with a value), template.labels_changed, template.deleted, and Headroom's headroom.burst_started, headroom.burst_ended, headroom.refused, headroom.running_count_reached, headroom.budget_threshold and headroom.budget_reached, which concern the organization rather than a sandbox. A group name with .*, as headroom.* or sandbox.*, means every event in the group, including ones added later; * alone means every event, the default. A * anywhere else, or a name that is not one of these, is rejected. An event has the same id in every webhook it is sent to, and sandbox.* and headroom.* events are also sent as log records to the collector set with PUT /v1/telemetry.
                      * @example [
                      *       "sandbox.created",
                      *       "sandbox.error",
@@ -12649,7 +12675,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description invalid_request: a field is invalid, url is not a public http(s) URL, or events has a * that is neither alone nor after a known group, as sandbox.*. */
+            /** @description invalid_request: a field is invalid, url is not a public http(s) URL, events names an event that is not a known one, as sandbox.stoped, or has a * that is neither alone nor after a known group, as sandbox.*. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -12804,7 +12830,7 @@ export interface operations {
                      */
                     url?: string;
                     /**
-                     * @description The events to send, at most 20 entries: sandbox.created, sandbox.started, sandbox.stopped, sandbox.archived, sandbox.error, sandbox.moved, sandbox.deleted, sandbox.auto_stop_set, sandbox.labels_changed, sandbox.scheduled_run, sandbox.schedule_paused, sandbox.low_cpu, prompt.created, email.received, email.delivered, email.bounced, member.invited, member.joined, member.removed, member.role_changed, key.revoked, template.created, template.updated, template.secrets_changed (named, never with a value), template.labels_changed, template.deleted, and Headroom's headroom.burst_started, headroom.burst_ended, headroom.refused, headroom.running_count_reached, headroom.budget_threshold and headroom.budget_reached, which concern the organization rather than a sandbox. A group name with .*, as headroom.* or sandbox.*, means every event in the group, including ones added later; * alone means every event, the default. A * anywhere else is rejected. An event has the same id in every webhook it is sent to, and sandbox.* and headroom.* events are also sent as log records to the collector set with PUT /v1/telemetry.
+                     * @description The events to send, at most 20 entries: sandbox.created, sandbox.started, sandbox.stopped, sandbox.archived, sandbox.error, sandbox.moved, sandbox.deleted, sandbox.auto_stop_set, sandbox.labels_changed, sandbox.scheduled_run, sandbox.schedule_paused, sandbox.low_cpu, prompt.created, email.received, email.delivered, email.bounced, member.invited, member.joined, member.removed, member.role_changed, key.revoked, template.created, template.updated, template.secrets_changed (named, never with a value), template.labels_changed, template.deleted, and Headroom's headroom.burst_started, headroom.burst_ended, headroom.refused, headroom.running_count_reached, headroom.budget_threshold and headroom.budget_reached, which concern the organization rather than a sandbox. A group name with .*, as headroom.* or sandbox.*, means every event in the group, including ones added later; * alone means every event, the default. A * anywhere else, or a name that is not one of these, is rejected. An event has the same id in every webhook it is sent to, and sandbox.* and headroom.* events are also sent as log records to the collector set with PUT /v1/telemetry.
                      * @example [
                      *       "sandbox.created",
                      *       "sandbox.error",
@@ -12848,7 +12874,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description invalid_request: a field is invalid, url is not a public http(s) URL, or events has a * that is neither alone nor after a known group, as sandbox.*. Nothing was changed. */
+            /** @description invalid_request: a field is invalid, url is not a public http(s) URL, events names an event that is not a known one, as sandbox.stoped, or has a * that is neither alone nor after a known group, as sandbox.*. Nothing was changed. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -14556,7 +14582,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Everything kept about the account and the person behind it: the account, its sessions with the address and browser each began from, keys, billing, payments, usage, and what it has made. Secrets are named, never given. What is in sandboxes is read through the rest of the API. */
+            /** @description The account's data, sent with Content-Disposition: attachment. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -14596,7 +14622,7 @@ export interface operations {
             content: {
                 "application/json": {
                     /**
-                     * @description The account's email address, to show it is meant.
+                     * @description The account's email address, to confirm the closure.
                      * @example ada@example.com
                      */
                     confirm: string;
@@ -14604,7 +14630,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description The account is closed. Its plan has ended, its API keys and other sessions are ended, mail is off on every sandbox, and running sandboxes are stopped with their disks kept. It can be reopened until eraseAt, when it is erased. Closing a closed account changes nothing. */
+            /** @description The account is closed, with when it will be erased. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -14631,7 +14657,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description session_required: an API key cannot do this. A person signed in can, from Settings in the console. */
+            /** @description session_required: an API key cannot do this; a person signed in can, from Settings in the console. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -14640,7 +14666,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description team_owner: the account is the only owner of a team that has other members. Make another member an owner first. Nothing was closed. */
+            /** @description team_owner: the account is the only owner of a team with other members. Make another member an owner first. Nothing was closed. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -14660,7 +14686,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The account is open again, with its sandboxes as they were left. Its plan, API keys and mail are not brought back. */
+            /** @description The account is open again. */
             204: {
                 headers: {
                     [name: string]: unknown;
@@ -14676,7 +14702,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description session_required: an API key cannot do this. A person signed in can, from Settings in the console. */
+            /** @description session_required: an API key cannot do this; a person signed in can, from Settings in the console. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -14685,7 +14711,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description account_not_closed. */
+            /** @description account_not_closed: the account is open. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -16951,7 +16977,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The keys of the organization the caller acts in, oldest first: in a team, every key of it for an owner or admin, and a member's own for a member. The secrets are never returned. */
+            /** @description The keys, without secrets. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -16986,7 +17012,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description The key, and its secret, which is returned this once. */
+            /** @description The key, with its secret, which is returned only this once. */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -16995,7 +17021,7 @@ export interface operations {
                     "application/json": components["schemas"]["CreatedApiKey"];
                 };
             };
-            /** @description invalid_request: neither preset nor actions was sent, or both were; expiresAt is not in the future; or an entry of allowFrom is no address or range, and the message says which. code_required: a person signed in, with two-factor sign-in on, sent no code. invalid_code: the code is not right. code_used: six digits from the app that were used already. */
+            /** @description invalid_request: neither preset nor actions was sent, or both were; expiresAt is not in the future; or an allowFrom entry is not an address or range; the message says which. code_required: a person signed in with two-factor sign-in on sent no code. invalid_code: the code is wrong. code_used: the six digits from the app were already used. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -17013,7 +17039,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description billing_required: the account is on the free plan with no card saved, where plans are required. Save one, or start a plan, in the console first; the message gives its address. */
+            /** @description billing_required: the account is on the free plan with no card saved, on a deployment that requires plans. Save a card or start a plan in the console first; the message gives the URL. */
             402: {
                 headers: {
                     [name: string]: unknown;
@@ -17022,7 +17048,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description key_action_forbidden: the key used lacks key.manage. key_exceeds_caller: the new key would be stronger than the key used to make it, and the message says how. not_a_member: the key used is of someone no longer in the team it acts in. */
+            /** @description key_action_forbidden: the calling key lacks key.manage. key_exceeds_caller: the new key would be stronger than the calling key; the message says how. not_a_member: the calling key belongs to someone no longer in the team it acts in. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -17031,7 +17057,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description not_found: a sandbox or template named is not one of the account's, or not one the key used reaches. */
+            /** @description not_found: a sandbox or template named is not the account's, or the calling key cannot reach it. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -17040,7 +17066,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description name_taken: another key has this name, or the name is the one kept for the seeded dev key. */
+            /** @description name_taken: another key you created has this name, or the name is reserved for the seeded dev key. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -17049,7 +17075,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description rate_limited: five wrong codes from this session in a quarter of an hour, on this call or another that asks for one. */
+            /** @description rate_limited: five wrong codes from this session in 15 minutes, on this call or any other that asks for one. */
             429: {
                 headers: {
                     [name: string]: unknown;
@@ -17071,7 +17097,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The key. The secret is never returned. */
+            /** @description The key, without its secret. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -17089,7 +17115,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description not_found. */
+            /** @description not_found: no such key, or the caller cannot see it. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -17111,7 +17137,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description API key deleted. Whatever holds it is refused from its next request. The sandboxes it made stay the account's. */
+            /** @description The key is deleted. */
             204: {
                 headers: {
                     [name: string]: unknown;
@@ -17127,7 +17153,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description not_found. */
+            /** @description not_found: no such key, or the caller cannot see it. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -17162,7 +17188,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description The key, with its addresses from now on. */
+            /** @description The key, with its new address list. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -17171,7 +17197,7 @@ export interface operations {
                     "application/json": components["schemas"]["ApiKey"];
                 };
             };
-            /** @description invalid_request: an entry is no address or range, and the message says which, or there are more than 100. code_required: a person signed in, with two-factor sign-in on, sent no code with a list that lets the key be used from more places. invalid_code: the code is not right. code_used: six digits from the app that were used already. */
+            /** @description invalid_request: an entry is not an address or range (the message says which), or there are more than 100. code_required: a person signed in with two-factor sign-in on sent no code with a list that widens where the key can be used. invalid_code: the code is wrong. code_used: the six digits from the app were already used. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -17189,7 +17215,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description key_exceeds_caller: the key used may be used only from some addresses, and the list is not inside them. role_required: another member of the team made the key, and only they change it. */
+            /** @description key_exceeds_caller: the calling key is itself limited to some addresses, and the new list is not inside them. role_required: another member of the team created the key, and only they can change it. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -17198,7 +17224,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description not_found. */
+            /** @description not_found: no such key, or the caller cannot see it. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -17207,7 +17233,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description dev_key_permanent: the seeded dev key is not limited. */
+            /** @description dev_key_permanent: the seeded dev key cannot be limited to addresses. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -17216,7 +17242,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description rate_limited: five wrong codes for the account in a quarter of an hour, on this call or another that asks for one. */
+            /** @description rate_limited: five wrong codes from this session in 15 minutes, on this call or any other that asks for one. */
             429: {
                 headers: {
                     [name: string]: unknown;
@@ -17236,7 +17262,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Sign-up mode and the limits that apply to every account. No auth. */
+            /** @description The deployment's policy. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -17559,13 +17585,31 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Where the caller's account stands: its plan, what it has used of the month, what is left of its top-ups, and whether it may run a sandbox. Amounts are millionths of a US dollar. */
+            /** @description The account's billing state. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["Billing"];
+                };
+            };
+            /** @description invalid_request: the key belongs to no account or organization, so it has no billing. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description forbidden: in a team, only an owner or admin can read its billing. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };
@@ -17595,7 +17639,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Where to send the browser: to save a card for the free plan, charging nothing; to pay for a plan; or for a top-up of credits that do not expire. An account that already has a plan and picks another is moved with nothing to pay on a page: url is null and changed is true, and the month's credits are each plan's for the part of the month it holds. A smaller plan is moved to at once, and a bigger one once the payment provider has charged the difference, within seconds. To go back to the free plan, cancel the plan in the billing portal. */
+            /** @description The payment page URL. When an account with a plan picks another, url is null and changed is true: the month's credits are each plan's for the part of the month it is held. A switch to a smaller plan happens at once, and to a bigger one once the payment provider has charged the difference, within seconds. To return to the free plan, cancel the plan in the billing portal. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -17604,7 +17648,25 @@ export interface operations {
                     "application/json": components["schemas"]["Checkout"];
                 };
             };
-            /** @description billing_not_configured, already_on_plan, card_saved: a card is saved already, or payment_late: the plan's last payment has not gone through, so it is not changed until it has. */
+            /** @description invalid_request: the key belongs to no account or organization, so it has no billing; or the body is not a valid plan or top-up. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description forbidden: in a team, only an owner can change its plan, card and credits. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description billing_not_configured: nothing is sold on this deployment. already_on_plan: the account is already on that plan. card_saved: a card is already saved. payment_late: the plan's last payment has not gone through, so the plan cannot change until it has. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -17613,7 +17675,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description rate_limited. The account asked for too many amounts of top-up the store had no product for today. */
+            /** @description rate_limited: the account asked today for too many top-up amounts the store had no product for. */
             429: {
                 headers: {
                     [name: string]: unknown;
@@ -17622,7 +17684,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description billing_error. The payment provider refused. Nothing was charged. */
+            /** @description billing_error: the payment provider returned an error. Nothing was charged. */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -17631,7 +17693,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description billing_unavailable. The payment provider did not answer. */
+            /** @description billing_unavailable: the payment provider did not respond. Try again in a moment. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -17652,13 +17714,13 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    /** @description The top-up the card is charged for when the credits run out, in whole US dollars, from 15 to 100000, with the bonus a top-up of that size has. null turns the auto-reload off. */
+                    /** @description The top-up charged to the card when the credits run out, in whole US dollars from 15 to 100000, with the bonus a top-up of that size gets. null turns auto-reload off. */
                     dollars: number | null;
                 };
             };
         };
         responses: {
-            /** @description The auto-reload as it is now. At most 3 reloads are charged in a day, and a card that would not pay is not asked again for a day, or until the auto-reload is set again. */
+            /** @description The auto-reload setting now. At most 3 reloads are charged a day, and a card that declines is not charged again for a day, or until auto-reload is set again. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -17667,7 +17729,25 @@ export interface operations {
                     "application/json": components["schemas"]["AutoReload"];
                 };
             };
-            /** @description billing_not_configured: Stripe does not sell here. no_card: the account has no card saved at Stripe: save one, or buy a plan or a top-up. */
+            /** @description invalid_request: the key belongs to no account or organization, so it has no billing. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description forbidden: in a team, only an owner can change its plan, card and credits. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description billing_not_configured: nothing is sold on this deployment. no_card: the account has no card saved at Stripe; save one, or buy a plan or a top-up. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -17676,7 +17756,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description billing_unavailable. The payment provider did not answer. */
+            /** @description billing_unavailable: the payment provider did not respond. Try again in a moment. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -17696,7 +17776,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Where the account sees its invoices, changes its card, and cancels its plan. */
+            /** @description The portal URL. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -17707,7 +17787,25 @@ export interface operations {
                     };
                 };
             };
-            /** @description billing_not_configured, or nothing_bought: the account has not bought anything yet. */
+            /** @description invalid_request: the key belongs to no account or organization, so it has no billing. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description forbidden: in a team, only an owner can change its plan, card and credits. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description billing_not_configured: nothing is sold on this deployment. nothing_bought: the account has not bought anything yet. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -17721,9 +17819,9 @@ export interface operations {
     listBillingInvoices: {
         parameters: {
             query?: {
-                /** @description How many to answer at most, 1 to 100. 25 when left out. */
+                /** @description Invoices per page, 1 to 100. Default 25. */
                 limit?: number;
-                /** @description The next value of the page before, for the page after it. A page may hold fewer than limit, drafts being left out, and still have a next. */
+                /** @description The next value from the previous page. A page may hold fewer than limit invoices, since drafts are left out, and still have a next. */
                 startingAfter?: string;
             };
             header?: never;
@@ -17732,7 +17830,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The account's invoices, newest first, as the payment provider keeps them: a plan's months, top-ups and auto-reloads, drafts left out. Read from it each time; agental keeps none of them. Amounts are millionths of the invoice's currency. */
+            /** @description A page of invoices. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -17741,7 +17839,25 @@ export interface operations {
                     "application/json": components["schemas"]["BillingInvoices"];
                 };
             };
-            /** @description billing_not_configured: nothing is sold here. */
+            /** @description invalid_request: the key belongs to no account or organization, so it has no billing. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description forbidden: in a team, only an owner or admin can read its billing. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description billing_not_configured: nothing is sold on this deployment. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -17761,7 +17877,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The card the account pays with now: the one a plan's month, a top-up and an auto-reload charge. Its brand, last four and expiry only, read from the payment provider each time. Changed on the payment provider's page, POST /v1/billing/portal. */
+            /** @description The saved card, or null. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -17770,7 +17886,25 @@ export interface operations {
                     "application/json": components["schemas"]["BillingCard"];
                 };
             };
-            /** @description billing_not_configured: nothing is sold here. */
+            /** @description invalid_request: the key belongs to no account or organization, so it has no billing. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description forbidden: in a team, only an owner or admin can read its billing. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description billing_not_configured: nothing is sold on this deployment. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -17790,7 +17924,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Who the account's invoices are made out to: the email they go to, the name and address on them, and its tax ids, as an EU VAT number. Read from the payment provider each time, and changed on its page, POST /v1/billing/portal; the next invoice carries them. */
+            /** @description The billing details, or null. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -17799,7 +17933,16 @@ export interface operations {
                     "application/json": components["schemas"]["BillingDetails"];
                 };
             };
-            /** @description forbidden: only an owner of a team sees who its invoices are made out to. */
+            /** @description invalid_request: the key belongs to no account or organization, so it has no billing. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description forbidden: in a team, only an owner can read its billing details. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -17808,7 +17951,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description billing_not_configured: nothing is sold here. */
+            /** @description billing_not_configured: nothing is sold on this deployment. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -19832,9 +19975,9 @@ export interface operations {
     getBurst: {
         parameters: {
             query?: {
-                /** @description A size to quote a start of. */
+                /** @description Optional. A size to quote: the response's quote is what starting count sandboxes of it would cost now. */
                 size?: "tiny" | "small" | "medium" | "large";
-                /** @description How many of it. 1 when left out. */
+                /** @description How many sandboxes of size to quote, 1 to 10000. Default 1. */
                 count?: number;
             };
             header?: never;
@@ -19843,7 +19986,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Where the caller's account stands: how many sandboxes it runs and may run at once, what its burst meter reads against its free burst, what it has spent on burst fees this month against its budget, and what a start of each size would cost now. */
+            /** @description The account's running count, burst meter, burst fees and quotes. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -19852,7 +19995,7 @@ export interface operations {
                     "application/json": components["schemas"]["Burst"];
                 };
             };
-            /** @description invalid_request. The key belongs to no account. */
+            /** @description invalid_request: the key belongs to no account. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -19870,7 +20013,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description The account behind the key is gone. */
+            /** @description not_found: the account behind the key no longer exists. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -19894,7 +20037,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description The budget is set, and the account is answered as it stands now (the now of GET /v1/headroom). */
+            /** @description The budget is set. The response is the account's state now, as GET /v1/burst returns it. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -19903,7 +20046,7 @@ export interface operations {
                     "application/json": components["schemas"]["Burst"];
                 };
             };
-            /** @description invalid_request. The budget is not a whole number from 0 to 100000000000, or null, or the key belongs to no account. */
+            /** @description invalid_request: budgetMicros is not null or a whole number from 0 to 100000000000, or the key belongs to no account. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -19921,7 +20064,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description role_required: in a team, only an owner sets its budget. */
+            /** @description role_required: in a team, only an owner can set the budget. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -19930,7 +20073,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description The account behind the key is gone. */
+            /** @description not_found: the account behind the key no longer exists. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -19954,7 +20097,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description The budget is set, and the account is answered as it stands now (the now of GET /v1/headroom). */
+            /** @description The budget is set. The response is the account's state now, as GET /v1/burst returns it. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -19963,7 +20106,7 @@ export interface operations {
                     "application/json": components["schemas"]["Burst"];
                 };
             };
-            /** @description invalid_request. The budget is not a whole number from 0 to 100000000000, or null, or the key belongs to no account. */
+            /** @description invalid_request: budgetMicros is not null or a whole number from 0 to 100000000000, or the key belongs to no account. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -19981,7 +20124,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description role_required: in a team, only an owner sets its budget. */
+            /** @description role_required: in a team, only an owner can set the budget. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -19990,7 +20133,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description The account behind the key is gone. */
+            /** @description not_found: the account behind the key no longer exists. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -20010,7 +20153,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Replaced by GET /v1/burst. The old shape, worked out from the account's burst: the free burst stands for the tier's amounts, and the meter for what was started. */
+            /** @description The account's limits in the old tier shape. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -20019,7 +20162,7 @@ export interface operations {
                     "application/json": components["schemas"]["Tier"];
                 };
             };
-            /** @description invalid_request. The key belongs to no account. */
+            /** @description invalid_request: the key belongs to no account. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -20037,7 +20180,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description The account behind the key is gone. */
+            /** @description not_found: the account behind the key no longer exists. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -20051,11 +20194,11 @@ export interface operations {
     getHeadroom: {
         parameters: {
             query?: {
-                /** @description Where the range begins, in ISO 8601. Today's midnight UTC when left out. */
+                /** @description Start of the range, as an ISO 8601 time. Default: midnight UTC today, or 24 hours before to when only to is given. */
                 from?: string;
-                /** @description Where it ends. Now when left out, and never later than now. */
+                /** @description End of the range, as an ISO 8601 time. Default now; a later time is treated as now. */
                 to?: string;
-                /** @description How often the series is read: 10m, hour or day. Left out, 10m up to two days, hour up to 8, day past that. */
+                /** @description The series' interval: 10m, hour or day. Default: 10m for ranges up to 2 days, hour up to 8 days, day beyond. */
                 step?: "10m" | "hour" | "day";
             };
             header?: never;
@@ -20064,7 +20207,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description How close the caller's account runs to its plan's limits: where it stands now, and over a range, what it ran against its running count, its burst meter against its free burst, each burst (a stretch when the meter was over the free burst, so every start in it paid a fee) with who started what in it, what did not start and why, and how fast what started ran. */
+            /** @description The account's headroom now and over the range. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -20091,7 +20234,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description The account behind the key is gone. */
+            /** @description not_found: the account behind the key no longer exists. */
             404: {
                 headers: {
                     [name: string]: unknown;
