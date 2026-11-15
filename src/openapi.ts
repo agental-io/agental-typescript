@@ -3125,8 +3125,8 @@ export interface components {
             network: components["schemas"]["SandboxNetwork"];
             /** @description What it is doing, as last read: null when it is not running, not read yet, or where GET /v1/policy says metrics is false. */
             activity: {
-                /** @description low-cpu: for the last hour, observed with enough coverage, its CPU at its busiest stayed under the line (5% of its vCPUs unless the deployment sets another). A heuristic: an agent waiting on a model or a download is busy with almost no CPU, and nothing acts on it by itself. disk-full, memory-full: at or over the line (90%). not-read: its server has not answered for 3 minutes, and none of the others is said. */
-                states: ("low-cpu" | "disk-full" | "memory-full" | "not-read")[];
+                /** @description low-cpu: for the last hour, observed with enough coverage, its CPU at its busiest stayed under the line (5% of its vCPUs unless the deployment sets another). A heuristic: an agent waiting on a model or a download is busy with almost no CPU, and nothing acts on it by itself. disk-full, memory-full: at or over the line (90%). agent-silent: the agent in its machine that runs commands, reads and writes files and serves the terminal has not answered for 15 seconds or more, so those fail until it does; it was stopped or killed from inside the sandbox, or the machine is hung. A restart of the sandbox starts it again. not-read: its server has not answered for 3 minutes, and none of the others is said. */
+                states: ("low-cpu" | "disk-full" | "memory-full" | "agent-silent" | "not-read")[];
                 /** @description Its CPU now, 0 to 1 of its vCPUs. */
                 cpuNow: number | null;
                 /** @description Its CPU at its busiest in the last hour, 0 to 1 of its vCPUs. */
@@ -6135,7 +6135,7 @@ export interface operations {
                 memoryKept?: string;
                 /** @description An outbound rule: open, blocked or allowlist. Sent more than once, or with commas, any of them. */
                 outbound?: string | string[];
-                /** @description What they are doing: low-cpu, disk-full, memory-full or not-read. Sent more than once, or with commas, any of them. Only where GET /v1/policy says metrics. */
+                /** @description What they are doing: low-cpu, disk-full, memory-full, agent-silent or not-read. Sent more than once, or with commas, any of them. Only where GET /v1/policy says metrics. */
                 activity?: string | string[];
                 /** @description What they are not doing: none of these states. */
                 notActivity?: string | string[];
@@ -6355,7 +6355,7 @@ export interface operations {
                 memoryKept?: string;
                 /** @description An outbound rule: open, blocked or allowlist. Sent more than once, or with commas, any of them. */
                 outbound?: string | string[];
-                /** @description What they are doing: low-cpu, disk-full, memory-full or not-read. Sent more than once, or with commas, any of them. Only where GET /v1/policy says metrics. */
+                /** @description What they are doing: low-cpu, disk-full, memory-full, agent-silent or not-read. Sent more than once, or with commas, any of them. Only where GET /v1/policy says metrics. */
                 activity?: string | string[];
                 /** @description What they are not doing: none of these states. */
                 notActivity?: string | string[];

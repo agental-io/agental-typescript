@@ -74,7 +74,7 @@ export interface SandboxFilter {
   memoryKept?: boolean;
   /** open, blocked or allowlist. */
   outbound?: string | readonly string[];
-  /** What they are doing: low-cpu, disk-full, memory-full or not-read. Any of them. */
+  /** What they are doing: low-cpu, disk-full, memory-full, agent-silent or not-read. Any of them. */
   activity?: string | readonly string[];
   /** None of these. */
   notActivity?: string | readonly string[];
