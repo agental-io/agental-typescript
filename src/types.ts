@@ -7,11 +7,11 @@ export type SandboxInfo = Schemas["Sandbox"];
 /** What a filter finds, counted and costed: GET /v1/sandbox-summary. Money is in millionths of a US dollar; spent is since midnight UTC. */
 export type SandboxSummary = Schemas["SandboxSummary"];
 /** A job that acts on many sandboxes: its state, its items counted by state, and its first problems. */
-export type SandboxJob = Schemas["SandboxJob"];
+export type BulkAction = Schemas["BulkAction"];
 /** The sandboxes a job would act on, fixed, and what they cost an hour before and after. */
-export type SandboxJobPreview = Schemas["SandboxJobPreview"];
+export type BulkActionPreview = Schemas["BulkActionPreview"];
 /** One sandbox of a job: its state, why, and what it made or follows. */
-export interface SandboxJobItem {
+export interface BulkActionItem {
   id: string;
   sandboxId: string;
   state: "pending" | "acting" | "accepted" | "done" | "skipped" | "failed" | "uncertain";
@@ -75,6 +75,8 @@ export type HostRoute = Schemas["HostRoute"];
 export type DesktopState = Schemas["DesktopState"];
 /** A picture of a sandbox's screen in base64, with its media type, its size and the part of the screen it shows. */
 export type DesktopScreenshot = Schemas["DesktopScreenshot"];
+/** What is on a sandbox's screen as its programs tell it: its windows, and the buttons, fields, menus and texts in them, each with its place on the screen. */
+export type DesktopTree = Schemas["DesktopTree"];
 /** A link to a sandbox's desktop: to watch it or to use it, until it expires. */
 export type DesktopLink = Schemas["DesktopLink"];
 /** Whether a sandbox's browser is turned on to be driven from outside it, whether it has a window, and where to connect. */

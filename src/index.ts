@@ -1,4 +1,4 @@
-export { Agental, type SandboxFilter, type SandboxJobAction, type SandboxJobOptions, type SandboxPage, type SandboxSort } from "./client.js";
+export { Agental, type SandboxFilter, type BulkActionType, type BulkActionOptions, type SandboxPage, type SandboxSort } from "./client.js";
 export { AgentalError, ApiError, ConnectionError, ProxyError, TimeoutError } from "./errors.js";
 export type { BurstRefusalCode } from "./errors.js";
 export type { AgentalOptions } from "./http.js";
@@ -37,6 +37,7 @@ export type {
   DesktopLink,
   DesktopScreenshot,
   DesktopState,
+  DesktopTree,
   Egress,
   EgressAccount,
   EgressInput,
@@ -67,9 +68,9 @@ export type {
   SandboxEmail,
   SandboxInfo,
   SandboxSummary,
-  SandboxJob,
-  SandboxJobItem,
-  SandboxJobPreview,
+  BulkAction,
+  BulkActionItem,
+  BulkActionPreview,
   SandboxMetrics,
   SandboxNetwork,
   SandboxNetworkDetail,

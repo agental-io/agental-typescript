@@ -229,7 +229,7 @@ const link = await sandbox.desktop.createLink({ access: "view", expiresIn: 600 }
 await sandbox.desktop.off();
 ```
 
-A program in the sandbox opens its windows there with `DISPLAY` set to `desktop.display`. `screenshot` takes `format: "jpeg"`, a `region`, a `scale` and `cursor: false`, each cheaper for a model to read, and `screenshotBase64` gives the same picture as a model is handed it. `move`, `drag`, `scroll`, `clipboard` and `setClipboard` do what they say. What uses the pointer or the keyboard is never sent twice.
+A program in the sandbox opens its windows there with `DISPLAY` set to `desktop.display`. `screenshot` takes `format: "jpeg"`, a `region`, a `scale` and `cursor: false`, each cheaper for a model to read, and `screenshotBase64` gives the same picture as a model is handed it. `move`, `drag`, `scroll`, `clipboard` and `setClipboard` do what they say. `tree({ window, query })` gives the windows on the screen and the buttons, fields and menus in them, each with its place, to click by name rather than from a picture. What uses the pointer or the keyboard is never sent twice.
 
 ## Browser
 

@@ -1545,6 +1545,23 @@ test("a picture of the screen is asked for as the options say, the clipboard is 
   assert.equal(sent.length, 9);
 });
 
+test("the desktop's tree is asked for as the options say, and only what was given is sent", async () => {
+  const tree = {
+    windows: [{ index: 0, program: "Thunar", title: "root - Thunar", bounds: { x: 0, y: 27, width: 650, height: 514 }, active: true }],
+    elements: [{ index: 0, window: 0, role: "push button", name: "Home", bounds: { x: 120, y: 85, width: 37, height: 35 }, states: ["focused"] }],
+    truncated: false,
+  };
+  const { agental, sent } = scripted(json(200, sandbox()), json(200, tree), json(200, tree));
+  const box = await agental.sandboxes.get("sbx_0123456789abcdef");
+  const at = "/v1/sandboxes/sbx_0123456789abcdef/desktop/tree";
+  assert.deepEqual(await box.desktop.tree(), tree);
+  assert.equal(new URL(sent[1]?.path ?? "", "https://agental.test").search, "");
+  assert.deepEqual(await box.desktop.tree({ window: "Thunar", query: "home", limit: 50 }), tree);
+  const asked = new URL(sent[2]?.path ?? "", "https://agental.test");
+  assert.equal(asked.pathname, at);
+  assert.deepEqual(Object.fromEntries(asked.searchParams), { window: "Thunar", query: "home", limit: "50" });
+});
+
 /** Runs with these environment variables set, or unset where undefined, and puts back what was there. */
 async function withEnvironment(changes: Record<string, string | undefined>, run: () => Promise<void> | void): Promise<void> {
   const kept = Object.fromEntries(Object.keys(changes).map((name) => [name, process.env[name]]));
@@ -1918,15 +1935,15 @@ test("a job is previewed by a filter, made from the preview with a key that make
     json(200, job),
     json(200, { ...job, state: "done", endedAt: "2026-11-07T00:01:00.000Z" }),
   );
-  const preview = await agental.jobs.preview("stop", { filter: { status: "running", tag: "ci" } }, { keepMemory: true });
+  const preview = await agental.bulkActions.preview("stop", { filter: { status: "running", tag: "ci" } }, { keepMemory: true });
   assert.deepEqual(sent[0]?.body, { action: "stop", options: { keepMemory: true }, select: { filter: { status: "running", tag: "ci" } } });
-  const made = await agental.jobs.create({ previewId: preview.id }, { idempotencyKey: "nightly-stop-1" });
+  const made = await agental.bulkActions.create({ previewId: preview.id }, { idempotencyKey: "nightly-stop-1" });
   assert.equal(sent[1]?.headers.get("idempotency-key"), "nightly-stop-1");
   assert.deepEqual(sent[1]?.body, { previewId: "sjp_1" });
   const seen: string[] = [];
-  const done = await agental.jobs.wait(made.id, { onProgress: (each) => seen.push(each.state) });
+  const done = await agental.bulkActions.wait(made.id, { onProgress: (each) => seen.push(each.state) });
   assert.deepEqual([done.state, seen], ["done", ["running", "done"]]);
-  assert.equal(sent[3]?.path, "/v1/sandbox-jobs/sjb_1");
+  assert.equal(sent[3]?.path, "/v1/bulk-actions/sjb_1");
 });
 
 test("a template is made with tags and metadata, changed, and tagged", async () => {

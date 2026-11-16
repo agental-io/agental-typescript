@@ -32,9 +32,9 @@ import type {
   RunningOverTime,
   SandboxInfo,
   SandboxSummary,
-  SandboxJob,
-  SandboxJobItem,
-  SandboxJobPreview,
+  BulkAction,
+  BulkActionItem,
+  BulkActionPreview,
   Snapshot,
   Team,
   TeamRole,
@@ -136,8 +136,8 @@ function filterQuery(filter: SandboxFilter): Record<string, string | string[]> {
 }
 
 /** What a job does to each sandbox, and how. */
-export type SandboxJobAction = "stop" | "start" | "archive" | "snapshot" | "auto-stop" | "labels" | "delete";
-export interface SandboxJobOptions {
+export type BulkActionType = "stop" | "start" | "archive" | "snapshot" | "auto-stop" | "labels" | "delete";
+export interface BulkActionOptions {
   /** For stop: keep their memory too. */
   keepMemory?: boolean;
   /** For snapshot: its name. */
@@ -156,17 +156,17 @@ export interface SandboxJobOptions {
  * Jobs that act on many sandboxes at once. A preview fixes the sandboxes a filter finds; a job
  * acts on exactly those, checking each again just before, and on no other.
  */
-class SandboxJobs {
+class BulkActions {
   constructor(private readonly http: Http) {}
 
   /** The sandboxes a job would act on, fixed, with how many, the first of them, and the money before and after. Nothing is done. */
-  async preview(action: SandboxJobAction, select: { filter: SandboxFilter } | { ids: readonly string[] }, options: SandboxJobOptions = {}): Promise<SandboxJobPreview> {
+  async preview(action: BulkActionType, select: { filter: SandboxFilter } | { ids: readonly string[] }, options: BulkActionOptions = {}): Promise<BulkActionPreview> {
     const body = {
       action,
       options: jobOptions(options),
       select: "ids" in select ? { ids: [...select.ids] } : { filter: filterQuery(select.filter) },
     };
-    return (await this.http.json<SandboxJobPreview>({ method: "POST", path: "/v1/sandbox-jobs/preview", body })).body;
+    return (await this.http.json<BulkActionPreview>({ method: "POST", path: "/v1/bulk-actions/preview", body })).body;
   }
 
   /**
@@ -174,41 +174,41 @@ class SandboxJobs {
    * idempotencyKey, the same job is answered.
    */
   async create(
-    from: { previewId: string; confirm?: number } | { action: SandboxJobAction; ids: readonly string[]; options?: SandboxJobOptions; confirm?: number },
+    from: { previewId: string; confirm?: number } | { action: BulkActionType; ids: readonly string[]; options?: BulkActionOptions; confirm?: number },
     options: { idempotencyKey?: string } = {},
-  ): Promise<SandboxJob> {
+  ): Promise<BulkAction> {
     // A delete is made with confirm: the count its preview showed.
     const confirm = from.confirm === undefined ? {} : { confirm: from.confirm };
     const body = "previewId" in from ? { previewId: from.previewId, ...confirm } : { action: from.action, ids: [...from.ids], options: jobOptions(from.options ?? {}), ...confirm };
     const key = options.idempotencyKey ?? `sdk-${crypto.randomUUID().replaceAll("-", "").slice(0, 12)}`;
-    return (await this.http.json<SandboxJob>({ method: "POST", path: "/v1/sandbox-jobs", body, headers: { "Idempotency-Key": key }, replay: true })).body;
+    return (await this.http.json<BulkAction>({ method: "POST", path: "/v1/bulk-actions", body, headers: { "Idempotency-Key": key }, replay: true })).body;
   }
 
-  async get(id: string): Promise<SandboxJob> {
-    return (await this.http.json<SandboxJob>({ method: "GET", path: `/v1/sandbox-jobs/${encodeURIComponent(id)}`, replay: true })).body;
+  async get(id: string): Promise<BulkAction> {
+    return (await this.http.json<BulkAction>({ method: "GET", path: `/v1/bulk-actions/${encodeURIComponent(id)}`, replay: true })).body;
   }
 
   /** The organization's last 50 jobs, the newest first. */
-  async list(): Promise<SandboxJob[]> {
-    return (await this.http.json<{ jobs: SandboxJob[] }>({ method: "GET", path: "/v1/sandbox-jobs", replay: true })).body.jobs;
+  async list(): Promise<BulkAction[]> {
+    return (await this.http.json<{ actions: BulkAction[] }>({ method: "GET", path: "/v1/bulk-actions", replay: true })).body.actions;
   }
 
   /** A page of a job's items, in order, each with its state, why, and what it made or follows. */
-  async items(id: string, options: { state?: string; limit?: number; cursor?: string } = {}): Promise<{ items: SandboxJobItem[]; nextCursor: string | null }> {
+  async items(id: string, options: { state?: string; limit?: number; cursor?: string } = {}): Promise<{ items: BulkActionItem[]; nextCursor: string | null }> {
     const query: Record<string, string> = {};
     if (options.state) query["state"] = options.state;
     if (options.limit !== undefined) query["limit"] = String(options.limit);
     if (options.cursor) query["cursor"] = options.cursor;
-    return (await this.http.json<{ items: SandboxJobItem[]; nextCursor: string | null }>({ method: "GET", path: `/v1/sandbox-jobs/${encodeURIComponent(id)}/items`, query, replay: true })).body;
+    return (await this.http.json<{ items: BulkActionItem[]; nextCursor: string | null }>({ method: "GET", path: `/v1/bulk-actions/${encodeURIComponent(id)}/items`, query, replay: true })).body;
   }
 
   /** No item that has not begun begins; those under way are followed to their end. */
-  async cancel(id: string): Promise<SandboxJob> {
-    return (await this.http.json<SandboxJob>({ method: "POST", path: `/v1/sandbox-jobs/${encodeURIComponent(id)}/cancel`, replay: true })).body;
+  async cancel(id: string): Promise<BulkAction> {
+    return (await this.http.json<BulkAction>({ method: "POST", path: `/v1/bulk-actions/${encodeURIComponent(id)}/cancel`, replay: true })).body;
   }
 
   /** Reads the job until it has ended, telling onProgress each time, and answers it ended. */
-  async wait(id: string, options: { onProgress?: (job: SandboxJob) => void; signal?: AbortSignal } = {}): Promise<SandboxJob> {
+  async wait(id: string, options: { onProgress?: (job: BulkAction) => void; signal?: AbortSignal } = {}): Promise<BulkAction> {
     for (;;) {
       const job = await this.get(id);
       options.onProgress?.(job);
@@ -220,7 +220,7 @@ class SandboxJobs {
   }
 }
 
-function jobOptions(options: SandboxJobOptions): Record<string, unknown> {
+function jobOptions(options: BulkActionOptions): Record<string, unknown> {
   const { at, ...rest } = options;
   return { ...rest, ...(at === undefined ? {} : { at: at instanceof Date ? at.toISOString() : at }) };
 }
@@ -488,7 +488,7 @@ export class Agental {
   /** The organizations the key's person is in, and the members and invites of a team. */
   readonly organizations: Organizations;
   /** Jobs that act on many sandboxes at once: a preview fixes the set, a job acts on exactly it. */
-  readonly jobs: SandboxJobs;
+  readonly bulkActions: BulkActions;
   private readonly http: Http;
 
   constructor(options: AgentalOptions = {}) {
@@ -498,7 +498,7 @@ export class Agental {
     this.templates = new Templates(this.http);
     this.apiKeys = new ApiKeys(this.http);
     this.organizations = new Organizations(this.http);
-    this.jobs = new SandboxJobs(this.http);
+    this.bulkActions = new BulkActions(this.http);
   }
 
   /** The regions sandboxes can be made in now, the default first, with the sizes each has room for. */

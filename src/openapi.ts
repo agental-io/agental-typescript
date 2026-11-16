@@ -105,7 +105,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/sandbox-jobs/preview": {
+    "/v1/bulk-actions/preview": {
         parameters: {
             query?: never;
             header?: never;
@@ -115,39 +115,39 @@ export interface paths {
         get?: never;
         put?: never;
         /** @description Fixes the sandboxes a job would act on, and does nothing to them: those the filter finds (the list's filters, not limit or cursor), or the IDs named, that the caller may act on. Answers how many, the first of them, what they cost an hour now and would after, and when the preview expires. A job made from it acts on exactly these, and on no sandbox that comes into the filter later. A key needs the action the single call takes: sandbox.stop for stop and archive, sandbox.resume for start, snapshot.write, sandbox.auto-stop to set a stop time and sandbox.update to take it away, sandbox.update for labels, sandbox.delete for delete (or sandbox.delete-own, which deletes only the sandboxes the key made). */
-        post: operations["previewSandboxJob"];
+        post: operations["previewBulkAction"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/sandbox-jobs": {
+    "/v1/bulk-actions": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** @description The organization's last 50 jobs, the newest first. A key limited by lists sees only the jobs it made. */
-        get: operations["listSandboxJobs"];
+        /** @description The organization's last 50 bulk actions, the newest first. A key limited by lists sees only the ones it made. */
+        get: operations["listBulkActions"];
         put?: never;
         /** @description Makes a job from a preview, { previewId }, or from IDs named outright, { action, options, ids }. It acts on exactly those sandboxes, a few at a time, checking each again just before: one that left the filter it was chosen by, is already as the action would make it, or that its maker may no longer act on, is skipped. An item is pending, acting, accepted (going on after the call, as a stop writing memory does), done, skipped, failed, or uncertain (the worker stopped between acting and writing the answer; settled by reading the sandbox, never by acting again). Sent again with the same Idempotency-Key, the same job is answered. */
-        post: operations["createSandboxJob"];
+        post: operations["createBulkAction"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/sandbox-jobs/{id}": {
+    "/v1/bulk-actions/{id}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["getSandboxJob"];
+        get: operations["getBulkAction"];
         put?: never;
         post?: never;
         delete?: never;
@@ -156,7 +156,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/sandbox-jobs/{id}/items": {
+    "/v1/bulk-actions/{id}/items": {
         parameters: {
             query?: never;
             header?: never;
@@ -164,7 +164,7 @@ export interface paths {
             cookie?: never;
         };
         /** @description Each sandbox of the job, in order: its state, why, and what it made or follows (an operation, a stop, a snapshot). */
-        get: operations["listSandboxJobItems"];
+        get: operations["listBulkActionItems"];
         put?: never;
         post?: never;
         delete?: never;
@@ -173,7 +173,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/sandbox-jobs/{id}/cancel": {
+    "/v1/bulk-actions/{id}/cancel": {
         parameters: {
             query?: never;
             header?: never;
@@ -183,7 +183,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** @description No item that has not begun begins; those under way are followed to their end. Who made the job may cancel it, and an owner or admin of its organization. */
-        post: operations["cancelSandboxJob"];
+        post: operations["cancelBulkAction"];
         delete?: never;
         options?: never;
         head?: never;
@@ -951,6 +951,23 @@ export interface paths {
         get: operations["getDesktopClipboard"];
         /** @description Replaces the text on the desktop's clipboard. It does not paste: press ctrl+v with POST /v1/sandboxes/{id}/desktop/key to paste where the keyboard focus is. Up to 1000000 bytes of UTF-8. For long text this is much faster than POST /v1/sandboxes/{id}/desktop/type, which types about 100 characters a second; a paste is instant. */
         put: operations["setDesktopClipboard"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sandboxes/{id}/desktop/tree": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Returns the accessibility tree of what is on the sandbox's screen: its windows, and in them the buttons, fields, menus, tabs and texts their programs tell of, each with its role, name, state and place on the screen. A program can then be used by what is on it rather than by where a picture shows it, which costs far fewer tokens than screenshots. window and query narrow it. It holds what the desktop's own programs tell (the panel, the file manager, a terminal, GTK programs); the browser's pages are not in it: read a page with the browser's own tools. Only what is shown is in it. A sandbox whose machine was made from an image from before it answers 409 desktop_unavailable. Read-only. */
+        get: operations["getDesktopTree"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -3602,7 +3619,7 @@ export interface components {
                 };
             };
         };
-        SandboxJobPreview: {
+        BulkActionPreview: {
             id: string;
             /** @enum {string} */
             action: "stop" | "start" | "archive" | "snapshot" | "auto-stop" | "labels" | "delete";
@@ -3637,7 +3654,7 @@ export interface components {
             };
             expiresAt: string;
         };
-        SandboxJob: {
+        BulkAction: {
             id: string;
             /** @enum {string} */
             action: "stop" | "start" | "archive" | "snapshot" | "auto-stop" | "labels" | "delete";
@@ -3925,6 +3942,58 @@ export interface components {
              * @example copied in the sandbox
              */
             text: string;
+        };
+        DesktopTree: {
+            windows: components["schemas"]["DesktopTreeWindow"][];
+            elements: components["schemas"]["DesktopTreeElement"][];
+            /** @description Whether there was more than limit, or more than could be read in the time a read is given. Narrow it with window or query. */
+            truncated: boolean;
+        };
+        DesktopTreeWindow: {
+            /** @description Its place in windows, which elements name it by. */
+            index: number;
+            /**
+             * @description The program the window is of.
+             * @example Thunar
+             */
+            program: string;
+            /**
+             * @description Its title, or an empty string.
+             * @example root - Thunar
+             */
+            title: string;
+            bounds: components["schemas"]["DesktopRegion"] & unknown;
+            /** @description Whether it is the window the keyboard goes to. */
+            active: boolean;
+        };
+        DesktopTreeElement: {
+            /** @description Its place in elements. It holds for this answer only: the screen changes. */
+            index: number;
+            /** @description The index of its window in windows. */
+            window: number;
+            /**
+             * @description What it is, as its program tells it: push button, entry, text, menu, menu item, check box, page tab, link, label, table cell and others.
+             * @example push button
+             */
+            role: string;
+            /**
+             * @description Its name, as a screen reader would say it, or an empty string.
+             * @example Home
+             */
+            name: string;
+            bounds: components["schemas"]["DesktopRegion"] & unknown;
+            /**
+             * @description What is notable about it now, when anything is: focused, checked, selected, expanded, pressed, editable, disabled.
+             * @example [
+             *       "focused"
+             *     ]
+             */
+            states?: string[];
+            /**
+             * @description The text in it, for a field.
+             * @example /root/
+             */
+            value?: string;
         };
         DesktopLink: {
             /** @example dln_4f1c2a9b0d3e7c55 */
@@ -6747,7 +6816,7 @@ export interface operations {
             };
         };
     };
-    previewSandboxJob: {
+    previewBulkAction: {
         parameters: {
             query?: never;
             header?: never;
@@ -6794,7 +6863,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SandboxJobPreview"];
+                    "application/json": components["schemas"]["BulkActionPreview"];
                 };
             };
             /** @description Missing or invalid API key. */
@@ -6826,7 +6895,7 @@ export interface operations {
             };
         };
     };
-    listSandboxJobs: {
+    listBulkActions: {
         parameters: {
             query?: never;
             header?: never;
@@ -6835,14 +6904,14 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Jobs. */
+            /** @description Bulk actions. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        jobs: components["schemas"]["SandboxJob"][];
+                        actions: components["schemas"]["BulkAction"][];
                     };
                 };
             };
@@ -6866,7 +6935,7 @@ export interface operations {
             };
         };
     };
-    createSandboxJob: {
+    createBulkAction: {
         parameters: {
             query?: never;
             header?: never;
@@ -6910,7 +6979,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SandboxJob"];
+                    "application/json": components["schemas"]["BulkAction"];
                 };
             };
             /** @description confirm_required: a delete is made with confirm, the count its preview showed. */
@@ -6951,7 +7020,7 @@ export interface operations {
             };
         };
     };
-    getSandboxJob: {
+    getBulkAction: {
         parameters: {
             query?: never;
             header?: never;
@@ -6968,7 +7037,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SandboxJob"];
+                    "application/json": components["schemas"]["BulkAction"];
                 };
             };
             /** @description Missing or invalid API key. */
@@ -6991,7 +7060,7 @@ export interface operations {
             };
         };
     };
-    listSandboxJobItems: {
+    listBulkActionItems: {
         parameters: {
             query?: {
                 /** @description Only items in this state. */
@@ -7051,7 +7120,7 @@ export interface operations {
             };
         };
     };
-    cancelSandboxJob: {
+    cancelBulkAction: {
         parameters: {
             query?: never;
             header?: never;
@@ -7068,7 +7137,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SandboxJob"];
+                    "application/json": components["schemas"]["BulkAction"];
                 };
             };
             /** @description Missing or invalid API key. */
@@ -7447,7 +7516,7 @@ export interface operations {
         requestBody?: {
             content: {
                 "application/json": {
-                    /** @description Keep its memory as well as its disk, so that a start puts back every process as it was: shells, servers, a browser and what is in /dev/shm. Writing the memory takes about a second for each 110 MB the sandbox uses, two minutes for a large one that is full, and the sandbox runs and is metered as running until it is written. Stopped so, it costs 10% of its running price, and 5% without. GET /v1/policy says whether it is offered as keepMemory. */
+                    /** @description Keep its memory as well as its disk, so that a start puts back every process as it was: shells, servers, a browser and what is in /dev/shm. Writing the memory takes about a second for every 2 to 3 GiB the sandbox has, and the sandbox runs and is metered as running until it is written. Stopped so, it costs 10% of its running price, and 5% without. GET /v1/policy says whether it is offered as keepMemory. */
                     keepMemory?: boolean;
                 };
             };
@@ -10648,6 +10717,81 @@ export interface operations {
                 };
             };
             /** @description sandbox_not_running: the sandbox is not running. desktop_not_running: no desktop is turned on for the sandbox, or it is turned on but not running yet, as in the seconds after a start. PUT /v1/sandboxes/{id}/desktop turns it on, and restarts one that has exited. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description desktop_not_configured: this deployment offers no desktop. GET /v1/policy reports it as desktop. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getDesktopTree: {
+        parameters: {
+            query?: {
+                /** @description A part of a window's title or of its program's name, any case: only the windows that hold it are read. */
+                window?: string;
+                /** @description A part of an element's name or role, any case: only the elements that hold it are answered. Every window is still listed. */
+                query?: string;
+                /** @description The most elements answered, from 1 to 2000. Default 300. truncated says when there were more. */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The sandbox's ID. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The windows on the screen and the elements in them. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DesktopTree"];
+                };
+            };
+            /** @description invalid_request: limit is not from 1 to 2000, or window or query is longer than 200 characters. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description sandbox_not_running, desktop_not_running: as for a screenshot; desktop_not_running too in the seconds after the desktop starts, before its programs tell what is on them. desktop_unavailable: the sandbox's machine was made from an image without the accessibility reader. */
             409: {
                 headers: {
                     [name: string]: unknown;

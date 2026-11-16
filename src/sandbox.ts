@@ -13,6 +13,7 @@ import type {
   Command,
   DesktopLink,
   DesktopScreenshot,
+  DesktopTree,
   DesktopState,
   EmailMessage,
   EmailMessageList,
@@ -195,7 +196,7 @@ export interface StopOptions {
   /**
    * Keep its memory as well as its disk, at 10% of the running price, so that start() puts
    * back every process as it was. The stop answers once the memory is written, about a
-   * second for each 110 MB the sandbox uses. info.memoryKept says whether it was.
+   * second for every 2 to 3 GiB the sandbox has. info.memoryKept says whether it was.
    */
   keepMemory?: boolean;
   /**
@@ -525,6 +526,18 @@ export class Desktop {
       ...(region ? { x: String(region.x), y: String(region.y), width: String(region.width), height: String(region.height) } : {}),
     };
     return (await this.http.json<DesktopScreenshot>({ method: "GET", path: `${this.path}/screenshot`, query, replay: true })).body;
+  }
+
+  /**
+   * What is on the screen as its programs tell it: each window, and the buttons, fields, menus
+   * and texts in it, each with its role, name, state and bounds in screen pixels, the ones
+   * click takes. window keeps the windows whose title or program holds it, query the elements
+   * whose name or role does, and limit says how many elements at most, 300 unless given.
+   * It holds the desktop's own programs; a page in the browser is not in it. It changes nothing.
+   */
+  async tree(options: { window?: string; query?: string; limit?: number } = {}): Promise<DesktopTree> {
+    const query = { window: options.window, query: options.query, limit: options.limit === undefined ? undefined : String(options.limit) };
+    return (await this.http.json<DesktopTree>({ method: "GET", path: `${this.path}/tree`, query, replay: true })).body;
   }
 
   /** The text on the desktop's clipboard: what a paste there would put in. "" when it holds none. It changes nothing. */
