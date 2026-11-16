@@ -60,14 +60,38 @@ export type Size = SandboxInfo["size"];
 export type ExecResult = Schemas["ExecResult"];
 /** A command left running in the background, and its output so far. */
 export type Command = Schemas["Command"];
-/** A command a sandbox runs on a schedule, with its last run. */
-export type Schedule = Schemas["Schedule"];
-/** One run of a schedule: when it was due, how it ended, and whether it started and stopped its sandbox. */
-export type ScheduleRun = Schemas["ScheduleRun"];
-/** What a new schedule is: what it runs, and every or cron. */
-export type CreateSchedule = Schemas["CreateSchedule"];
-/** What to change in a schedule. What is left out is as it was. */
-export type UpdateSchedule = Schemas["UpdateSchedule"];
+/** A command that runs in a sandbox you keep, or in a fresh one made from a template for each run, on a timer (every, cron or at) or only when asked, with its last run. */
+export type Job = Schemas["Job"];
+/** One run of a job: when it was due, how it ended, what started it, and whether it started, stopped or deleted its sandbox. */
+export type JobRun = Schemas["JobRun"];
+/** One run of a job with the last of what its command wrote to stdout and stderr. */
+export type JobRunWithOutput = Schemas["JobRunWithOutput"];
+/** How a run ended, or running. */
+export type JobRunOutcome = JobRun["outcome"];
+/** What a new job is: the sandbox it runs in or the template of its fresh sandboxes, what it runs, and every, cron, at or none of them. */
+export type CreateJob = Schemas["CreateJob"];
+/** What a job runs in: a sandbox you keep ({ sandbox }), or a fresh sandbox made from a template for each run ({ template, size }). */
+export type JobTarget = Schemas["JobTarget"];
+/** What to change in a job. What is left out is as it was. */
+export type UpdateJob = Schemas["UpdateJob"];
+/** A job as jobs.put() sends it, by its name: exactly this, whatever is left out at its default. */
+export type PutJob = Schemas["PutJob"];
+/** A job's inputs, by name: a default, null for one a run must be given, or { default, secret }. */
+export type JobInputs = NonNullable<CreateJob["inputs"]>;
+/** A job's HTTP address: POST to its url starts a run, from anywhere, with the secret it was made with. */
+export type JobTrigger = Schemas["JobTrigger"];
+/** A trigger with its secret, as jobs.triggers.create() and rotate() answer it: the secret is shown this once. */
+export type JobTriggerWithSecret = Schemas["JobTriggerWithSecret"];
+/** What a new trigger is: how a caller proves it may call (signature, and header for hmac-sha256), how a call is answered, and how many calls a minute it takes. */
+export type CreateJobTrigger = Schemas["MakeJobTrigger"];
+/** What to change in a trigger. What is left out is as it was; its secret stays. */
+export type UpdateJobTrigger = Pick<CreateJobTrigger, "respond" | "ratePerMinute">;
+/** How a caller proves it may call a trigger. */
+export type JobTriggerSignature = JobTrigger["signature"];
+/** A call of a job's address that was refused, with why: kept 7 days. */
+export type RefusedJobCall = operations["listRefusedJobCalls"]["responses"][200]["content"]["application/json"]["calls"][number];
+/** Running time and list cost by job over a window: GET /v1/usage/jobs. */
+export type JobUsage = Schemas["JobUsage"];
 export type Snapshot = Schemas["Snapshot"];
 /** A port of a sandbox, and the address it is reached at. */
 export type HostRoute = Schemas["HostRoute"];

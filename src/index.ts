@@ -1,8 +1,8 @@
-export { Agental, type SandboxFilter, type BulkActionType, type BulkActionOptions, type SandboxPage, type SandboxSort } from "./client.js";
+export { Agental, type SandboxFilter, type BulkActionType, type BulkActionOptions, type SandboxPage, type SandboxSort, type JobRunOptions, type JobRunInputs, type JobPut } from "./client.js";
 export { AgentalError, ApiError, ConnectionError, ProxyError, TimeoutError } from "./errors.js";
 export type { BurstRefusalCode } from "./errors.js";
 export type { AgentalOptions } from "./http.js";
-export { Browser, Commands, Desktop, Email, Files, Sandbox, Schedules, Ssh } from "./sandbox.js";
+export { Browser, Commands, Desktop, Email, Files, Sandbox, Ssh } from "./sandbox.js";
 export { Secrets, Template, Templates } from "./template.js";
 export { KEPT_TERMINAL_ID, Terminal, TERMINAL_CLOSE, TERMINAL_PROTOCOL } from "./terminal.js";
 export type { TerminalExit, TerminalOptions, WebSocketConstructor, WebSocketLike } from "./terminal.js";
@@ -31,7 +31,7 @@ export type {
   BillingInvoices,
   Checkout,
   Command,
-  CreateSchedule,
+  CreateJob,
   CreateApiKey,
   CreatedApiKey,
   DesktopLink,
@@ -78,8 +78,19 @@ export type {
   SandboxStatus,
   SandboxTemplate,
   SandboxUsage,
-  Schedule,
-  ScheduleRun,
+  Job,
+  JobRun,
+  JobRunOutcome,
+  JobRunWithOutput,
+  JobTarget,
+  JobUsage,
+  JobTrigger,
+  JobTriggerWithSecret,
+  CreateJobTrigger,
+  UpdateJobTrigger,
+  JobTriggerSignature,
+  RefusedJobCall,
+  JobInputs,
   SecretVariable,
   SendEmail,
   SetAutoStop,
@@ -88,7 +99,8 @@ export type {
   SshKey,
   KeptTerminal,
   SshState,
-  UpdateSchedule,
+  UpdateJob,
+  PutJob,
   Team,
   TeamRole,
   Telemetry,

@@ -20,6 +20,8 @@ import {
   type EgressAccount,
   type EmailMessageSummary,
   type HiddenVariable,
+  type Job,
+  type JobRun,
   type MetricsAtMoment,
   type MetricsReading,
   type RunningOverTime,
@@ -389,6 +391,17 @@ test("a delete says which sandbox it means", async () => {
   await (await agental.sandboxes.get("sbx_0123456789abcdef")).delete();
   assert.equal(sent[1]?.method, "DELETE");
   assert.equal(sent[1]?.headers.get("x-agental-confirm-delete"), "sbx_0123456789abcdef");
+  assert.equal(sent[1]?.path, "/v1/sandboxes/sbx_0123456789abcdef");
+});
+
+test("a delete of a sandbox that jobs run in pauses them only when asked", async () => {
+  const { agental, sent } = scripted(json(200, sandbox()), refusal(409, "in_use_by_jobs"), new Response(null, { status: 204 }));
+  const box = await agental.sandboxes.get("sbx_0123456789abcdef");
+  await assert.rejects(box.delete(), (error: unknown) => error instanceof ApiError && error.code === "in_use_by_jobs");
+  await box.delete({ pauseJobs: true });
+  assert.equal(sent[2]?.method, "DELETE");
+  assert.equal(sent[2]?.path, "/v1/sandboxes/sbx_0123456789abcdef?pauseJobs=true");
+  assert.equal(sent[2]?.headers.get("x-agental-confirm-delete"), "sbx_0123456789abcdef");
 });
 
 test("a start waits for a sandbox that is brought back, and says why one was not", async () => {
@@ -2018,64 +2031,296 @@ test("a team's members and invites are read and changed through organizations, i
   assert.deepEqual([sent[9]?.method, sent[9]?.path], ["DELETE", "/v1/invites/inv_1"]);
 });
 
-test("a sandbox's schedules are listed, made, read, changed, run, their runs read, and deleted, each by the call the API has for it", async () => {
-  const run = { id: "run_1", scheduleId: "sch_1", sandboxId: "sbx_0123456789abcdef", dueAt: "2026-11-03T16:00:00.000Z", startedAt: null, finishedAt: null, outcome: "running", reason: null, exitCode: null, commandId: null, startedSandbox: false, stoppedSandbox: null } as const;
-  const schedule = {
-    id: "sch_1",
+function jobRun(changes: Partial<JobRun> = {}): JobRun {
+  return {
+    id: "run_1",
+    jobId: "job_1",
+    jobName: "scrape",
     sandboxId: "sbx_0123456789abcdef",
+    fresh: false,
+    dueAt: "2026-11-03T16:00:00.000Z",
+    startedAt: null,
+    finishedAt: null,
+    outcome: "running",
+    reason: null,
+    exitCode: null,
+    commandId: null,
+    startedSandbox: false,
+    stoppedSandbox: null,
+    deletedSandbox: false,
+    startedBy: "api",
+    keepUntil: null,
+    sandboxKept: false,
+    attempt: 1,
+    failedForGood: false,
+    inputs: {},
+    ...changes,
+  };
+}
+
+function job(changes: Partial<Job> = {}): Job {
+  return {
+    id: "job_1",
     name: "scrape",
+    organizationId: "org_1",
+    target: { sandbox: "sbx_0123456789abcdef", sandboxName: "box", template: null, templateName: null, size: null },
     command: "python scrape.py",
     every: "1h",
     cron: null,
+    at: null,
     timeZone: "UTC",
     timeoutMs: 600000,
-    ifStopped: "start",
-    keepMemory: false,
     overlap: "skip",
+    ifStopped: "start",
+    after: "stop",
+    keepFailedFor: null,
     enabled: true,
+    pausedReason: null,
     nextRunAt: "2026-11-03T17:00:00.000Z",
     lastRun: null,
+    madeBy: { kind: "key", name: "ci" },
+    retries: 0,
+    alerts: "email",
+    failingSince: null,
+    inputs: {},
     createdAt: "2026-11-03T16:00:00.000Z",
     updatedAt: "2026-11-03T16:00:00.000Z",
-  } as const;
+    ...changes,
+  };
+}
+
+test("jobs are listed, made, read, changed, paused, resumed, run, their runs read, and deleted, each by the call the API has for it", async () => {
+  const run = jobRun();
   const { agental, sent } = scripted(
-    json(200, sandbox()),
-    json(200, { schedules: [schedule] }),
-    json(201, schedule),
-    json(200, schedule),
-    json(200, { ...schedule, enabled: false, nextRunAt: null }),
+    json(200, { jobs: [job()] }),
+    json(200, { jobs: [job()] }),
+    json(201, job()),
+    json(200, job()),
+    json(200, job({ enabled: false, nextRunAt: null })),
+    json(200, job({ enabled: false, nextRunAt: null })),
+    json(200, job()),
     json(202, run),
     json(200, { runs: [run] }),
+    json(200, { ...run, finishedAt: "2026-11-03T16:00:05.000Z", outcome: "succeeded", exitCode: 0, stdout: "ok\n", stderr: "" }),
     new Response(null, { status: 204 }),
   );
-  const box = await agental.sandboxes.get("sbx_0123456789abcdef");
-  const base = "/v1/sandboxes/sbx_0123456789abcdef/schedules";
 
-  assert.equal((await box.schedules.list())[0]?.id, "sch_1");
-  assert.deepEqual([sent[1]?.method, sent[1]?.path], ["GET", base]);
-  assert.equal((await box.schedules.create({ name: "scrape", command: "python scrape.py", every: "1h" })).every, "1h");
-  assert.deepEqual([sent[2]?.method, sent[2]?.path, sent[2]?.body], ["POST", base, { name: "scrape", command: "python scrape.py", every: "1h" }]);
-  assert.equal((await box.schedules.get("sch_1")).name, "scrape");
-  assert.deepEqual([sent[3]?.method, sent[3]?.path], ["GET", `${base}/sch_1`]);
-  assert.equal((await box.schedules.update("sch_1", { enabled: false })).nextRunAt, null);
-  assert.deepEqual([sent[4]?.method, sent[4]?.path, sent[4]?.body], ["PATCH", `${base}/sch_1`, { enabled: false }]);
-  assert.equal((await box.schedules.run("sch_1")).outcome, "running");
-  assert.deepEqual([sent[5]?.method, sent[5]?.path], ["POST", `${base}/sch_1/run`]);
-  assert.equal((await box.schedules.runs("sch_1", { limit: 5 }))[0]?.id, "run_1");
-  assert.deepEqual([sent[6]?.method, sent[6]?.path], ["GET", `${base}/sch_1/runs?limit=5`]);
-  await box.schedules.delete("sch_1");
-  assert.deepEqual([sent[7]?.method, sent[7]?.path], ["DELETE", `${base}/sch_1`]);
+  assert.equal((await agental.jobs.list())[0]?.id, "job_1");
+  assert.deepEqual([sent[0]?.method, sent[0]?.path], ["GET", "/v1/jobs"]);
+  await agental.jobs.list({ sandbox: "box" });
+  assert.deepEqual([sent[1]?.method, sent[1]?.path], ["GET", "/v1/jobs?sandbox=box"]);
+  const body = { name: "scrape", target: { sandbox: "box" }, command: "python scrape.py", every: "1h" };
+  assert.equal((await agental.jobs.create(body)).every, "1h");
+  assert.deepEqual([sent[2]?.method, sent[2]?.path, sent[2]?.body], ["POST", "/v1/jobs", body]);
+  assert.equal((await agental.jobs.get("scrape")).name, "scrape");
+  assert.deepEqual([sent[3]?.method, sent[3]?.path], ["GET", "/v1/jobs/scrape"]);
+  assert.equal((await agental.jobs.update("job_1", { enabled: false })).nextRunAt, null);
+  assert.deepEqual([sent[4]?.method, sent[4]?.path, sent[4]?.body], ["PATCH", "/v1/jobs/job_1", { enabled: false }]);
+  assert.equal((await agental.jobs.pause("job_1")).enabled, false);
+  assert.deepEqual([sent[5]?.method, sent[5]?.path, sent[5]?.body], ["PATCH", "/v1/jobs/job_1", { enabled: false }]);
+  assert.equal((await agental.jobs.resume("job_1")).enabled, true);
+  assert.deepEqual([sent[6]?.method, sent[6]?.path, sent[6]?.body], ["PATCH", "/v1/jobs/job_1", { enabled: true }]);
+  assert.equal((await agental.jobs.run("job_1")).outcome, "running");
+  assert.deepEqual([sent[7]?.method, sent[7]?.path], ["POST", "/v1/jobs/job_1/run"]);
+  assert.equal((await agental.jobs.runs("job_1", { limit: 5 }))[0]?.id, "run_1");
+  assert.deepEqual([sent[8]?.method, sent[8]?.path], ["GET", "/v1/jobs/job_1/runs?limit=5"]);
+  assert.equal((await agental.jobs.runOutput("job_1", "run_1")).stdout, "ok\n");
+  assert.deepEqual([sent[9]?.method, sent[9]?.path], ["GET", "/v1/jobs/job_1/runs/run_1"]);
+  await agental.jobs.delete("job_1");
+  assert.deepEqual([sent[10]?.method, sent[10]?.path], ["DELETE", "/v1/jobs/job_1"]);
 });
 
-test("a schedule that runs once is asked to delete its sandbox after with deleteAfter, and its run says it did", async () => {
-  const run = { id: "run_1", scheduleId: "sch_1", sandboxId: "sbx_0123456789abcdef", dueAt: "2026-11-04T09:00:20.000Z", startedAt: "2026-11-04T09:00:21.000Z", finishedAt: "2026-11-04T09:00:30.000Z", outcome: "succeeded", reason: null, exitCode: 0, commandId: "cmd_1", startedSandbox: false, stoppedSandbox: null, deletedSandbox: true } as const;
-  const schedule = { id: "sch_1", sandboxId: "sbx_0123456789abcdef", name: "last", command: "./finish.sh", every: null, cron: null, at: "2026-11-04T09:00:00.000Z", timeZone: "UTC", timeoutMs: 600000, ifStopped: "start", keepMemory: false, overlap: "skip", deleteAfter: true, enabled: true, nextRunAt: null, pausedReason: null, lastRun: run, createdAt: "2026-11-03T16:00:00.000Z", updatedAt: "2026-11-03T16:00:00.000Z" } as const;
-  const { agental, sent } = scripted(json(200, sandbox()), json(201, schedule), json(200, { runs: [run] }));
-  const box = await agental.sandboxes.get("sbx_0123456789abcdef");
-  const made = await box.schedules.create({ command: "./finish.sh", at: "2026-11-04T09:00:00Z", deleteAfter: true });
-  assert.equal(made.deleteAfter, true);
-  assert.deepEqual(sent[1]?.body, { command: "./finish.sh", at: "2026-11-04T09:00:00Z", deleteAfter: true });
-  assert.equal((await box.schedules.runs("sch_1"))[0]?.deletedSandbox, true);
+test("a job's triggers are listed, made with their secret, changed, rotated and deleted, and its refused calls read, each by the call the API has for it", async () => {
+  const trigger = {
+    id: "trg_1",
+    jobId: "job_1",
+    url: "https://agental.run/trg_1",
+    signature: "github",
+    header: null,
+    respond: "accepted",
+    ratePerMinute: 60,
+    createdAt: "2026-11-16T10:00:00.000Z",
+    rotatedAt: null,
+  } as const;
+  const refused = { id: "call_1", triggerId: "trg_1", at: "2026-11-16T10:05:00.000Z", status: 401, reason: "no X-Hub-Signature-256 header was sent", from: "203.0.113.9" };
+  const { agental, sent } = scripted(
+    json(200, { triggers: [trigger] }),
+    json(201, { trigger, secret: "jts_first" }),
+    json(201, { trigger: { ...trigger, id: "trg_2", signature: "bearer" }, secret: "jts_plain" }),
+    json(200, { ...trigger, respond: "wait", ratePerMinute: 10 }),
+    json(200, { trigger: { ...trigger, rotatedAt: "2026-11-16T11:00:00.000Z" }, secret: "jts_second" }),
+    new Response(null, { status: 204 }),
+    json(200, { calls: [refused] }),
+  );
+  assert.equal((await agental.jobs.triggers.list("report"))[0]?.url, "https://agental.run/trg_1");
+  assert.deepEqual([sent[0]?.method, sent[0]?.path], ["GET", "/v1/jobs/report/triggers"]);
+  const made = await agental.jobs.triggers.create("report", { signature: "github", ratePerMinute: 60 });
+  assert.equal(made.secret, "jts_first");
+  assert.deepEqual([sent[1]?.method, sent[1]?.path, sent[1]?.body], ["POST", "/v1/jobs/report/triggers", { signature: "github", ratePerMinute: 60 }]);
+  // Given nothing, it makes a bearer trigger with the API's defaults.
+  assert.equal((await agental.jobs.triggers.create("report")).trigger.signature, "bearer");
+  assert.deepEqual([sent[2]?.method, sent[2]?.path, sent[2]?.body], ["POST", "/v1/jobs/report/triggers", {}]);
+  assert.equal((await agental.jobs.triggers.update("report", "trg_1", { respond: "wait", ratePerMinute: 10 })).respond, "wait");
+  assert.deepEqual([sent[3]?.method, sent[3]?.path, sent[3]?.body], ["PATCH", "/v1/jobs/report/triggers/trg_1", { respond: "wait", ratePerMinute: 10 }]);
+  assert.equal((await agental.jobs.triggers.rotate("report", "trg_1")).secret, "jts_second");
+  assert.deepEqual([sent[4]?.method, sent[4]?.path], ["POST", "/v1/jobs/report/triggers/trg_1/rotate"]);
+  await agental.jobs.triggers.delete("report", "trg_1");
+  assert.deepEqual([sent[5]?.method, sent[5]?.path], ["DELETE", "/v1/jobs/report/triggers/trg_1"]);
+  assert.deepEqual(await agental.jobs.calls("report"), [refused]);
+  assert.deepEqual([sent[6]?.method, sent[6]?.path], ["GET", "/v1/jobs/report/calls"]);
+});
+
+test("a job run with wait reads the run until it has finished, and answers it with its output", async () => {
+  const { agental, sent } = scripted(
+    json(202, jobRun()),
+    json(200, { ...jobRun(), stdout: null, stderr: null }),
+    json(200, { ...jobRun({ finishedAt: "2026-11-03T16:00:05.000Z", outcome: "failed", exitCode: 2 }), stdout: "", stderr: "boom\n" }),
+  );
+  const run = await agental.jobs.run("scrape", { wait: 60 });
+  assert.equal(run.outcome, "failed");
+  assert.equal(run.stderr, "boom\n");
+  // The API held the call for 60 seconds, and answered 202: the run still went, and is read until it ends.
+  assert.deepEqual(sent.map((call) => [call.method, call.path]), [
+    ["POST", "/v1/jobs/scrape/run?wait=60"],
+    ["GET", "/v1/jobs/job_1/runs/run_1"],
+    ["GET", "/v1/jobs/job_1/runs/run_1"],
+  ]);
+});
+
+test("a job run whose wait runs out answers the run as it last read it, still running", async () => {
+  const { agental, sent } = scripted(json(202, jobRun()), json(200, { ...jobRun(), stdout: "half", stderr: "" }));
+  const run = await agental.jobs.run("scrape", { wait: 0 });
+  assert.equal(run.finishedAt, null);
+  assert.equal(run.stdout, "half");
+  assert.equal(sent.length, 2);
+  assert.equal(sent[0]?.path, "/v1/jobs/scrape/run?wait=0");
+});
+
+test("a job run is given its inputs, and with wait the API holds the call: a 200 is the run ended, with its output, read no more", async () => {
+  const ended = { ...jobRun({ finishedAt: "2026-11-03T16:00:05.000Z", outcome: "succeeded", exitCode: 0, inputs: { REPORT_DAY: "2026-11-15", API_TOKEN: "••••" } }), stdout: "ok\n", stderr: "" };
+  const { agental, sent } = scripted(json(200, ended), json(202, jobRun({ inputs: { REPORT_DAY: "yesterday" } })), json(202, jobRun({ id: "run_2" })), json(200, { ...ended, id: "run_2" }));
+  const run = await agental.jobs.run("report", { inputs: { REPORT_DAY: "2026-11-15", API_TOKEN: "s3cret" }, wait: 600 });
+  assert.equal(run.stdout, "ok\n");
+  assert.deepEqual(run.inputs, { REPORT_DAY: "2026-11-15", API_TOKEN: "••••" });
+  // A wait longer than a call is held asks for 90 seconds, and the rest is spent reading the run.
+  assert.deepEqual([sent[0]?.method, sent[0]?.path, sent[0]?.body], ["POST", "/v1/jobs/report/run?wait=90", { inputs: { REPORT_DAY: "2026-11-15", API_TOKEN: "s3cret" } }]);
+  assert.equal(sent.length, 1);
+
+  // Without wait it answers as the run begins; inputs without wait are sent all the same.
+  const started = await agental.jobs.run("report", { inputs: { REPORT_DAY: "yesterday" } });
+  assert.equal(started.outcome, "running");
+  assert.deepEqual([sent[1]?.path, sent[1]?.body], ["/v1/jobs/report/run", { inputs: { REPORT_DAY: "yesterday" } }]);
+
+  // runAgain runs it once more with what a run was given, and waits as run() does.
+  const again = await agental.jobs.runAgain("report", "run_1", { wait: 30 });
+  assert.equal(again.stdout, "ok\n");
+  assert.deepEqual(sent.slice(2).map((call) => [call.method, call.path, call.body]), [
+    ["POST", "/v1/jobs/report/runs/run_1/again?wait=30", undefined],
+    ["GET", "/v1/jobs/job_1/runs/run_2", undefined],
+  ]);
+});
+
+test("a job is put by its name: made, changed, or as it was, as the status and Agental-Changed say", async () => {
+  const { agental, sent } = scripted(
+    json(201, job({ name: "report", inputs: { REPORT_DAY: { default: "yesterday", secret: false } } })),
+    json(200, job({ name: "report" }), { "Agental-Changed": "true" }),
+    json(200, job({ name: "report" }), { "Agental-Changed": "false" }),
+  );
+  const body = { target: { template: "ci", size: "medium" }, command: "python report.py", inputs: { REPORT_DAY: "yesterday", API_TOKEN: { default: null, secret: true } } };
+  const made = await agental.jobs.put("report", body);
+  assert.deepEqual([made.created, made.changed, made.job.inputs], [true, true, { REPORT_DAY: { default: "yesterday", secret: false } }]);
+  assert.deepEqual([sent[0]?.method, sent[0]?.path, sent[0]?.body], ["PUT", "/v1/jobs/report", body]);
+  const changed = await agental.jobs.put("report", body);
+  assert.deepEqual([changed.created, changed.changed], [false, true]);
+  const same = await agental.jobs.put("report", body);
+  assert.deepEqual([same.created, same.changed], [false, false]);
+});
+
+test("a job that runs once is asked to delete its sandbox after, and its run says it did", async () => {
+  const run = jobRun({ startedAt: "2026-11-04T09:00:21.000Z", finishedAt: "2026-11-04T09:00:30.000Z", outcome: "succeeded", exitCode: 0, commandId: "cmd_1", deletedSandbox: true, startedBy: "timer" });
+  const { agental, sent } = scripted(json(201, job({ every: null, at: "2026-11-04T09:00:00.000Z", after: "delete", nextRunAt: null, lastRun: run })), json(200, { runs: [run] }));
+  const made = await agental.jobs.create({ target: { sandbox: "sbx_0123456789abcdef" }, command: "./finish.sh", at: "2026-11-04T09:00:00Z", after: "delete" });
+  assert.equal(made.after, "delete");
+  assert.deepEqual(sent[0]?.body, { target: { sandbox: "sbx_0123456789abcdef" }, command: "./finish.sh", at: "2026-11-04T09:00:00Z", after: "delete" });
+  assert.equal((await agental.jobs.runs("job_1"))[0]?.deletedSandbox, true);
+});
+
+test("a job on fresh sandboxes is made from a template, listed by it, and a failed run's kept sandbox is kept for good", async () => {
+  const fresh = job({
+    name: "tests",
+    target: { sandbox: null, sandboxName: null, template: "tpl_0000000000000002", templateName: "coding-agent", size: "medium" },
+    ifStopped: null,
+    after: null,
+    keepFailedFor: "30m",
+  });
+  const failed = jobRun({ fresh: true, sandboxId: "sbx_00000000000000f1", outcome: "failed", exitCode: 1, finishedAt: "2026-11-03T16:00:05.000Z", keepUntil: "2026-11-03T16:30:05.000Z" });
+  const { agental, sent } = scripted(
+    json(201, fresh),
+    json(200, { jobs: [fresh] }),
+    json(200, { runs: [failed] }),
+    json(200, { ...failed, keepUntil: null, sandboxKept: true }),
+    refusal(409, "not_fresh"),
+  );
+  const body = { name: "tests", target: { template: "coding-agent", size: "medium" }, keepFailedFor: "30m", command: "npm test", every: "1h" };
+  const made = await agental.jobs.create(body);
+  assert.deepEqual([sent[0]?.method, sent[0]?.path, sent[0]?.body], ["POST", "/v1/jobs", body]);
+  assert.equal(made.target.sandbox, null);
+  assert.equal(made.target.templateName, "coding-agent");
+  assert.equal(made.keepFailedFor, "30m");
+  await agental.jobs.list({ template: "coding-agent" });
+  assert.deepEqual([sent[1]?.method, sent[1]?.path], ["GET", "/v1/jobs?template=coding-agent"]);
+  const [last] = await agental.jobs.runs("tests");
+  assert.equal(last?.keepUntil, "2026-11-03T16:30:05.000Z");
+  const kept = await agental.jobs.keepSandbox("tests", "run_1");
+  assert.deepEqual([sent[3]?.method, sent[3]?.path], ["POST", "/v1/jobs/tests/runs/run_1/keep-sandbox"]);
+  assert.equal(kept.sandboxKept, true);
+  assert.equal(kept.keepUntil, null);
+  await assert.rejects(agental.jobs.keepSandbox("scrape", "run_2"), (error: unknown) => error instanceof ApiError && error.code === "not_fresh");
+});
+
+test("a job's retries and alerts are sent as given, and its runs say which try each is and whether it failed for good", async () => {
+  const failing = job({ retries: 2, alerts: "webhook", failingSince: "2026-11-03T16:00:00.000Z" });
+  const tries = [
+    jobRun({ id: "run_3", attempt: 3, outcome: "failed", exitCode: 1, failedForGood: true }),
+    jobRun({ id: "run_2", attempt: 2, outcome: "timed_out" }),
+    jobRun({ id: "run_1", attempt: 1, outcome: "failed", exitCode: 1 }),
+  ];
+  const { agental, sent } = scripted(json(201, failing), json(200, failing), json(200, { runs: tries }));
+  const body = { name: "scrape", target: { sandbox: "box" }, command: "python scrape.py", every: "1h", retries: 2, alerts: "webhook" as const };
+  const made = await agental.jobs.create(body);
+  assert.deepEqual(sent[0]?.body, body);
+  assert.equal(made.retries, 2);
+  assert.equal(made.alerts, "webhook");
+  assert.equal(made.failingSince, "2026-11-03T16:00:00.000Z");
+  await agental.jobs.update("scrape", { retries: 0, alerts: "both" });
+  assert.deepEqual([sent[1]?.method, sent[1]?.path, sent[1]?.body], ["PATCH", "/v1/jobs/scrape", { retries: 0, alerts: "both" }]);
+  const runs = await agental.jobs.runs("scrape");
+  assert.deepEqual(
+    runs.map((run) => [run.attempt, run.failedForGood]),
+    [
+      [3, true],
+      [2, false],
+      [1, false],
+    ],
+  );
+});
+
+test("a delete of a template that jobs make their fresh sandboxes from pauses them only when asked", async () => {
+  const { agental, sent } = scripted(json(200, { templates: [template()] }), refusal(409, "in_use_by_jobs"), new Response(null, { status: 204 }));
+  const found = await agental.templates.find("coding-agent");
+  assert.ok(found);
+  await assert.rejects(found.delete(), (error: unknown) => error instanceof ApiError && error.code === "in_use_by_jobs");
+  assert.deepEqual([sent[1]?.method, sent[1]?.path], ["DELETE", "/v1/templates/tpl_0000000000000002"]);
+  await found.delete({ pauseJobs: true });
+  assert.deepEqual([sent[2]?.method, sent[2]?.path], ["DELETE", "/v1/templates/tpl_0000000000000002?pauseJobs=true"]);
+});
+
+test("every job's runs are read with limit, job and outcome, and job usage over a window", async () => {
+  const { agental, sent } = scripted(json(200, { runs: [jobRun({ outcome: "failed" })] }), json(200, { since: "2026-11-01T00:00:00.000Z", until: "2026-11-03T00:00:00.000Z", runningSeconds: 0, listCostMicros: 0, jobs: [] }));
+  assert.equal((await agental.jobRuns({ limit: 10, job: "scrape", outcome: "failed" }))[0]?.outcome, "failed");
+  assert.deepEqual([sent[0]?.method, sent[0]?.path], ["GET", "/v1/job-runs?limit=10&job=scrape&outcome=failed"]);
+  await agental.jobs.usage({ since: new Date("2026-11-01T00:00:00Z") });
+  assert.deepEqual([sent[1]?.method, sent[1]?.path], ["GET", "/v1/usage/jobs?since=2026-11-01T00%3A00%3A00.000Z"]);
 });
 
 function egressAccount(changes: Partial<EgressAccount> = {}): EgressAccount {

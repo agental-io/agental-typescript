@@ -206,9 +206,14 @@ export class Template {
     return this;
   }
 
-  /** Deletes it. One that sandboxes are on is refused: put them on another template first. */
-  async delete(): Promise<void> {
-    await this.http.send({ method: "DELETE", path: this.path });
+  /**
+   * Deletes it. One that sandboxes are on is refused: put them on another template first. Where
+   * jobs make their fresh sandboxes from it, the delete is refused with `in_use_by_jobs`, which
+   * names them, unless `pauseJobs` is true: then it is deleted and they are paused, with the
+   * reason "its template was deleted".
+   */
+  async delete(options: { pauseJobs?: boolean } = {}): Promise<void> {
+    await this.http.send({ method: "DELETE", path: this.path, ...(options.pauseJobs === true ? { query: { pauseJobs: "true" } } : {}) });
   }
 
   /** What a sandbox made from it starts as. */

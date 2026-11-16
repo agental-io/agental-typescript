@@ -47,6 +47,19 @@ import type {
   Usage,
   Webhook,
   EgressAccount,
+  CreateJob,
+  Job,
+  JobRun,
+  JobRunOutcome,
+  JobRunWithOutput,
+  JobUsage,
+  PutJob,
+  UpdateJob,
+  JobTrigger,
+  JobTriggerWithSecret,
+  CreateJobTrigger,
+  UpdateJobTrigger,
+  RefusedJobCall,
 } from "./types.js";
 
 /** What a list of sandboxes is narrowed to. Each field left out narrows nothing; a list of values is any of them. */
@@ -223,6 +236,263 @@ class BulkActions {
 function jobOptions(options: BulkActionOptions): Record<string, unknown> {
   const { at, ...rest } = options;
   return { ...rest, ...(at === undefined ? {} : { at: at instanceof Date ? at.toISOString() : at }) };
+}
+
+/** What jobs.run() and jobs.runAgain() wait for: left out, they answer as the run begins. */
+export interface JobRunOptions {
+  /** Seconds to wait for the run to end, reading it until it has, and to answer it with its output. */
+  wait?: number;
+  /** Stops the wait early. */
+  signal?: AbortSignal;
+}
+
+/** What jobs.run() gives the run: values for the job's inputs, by name, over their defaults. */
+export interface JobRunInputs {
+  inputs?: Record<string, string>;
+}
+
+/** What jobs.put() answers: the job as it is now, whether it was made, and whether it changed. */
+export interface JobPut {
+  job: Job;
+  /** It was not there, and was made. */
+  created: boolean;
+  /** It was made, or changed; false where it was this already. */
+  changed: boolean;
+}
+
+/**
+ * The most seconds a call asks the API to hold it for a run to end: the API holds one 90 seconds
+ * at most, as the proxy in front of it gives up at 100. The rest of a longer wait is spent reading
+ * the run.
+ */
+const HELD_SECONDS = 90;
+
+/**
+ * Commands that run in a sandbox on a timer: every so many minutes, hours or days, as a cron
+ * expression says in a time zone, once at a time, or only when asked. The API keeps them, so a
+ * run that finds its sandbox stopped starts it, by default, and stops it again when the command
+ * ends, keeping its disk. A job on fresh sandboxes makes one from a template for each run
+ * instead, and deletes it after a run that succeeds. Each takes the job's id or its name.
+ */
+class Jobs {
+  /** A job's HTTP addresses: each starts a run when it is called, from anywhere, with its secret. */
+  readonly triggers: JobTriggers;
+
+  constructor(private readonly http: Http) {
+    this.triggers = new JobTriggers(http);
+  }
+
+  /**
+   * Makes a job: the sandbox it runs in (target.sandbox, its id or name), or a template to make a
+   * fresh sandbox from for each run (target.template, its id or name, and target.size, else the
+   * template's); what it runs, through
+   * sh -c, and every ("15m", "1h", "1d"), cron ("0 7 * * 1-5", in timeZone), at, once
+   * ("2026-11-04T09:00:00Z"), or none of them for one that runs only when asked. A run gets
+   * 600000 ms unless timeoutMs says, up to six hours. One that may start the sandbox needs a key
+   * that may start and stop it; ifStopped "skip" runs only while it runs. after "delete", with at
+   * only, deletes the sandbox once the run's command exits 0, and needs a key that may delete it.
+   * A fresh run's sandbox is deleted after a run that succeeds; after one that fails it is kept,
+   * stopped, for keepFailedFor ("0", "30m", "24h" by default, up to "7d"), then deleted, unless
+   * keepSandbox() keeps it for good. ifStopped and after are for a sandbox you keep only.
+   * retries (0 to 5, 0 by default) tries a run that failed or ran out of time again, after 30
+   * seconds, then 2 minutes, 8, 32 and about 2 hours, each try a run of its own with its attempt;
+   * the last fails for good (failedForGood). alerts says who is told when a run fails for good and
+   * when the job works again: "email" by default, its maker and the organization's owners and
+   * admins; "webhook", the events job.run_failed and job.recovered; "both"; or "none". failingSince
+   * says since when a job has been failing, null while it works.
+   */
+  async create(job: CreateJob): Promise<Job> {
+    return (await this.http.json<Job>({ method: "POST", path: "/v1/jobs", body: job })).body;
+  }
+
+  /**
+   * The organization's jobs, oldest first, each with its last run; with sandbox, only those that
+   * run in it, and with template, only those that make their fresh sandboxes from it (each by its
+   * id or name).
+   */
+  async list(options: { sandbox?: string; template?: string } = {}): Promise<Job[]> {
+    return (await this.http.json<{ jobs: Job[] }>({ method: "GET", path: "/v1/jobs", query: { sandbox: options.sandbox, template: options.template }, replay: true })).body.jobs;
+  }
+
+  /** A job, with its next run and its last. */
+  async get(idOrName: string): Promise<Job> {
+    return (await this.http.json<Job>({ method: "GET", path: this.path(idOrName), replay: true })).body;
+  }
+
+  /** Changes a job. What is left out is as it was; enabled false pauses it, and drops a retry that waits. */
+  async update(idOrName: string, changes: UpdateJob): Promise<Job> {
+    return (await this.http.json<Job>({ method: "PATCH", path: this.path(idOrName), body: changes, replay: true })).body;
+  }
+
+  /** Pauses a job: it does not run on its timer until resumed. A run under way goes on to its end. */
+  async pause(idOrName: string): Promise<Job> {
+    return await this.update(idOrName, { enabled: false });
+  }
+
+  /** Resumes a paused job, clearing why it paused itself. */
+  async resume(idOrName: string): Promise<Job> {
+    return await this.update(idOrName, { enabled: true });
+  }
+
+  /** Deletes a job and its runs. A run under way goes on to its end. */
+  async delete(idOrName: string): Promise<void> {
+    await this.http.send({ method: "DELETE", path: this.path(idOrName), replay: true });
+  }
+
+  /**
+   * Makes the job of this name, or changes it to exactly this body: whatever it leaves out goes
+   * back to its default, as on a new job. The same body twice changes nothing. Answers the job,
+   * whether it was made (created), and whether it changed: what agental job apply does for each
+   * job of a file.
+   */
+  async put(name: string, job: PutJob): Promise<JobPut> {
+    const answer = await this.http.json<Job>({ method: "PUT", path: this.path(name), body: job, replay: true });
+    const created = answer.status === 201;
+    return { job: answer.body, created, changed: created || answer.headers.get("agental-changed") !== "false" };
+  }
+
+  /**
+   * Makes a run now, by the job's own rules, paused or not; its next run does not move. inputs
+   * gives values for the job's inputs over their defaults; one it does not name is refused with
+   * unknown_input, and one it needs and was not given with input_required. Without wait it
+   * answers as the run begins. With wait, in seconds, the API holds the call until the run ends,
+   * and after that it is read until it has ended or the wait runs out; it answers the run as it
+   * last read it, with its stdout and stderr: read finishedAt to know which.
+   */
+  async run(idOrName: string): Promise<JobRun>;
+  async run(idOrName: string, options: JobRunOptions & JobRunInputs & { wait: number }): Promise<JobRunWithOutput>;
+  async run(idOrName: string, options?: JobRunOptions & JobRunInputs): Promise<JobRun | JobRunWithOutput>;
+  async run(idOrName: string, options: JobRunOptions & JobRunInputs = {}): Promise<JobRun | JobRunWithOutput> {
+    return await this.made(`${this.path(idOrName)}/run`, options.inputs === undefined ? undefined : { inputs: options.inputs }, options);
+  }
+
+  /**
+   * Runs the job again now with what one of its runs was given, its secret inputs too; an input
+   * the job no longer names is left out. wait is as run() takes it.
+   */
+  async runAgain(idOrName: string, runId: string): Promise<JobRun>;
+  async runAgain(idOrName: string, runId: string, options: JobRunOptions & { wait: number }): Promise<JobRunWithOutput>;
+  async runAgain(idOrName: string, runId: string, options?: JobRunOptions): Promise<JobRun | JobRunWithOutput>;
+  async runAgain(idOrName: string, runId: string, options: JobRunOptions = {}): Promise<JobRun | JobRunWithOutput> {
+    return await this.made(`${this.path(idOrName)}/runs/${encodeURIComponent(runId)}/again`, undefined, options);
+  }
+
+  /** A run made at path: answered as it begins, or, with wait, held by the API and then read until it ends or the wait runs out. */
+  private async made(path: string, body: unknown, options: JobRunOptions): Promise<JobRun | JobRunWithOutput> {
+    const deadline = options.wait === undefined ? 0 : Date.now() + options.wait * 1000;
+    const held = options.wait === undefined ? undefined : Math.max(0, Math.min(HELD_SECONDS, Math.floor(options.wait)));
+    const answer = await this.http.json<JobRun | JobRunWithOutput>({
+      method: "POST",
+      path,
+      ...(held === undefined ? {} : { query: { wait: String(held) } }),
+      ...(body === undefined ? {} : { body }),
+      ...(options.signal ? { signal: options.signal } : {}),
+    });
+    // 200 is the run ended within the wait, with its output.
+    if (options.wait === undefined || answer.status === 200) {
+      return answer.body;
+    }
+    const started = answer.body;
+    for (;;) {
+      const run = await this.runOutput(started.jobId, started.id);
+      if (run.finishedAt !== null || Date.now() + this.http.pollIntervalMs >= deadline) {
+        return run;
+      }
+      await sleep(this.http.pollIntervalMs, options.signal);
+    }
+  }
+
+  /**
+   * Its runs, the latest first: 100 unless limit says, at most 500. Each try of a run its retries
+   * make is a run of its own: attempt is 1 for the first, and failedForGood marks the one with no
+   * tries left.
+   */
+  async runs(idOrName: string, options: { limit?: number } = {}): Promise<JobRun[]> {
+    return (await this.http.json<{ runs: JobRun[] }>({ method: "GET", path: `${this.path(idOrName)}/runs`, query: { limit: options.limit?.toString() }, replay: true })).body.runs;
+  }
+
+  /**
+   * One run, with the last 262,144 characters its command wrote to stdout and to stderr;
+   * stdoutCut and stderrCut say where that is the end of more.
+   */
+  async runOutput(idOrName: string, runId: string): Promise<JobRunWithOutput> {
+    return (await this.http.json<JobRunWithOutput>({ method: "GET", path: `${this.path(idOrName)}/runs/${encodeURIComponent(runId)}`, replay: true })).body;
+  }
+
+  /**
+   * Keep it: makes the sandbox of a failed fresh run, kept stopped until keepUntil, an ordinary
+   * sandbox of yours, out of the job: it is no longer deleted when keepFailedFor passes. Answers
+   * the run, with sandboxKept true. A run in a sandbox you keep is refused with not_fresh, one
+   * still running with run_running, and one whose sandbox is gone with sandbox_gone.
+   */
+  async keepSandbox(idOrName: string, runId: string): Promise<JobRun> {
+    return (await this.http.json<JobRun>({ method: "POST", path: `${this.path(idOrName)}/runs/${encodeURIComponent(runId)}/keep-sandbox`, replay: true })).body;
+  }
+
+  /**
+   * The calls of the job's addresses that were refused in the last 7 days, the latest first, 100
+   * at most, each with why: a secret or signature that was not right, too many calls, the job
+   * paused, an input it needs not given. What answers "my webhook did not fire".
+   */
+  async calls(idOrName: string): Promise<RefusedJobCall[]> {
+    return (await this.http.json<{ calls: RefusedJobCall[] }>({ method: "GET", path: `${this.path(idOrName)}/calls`, replay: true })).body.calls;
+  }
+
+  /** Running time and list cost by job, for the runs due in a window: this month in UTC unless since and until say. */
+  async usage(window: { since?: string | Date; until?: string | Date } = {}): Promise<JobUsage> {
+    return (await this.http.json<JobUsage>({ method: "GET", path: "/v1/usage/jobs", query: { since: iso(window.since), until: iso(window.until) }, replay: true })).body;
+  }
+
+  private path(idOrName: string): string {
+    return `/v1/jobs/${encodeURIComponent(idOrName)}`;
+  }
+}
+
+/**
+ * A job's HTTP addresses. POST to a trigger's url starts a run of its job, from anywhere, with no
+ * API key: the caller sends the trigger's secret as Authorization: Bearer, or signs the body with
+ * it as GitHub (X-Hub-Signature-256), Stripe (Stripe-Signature) or any sender of an HMAC-SHA256
+ * header does. The fields of a JSON body that the job names in its inputs are given to the run,
+ * and the whole request is a file its command reads at $AGENTAL_REQUEST. A run a call starts has
+ * startedBy "http". Each takes the job's id or its name.
+ */
+class JobTriggers {
+  constructor(private readonly http: Http) {}
+
+  /** The job's triggers, oldest first. Their secrets are never shown again. */
+  async list(idOrName: string): Promise<JobTrigger[]> {
+    return (await this.http.json<{ triggers: JobTrigger[] }>({ method: "GET", path: this.path(idOrName), replay: true })).body.triggers;
+  }
+
+  /**
+   * Gives the job an HTTP address: signature "bearer" unless given ("github", "stripe" or
+   * "hmac-sha256", whose header is X-Signature unless given); respond "accepted", answered at
+   * once with the run's id, or "wait", held until the run ends, up to 60 seconds; ratePerMinute 60
+   * unless given, 600 at most. Answers it with its secret, which is shown this once: keep it.
+   * Needs a key that may change the job.
+   */
+  async create(idOrName: string, trigger: CreateJobTrigger = {}): Promise<JobTriggerWithSecret> {
+    return (await this.http.json<JobTriggerWithSecret>({ method: "POST", path: this.path(idOrName), body: trigger })).body;
+  }
+
+  /** Changes how a trigger answers and how many calls a minute it takes. Its address and its secret stay. */
+  async update(idOrName: string, triggerId: string, changes: UpdateJobTrigger): Promise<JobTrigger> {
+    return (await this.http.json<JobTrigger>({ method: "PATCH", path: `${this.path(idOrName)}/${encodeURIComponent(triggerId)}`, body: changes, replay: true })).body;
+  }
+
+  /** Gives a trigger a new secret, at once: the old one no longer calls it. Its address stays. Answers the new secret, shown this once. */
+  async rotate(idOrName: string, triggerId: string): Promise<JobTriggerWithSecret> {
+    return (await this.http.json<JobTriggerWithSecret>({ method: "POST", path: `${this.path(idOrName)}/${encodeURIComponent(triggerId)}/rotate` })).body;
+  }
+
+  /** Deletes a trigger: its address no longer starts a run. */
+  async delete(idOrName: string, triggerId: string): Promise<void> {
+    await this.http.send({ method: "DELETE", path: `${this.path(idOrName)}/${encodeURIComponent(triggerId)}`, replay: true });
+  }
+
+  private path(idOrName: string): string {
+    return `/v1/jobs/${encodeURIComponent(idOrName)}/triggers`;
+  }
 }
 
 class Sandboxes {
@@ -487,8 +757,10 @@ export class Agental {
   readonly apiKeys: ApiKeys;
   /** The organizations the key's person is in, and the members and invites of a team. */
   readonly organizations: Organizations;
-  /** Jobs that act on many sandboxes at once: a preview fixes the set, a job acts on exactly it. */
+  /** Actions on many sandboxes at once: a preview fixes the set, a bulk action acts on exactly it. */
   readonly bulkActions: BulkActions;
+  /** Commands that run in a sandbox on a timer, or when asked. */
+  readonly jobs: Jobs;
   private readonly http: Http;
 
   constructor(options: AgentalOptions = {}) {
@@ -499,6 +771,13 @@ export class Agental {
     this.apiKeys = new ApiKeys(this.http);
     this.organizations = new Organizations(this.http);
     this.bulkActions = new BulkActions(this.http);
+    this.jobs = new Jobs(this.http);
+  }
+
+  /** Every job's runs in the organization, the latest first: 100 unless limit says, at most 500; job (its id or name) and outcome narrow them. */
+  async jobRuns(options: { limit?: number; job?: string; outcome?: JobRunOutcome } = {}): Promise<JobRun[]> {
+    const query = { limit: options.limit?.toString(), job: options.job, outcome: options.outcome };
+    return (await this.http.json<{ runs: JobRun[] }>({ method: "GET", path: "/v1/job-runs", query, replay: true })).body.runs;
   }
 
   /** The regions sandboxes can be made in now, the default first, with the sizes each has room for. */

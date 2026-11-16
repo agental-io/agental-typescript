@@ -74,24 +74,75 @@ const now = await sandbox.commands.get(started.id);
 
 For work that must outlast ten minutes, start it in the background inside the machine: `sandbox.exec("nohup npm run dev > dev.log 2>&1 < /dev/null &")`.
 
-## On a schedule
+## Jobs: commands on a timer
+
+A job runs a command in a sandbox every so often, as a cron expression says, once at a time, or only when asked. Jobs belong to the account; each names the sandbox it runs in, by id or name, or a template to make a fresh sandbox from for each run.
 
 ```ts
-const tick = await sandbox.schedules.create({ name: "scrape", command: "python scrape.py", every: "1h" });
-await sandbox.schedules.create({ command: "./digest.sh", cron: "0 7 * * 1-5", timeZone: "Europe/Sofia" });
+const tick = await agental.jobs.create({ name: "scrape", target: { sandbox: sandbox.id }, command: "python scrape.py", every: "1h" });
+await agental.jobs.create({ target: { sandbox: "box" }, command: "./digest.sh", cron: "0 7 * * 1-5", timeZone: "Europe/Sofia" });
 
-await sandbox.schedules.run(tick.id); // one run now
-const runs = await sandbox.schedules.runs(tick.id); // the latest first: outcome, exitCode, commandId
-await sandbox.schedules.update(tick.id, { enabled: false }); // paused
+const run = await agental.jobs.run("scrape", { wait: 60 }); // run now, and wait up to 60 s for its end and output
+console.log(run.outcome, run.exitCode, run.stdout);
+await agental.jobs.run("scrape"); // run now, answered as it begins
+const runs = await agental.jobs.runs(tick.id); // the latest first: outcome, exitCode, startedBy
+const one = await agental.jobs.runOutput(tick.id, runs[0]!.id); // one run with its stdout and stderr
+await agental.jobs.pause("scrape"); // and resume("scrape")
+await agental.jobs.list({ sandbox: "box" }); // the jobs that run in one sandbox
+await agental.jobRuns({ outcome: "failed", limit: 20 }); // every job's runs
+
+// A fresh sandbox for each run, made from a template: deleted after a run that succeeds, kept stopped for 30 minutes after one that fails.
+const tests = await agental.jobs.create({ name: "tests", target: { template: "ci", size: "medium" }, keepFailedFor: "30m", command: "npm test", every: "1h" });
+const [last] = await agental.jobs.runs(tests.id);
+if (last?.keepUntil) {
+  await agental.jobs.keepSandbox(tests.id, last.id); // its sandbox becomes an ordinary one of yours, deleted only by you
+}
+await agental.jobs.list({ template: "ci" }); // the jobs that make their sandboxes from one template
+
+// Try a failed run twice more, and tell a webhook rather than mail when one fails for good.
+await agental.jobs.update("tests", { retries: 2, alerts: "webhook" });
+for (const run of await agental.jobs.runs("tests")) {
+  console.log(run.attempt, run.outcome, run.failedForGood); // 1, 2, 3: the tries of one due time
+}
+
+// Inputs: the variables a run is given, as its command's environment.
+await agental.jobs.create({
+  name: "report",
+  target: { sandbox: "box" },
+  command: 'python report.py --day "$REPORT_DAY"',
+  inputs: { REPORT_DAY: "yesterday", API_TOKEN: { default: "s3cret", secret: true } },
+});
+const report = await agental.jobs.run("report", { inputs: { REPORT_DAY: "2026-11-15" }, wait: 120 });
+await agental.jobs.runAgain("report", report.id, { wait: 120 }); // the same inputs, secret ones too
+
+// Put a job by its name: made, or changed to exactly this, as agental job apply does.
+const { created, changed } = await agental.jobs.put("nightly", { target: { sandbox: "box" }, command: "npm test", cron: "0 3 * * *" });
+
+// An HTTP address: POST to it starts a run, from anywhere, with no API key.
+const { trigger, secret } = await agental.jobs.triggers.create("report"); // the secret is shown this once
+await fetch(trigger.url!, { method: "POST", headers: { authorization: `Bearer ${secret}`, "content-type": "application/json" }, body: JSON.stringify({ REPORT_DAY: "2026-11-15" }) });
+await agental.jobs.triggers.create("report", { signature: "github" }); // a GitHub webhook's: X-Hub-Signature-256
+await agental.jobs.triggers.update("report", trigger.id, { respond: "wait", ratePerMinute: 10 });
+const { secret: next } = await agental.jobs.triggers.rotate("report", trigger.id); // the old secret no longer calls it
+await agental.jobs.calls("report"); // the calls refused in the last 7 days, with why
+await agental.jobs.triggers.delete("report", trigger.id);
 ```
 
-- When a run finds the sandbox stopped, it starts it, runs, and stops it again when the command ends, keeping its disk: you pay for the minutes it runs. `keepMemory: true` keeps its memory too. `ifStopped: "skip"` runs only while it runs.
+- When a run finds the sandbox stopped, it starts it, runs, and stops it again when the command ends, keeping its disk: you pay for the minutes it runs. `after: "stop_with_memory"` keeps its memory too. `ifStopped: "skip"` runs only while it runs.
 - A sandbox someone started again, sent a command or moved the stop of meanwhile is left running.
-- Every 5 minutes at the most: for anything more often, leave the sandbox running and loop inside it. `at` runs it once, at a date and time, as for a check you mean to come back to.
-- With `at`, `deleteAfter: true` deletes the sandbox once the run's command exits 0, whether the run started it or not; the run says so in `deletedSandbox`. A run that fails, times out or does not run leaves it, so that it can be looked at. It takes a key that may delete the sandbox.
-- After 10 runs one after another fail, a schedule pauses itself and says why in `pausedReason`; resuming it clears that.
+- Every minute at the most. With none of `every`, `cron` or `at`, it runs only when asked. `at` runs it once, at a date and time.
+- With `at`, `after: "delete"` deletes the sandbox once the run's command exits 0, whether the run started it or not; the run says so in `deletedSandbox`. A run that fails, times out or does not run leaves it, so that it can be looked at. It takes a key that may delete the sandbox.
+- `retries` (0 to 5, 0 unless it says) tries a run that failed or ran out of time again, after 30 seconds, then 2 minutes, 8, 32 and about 2 hours. Each try is a run of its own: `attempt` is 1 for the first, and the one with no tries left is `failedForGood`. A run that could not get a sandbox is tried again every 30 seconds within its timeout, its tries left as they were. A pause drops a retry that waits.
+- `alerts` says who is told when a run fails for good and when the job works again: `"email"`, the default, mails its maker and the organization's owners and admins once a stretch of failures, again when it works, and when it pauses itself; `"webhook"` sends the events `job.run_failed`, with the last 4 KB of its output, and `job.recovered`; `"both"`; or `"none"`. `failingSince` says when the stretch began, null while it works.
+- After 10 runs one after another fail for good, a job pauses itself and says why in `pausedReason`; resuming it clears that.
 - While a run still goes, the next is skipped. `overlap: "replace"` stops it instead, `"parallel"` runs both.
 - A run gets 10 minutes unless `timeoutMs` says, up to six hours. One that could not be made on time is `missed`, and never made up later.
+- `run(job, { wait })` answers when the run ends or the wait runs out, whichever is first: read `finishedAt` to know which. The API holds the call until the run ends, up to 90 seconds of it, and the run is read after that.
+- `inputs` are a job's variables, by name (upper-case letters, digits and underscores): a default, `null` for one a run must be given (only on a job that runs when asked), or `{ default, secret: true }` for one sealed where it is kept and shown as `••••`, in output too. A run by the clock is given the defaults; `run(job, { inputs })` gives values over them, and a run says what it was given in `inputs`. One the job does not name is refused with `unknown_input`, and one it needs and was not given with `input_required`. `runAgain(job, runId)` runs it again with what that run was given.
+- `put(name, job)` makes the job of that name, or changes it to exactly what it is given, whatever is left out going back to its default; it answers the job with `created` and `changed`, false where it was that already.
+- On fresh sandboxes (`target: { template }`), each run's sandbox is made running and deleted after a run that succeeds. After one that fails it is kept, stopped, until the run's `keepUntil` (`keepFailedFor`, 24 hours unless it says, `"0"` to `"7d"`), so that it can be looked at, then deleted; `keepSandbox(job, runId)` keeps it for good. `ifStopped` and `after` are for a sandbox you keep, and are null on a fresh job. A run whose sandbox someone stopped or deleted while it ran is `cancelled`.
+- A trigger is a job's HTTP address, `url`. A caller sends its secret as `Authorization: Bearer`, or signs the body with it: `signature: "github"` takes `X-Hub-Signature-256`, `"stripe"` takes `Stripe-Signature`, and `"hmac-sha256"` an HMAC-SHA256 of the body in `header` (`X-Signature` unless it says). The secret is shown once, when it is made or rotated. The fields of a JSON body that the job names in its inputs are given to the run, and the whole request is a file its command reads at `$AGENTAL_REQUEST`. A call is answered at once with the run's id (`respond: "accepted"`), or held until the run ends, up to 60 seconds (`"wait"`). An `Idempotency-Key` header, or GitHub's delivery id, makes a delivery sent twice in 24 hours one run. It takes `ratePerMinute` calls a minute, 60 unless it says. A run a call starts has `startedBy: "http"`. A call refused is listed by `jobs.calls(job)` for 7 days, with why.
+- A template that jobs make their fresh sandboxes from is deleted only with `template.delete({ pauseJobs: true })`, which pauses them; without it the delete is refused with `in_use_by_jobs`.
 
 ## Files
 

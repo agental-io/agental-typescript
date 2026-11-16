@@ -201,7 +201,7 @@ export interface paths {
         get: operations["getSandbox"];
         put?: never;
         post?: never;
-        /** @description Deletes a sandbox and its disk, running or stopped. It cannot be undone. Send the header X-Agental-Confirm-Delete with the sandbox's ID, or nothing is deleted. Its snapshots are kept until you delete them. */
+        /** @description Deletes a sandbox and its disk, running or stopped. It cannot be undone. Send the header X-Agental-Confirm-Delete with the sandbox's ID, or nothing is deleted. Its snapshots are kept until you delete them. A sandbox that jobs run in is deleted only with pauseJobs=true, which pauses them. */
         delete: operations["deleteSandbox"];
         options?: never;
         head?: never;
@@ -1415,7 +1415,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Returns how long the account keeps its sandboxes' history: command output, agent conversations, events and schedule runs (each schedule always keeps its newest 10 runs, however old). Whatever is set, a deleted sandbox's history and schedules are deleted with it, and its events a day later. */
+        /** @description Returns how long the account keeps its sandboxes' history: command output, agent conversations, events and job runs (each job always keeps its newest 10 runs that ran, and its newest run, however old). Whatever is set, a deleted sandbox's history is deleted with it, and its events a day later; the jobs that ran in it are kept, paused, with their runs. */
         get: operations["getDataRetention"];
         put?: never;
         post?: never;
@@ -1510,39 +1510,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/sandboxes/{id}/schedules": {
+    "/v1/jobs": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["listSchedules"];
+        get: operations["listJobs"];
         put?: never;
-        post: operations["createSchedule"];
+        /** @description Makes a job: a command that runs on a timer (every, cron or at), or only when asked (POST /v1/jobs/{id}/run) where none of them is given; in a sandbox you keep (target.sandbox), or in a fresh sandbox made from a template for each run (target.template), deleted after a run that succeeds. */
+        post: operations["createJob"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/sandboxes/{id}/schedules/{scheduleId}": {
+    "/v1/jobs/{id}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["getSchedule"];
+        get: operations["getJob"];
         put?: never;
         post?: never;
-        delete: operations["deleteSchedule"];
+        delete: operations["deleteJob"];
         options?: never;
         head?: never;
-        patch: operations["updateSchedule"];
+        patch: operations["updateJob"];
         trace?: never;
     };
-    "/v1/sandboxes/{id}/schedules/{scheduleId}/run": {
+    "/v1/jobs/{id}/run": {
         parameters: {
             query?: never;
             header?: never;
@@ -1551,21 +1552,56 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["runSchedule"];
+        /** @description Makes a run now. The body is optional: {"inputs": {"NAME": "value"}} gives the job's inputs values over their defaults, each a string. An empty body, or none, runs it with its defaults. */
+        post: operations["runJob"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/usage/schedules": {
+    "/v1/jobs/{id}/runs/{runId}/again": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["getScheduleUsage"];
+        get?: never;
+        put?: never;
+        /** @description Runs the job again now with what this run was given, as POST /v1/jobs/{id}/run does. An input the job no longer names is left out, and a secret one goes with its default as it is now: a secret given to that run alone is not given again. */
+        post: operations["runJobAgain"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/jobs/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Makes the job of this name, or changes it to exactly this: whatever the body leaves out goes back to its default, as on a new job. The same body twice changes nothing, and is told to the webhooks once. What agental job apply sends for each job of a file. */
+        put: operations["putJob"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/jobs/{id}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listJobRuns"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1574,14 +1610,130 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/sandboxes/{id}/schedules/{scheduleId}/runs": {
+    "/v1/jobs/{id}/runs/{runId}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["listScheduleRuns"];
+        get: operations["getJobRun"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/jobs/{id}/runs/{runId}/keep-sandbox": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Keep it: makes a failed fresh run's sandbox, kept stopped to be looked at, an ordinary sandbox of yours, out of the job. It is no longer deleted when keepFailedFor passes, shows in the sandbox list like any other, and is deleted only by you. */
+        post: operations["keepJobRunSandbox"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/job-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listAllJobRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/usage/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getJobUsage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/jobs/{id}/triggers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listJobTriggers"];
+        put?: never;
+        /** @description Gives a job an HTTP address: POST https://agental.run/{triggerId} starts a run, from anywhere, with no API key. The caller sends the secret this answers with, once, as Authorization: Bearer, or signs the body with it as GitHub or Stripe do, or as any sender of an HMAC-SHA256 header does. */
+        post: operations["makeJobTrigger"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/jobs/{id}/triggers/{triggerId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["deleteJobTrigger"];
+        options?: never;
+        head?: never;
+        patch: operations["updateJobTrigger"];
+        trace?: never;
+    };
+    "/v1/jobs/{id}/triggers/{triggerId}/rotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Gives the trigger a new secret, at once: the old one no longer calls it. Its address stays. */
+        post: operations["rotateJobTrigger"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/jobs/{id}/calls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description The calls of the job's addresses that were refused in the last 7 days, the latest first, each with why: a secret or signature that was not right, too many calls, the job paused, an input it needs not given. */
+        get: operations["listRefusedJobCalls"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1917,7 +2069,7 @@ export interface paths {
         get: operations["getTemplate"];
         put?: never;
         post?: never;
-        /** @description Deletes a template that no sandbox is on. Sandboxes are never moved off it by this: put them on another template first. */
+        /** @description Deletes a template that no sandbox is on. Sandboxes are never moved off it by this: put them on another template first. A template that jobs make their fresh sandboxes from is deleted only with pauseJobs=true, which pauses them. */
         delete: operations["deleteTemplate"];
         options?: never;
         head?: never;
@@ -3652,6 +3804,10 @@ export interface components {
                 now: number;
                 after: number;
             };
+            /** @description For a delete: how many jobs run in the chosen sandboxes. The delete pauses them, with the reason "its sandbox was deleted", and does not refuse for them as a single delete without pauseJobs=true does. 0 for the other actions. */
+            jobsPaused: number;
+            /** @description The first 10 of those jobs' names, oldest first. */
+            jobsPausedNames: string[];
             expiresAt: string;
         };
         BulkAction: {
@@ -4444,56 +4600,106 @@ export interface components {
                 signal: number;
             } | null;
         };
-        Schedule: {
-            /** @example sch_0123456789abcdef */
+        Job: {
+            /** @example job_0123456789abcdef */
             id: string;
-            sandboxId: string;
             name: string;
+            /** @description The organization it belongs to. */
+            organizationId: string;
+            target: {
+                /**
+                 * @description The id of the sandbox it runs in. Null for a job on fresh sandboxes.
+                 * @example sbx_0123456789abcdef
+                 */
+                sandbox: string | null;
+                /** @description That sandbox's name. */
+                sandboxName: string | null;
+                /**
+                 * @description The template each run's fresh sandbox is made from. Null for a job on a sandbox it keeps.
+                 * @example tpl_0123456789abcdef
+                 */
+                template: string | null;
+                /** @description That template's name. */
+                templateName: string | null;
+                /** @description The size of each fresh sandbox. Null for a job on a sandbox it keeps, or for the template's size. */
+                size: string | null;
+            };
             /** @description What it runs, through sh -c. */
             command: string;
-            /** @description How often it runs, as 15m, 1h or 1d, counted from when it was made. Null when cron says. */
+            /** @description How often it runs, as 15m, 1h or 1d, counted from when it was made. Null when cron or at says, or it runs only when asked. */
             every: string | null;
-            /** @description When it runs, as a five-field cron expression in timeZone. Null when every or at says. */
+            /** @description When it runs, as a five-field cron expression in timeZone. Null when every or at says, or it runs only when asked. */
             cron: string | null;
-            /** @description The one time it runs, for a schedule that runs once. After it, nextRunAt is null and the schedule and its run are kept until deleted. Null for one that runs again and again. */
+            /** @description The one time it runs, for a job that runs once. After it, nextRunAt is null and the job and its run are kept until deleted. */
             at: string | null;
             timeZone: string;
             timeoutMs: number;
             /** @enum {string} */
-            ifStopped: "start" | "skip";
-            keepMemory: boolean;
-            /** @enum {string} */
             overlap: "skip" | "replace" | "parallel";
-            /** @description Whether its run deletes the sandbox after, where its command exits 0. Only a schedule that runs once has it. */
-            deleteAfter: boolean;
+            /**
+             * @description Null for a job on fresh sandboxes.
+             * @enum {string|null}
+             */
+            ifStopped: "start" | "skip" | null;
+            /**
+             * @description What a run does to its sandbox after: stop, stop_with_memory (where it started it), or delete (where its command exits 0; a job that runs once only). Null for a job on fresh sandboxes.
+             * @enum {string|null}
+             */
+            after: "stop" | "stop_with_memory" | "delete" | null;
+            /** @description How long a failed run's fresh sandbox is kept, stopped, as 0, 30m or 24h. Null for a job on a sandbox it keeps. */
+            keepFailedFor: string | null;
             enabled: boolean;
-            /** @description When it next runs. Null while it is paused, and for one that ran once. A cron's or a one-off's is its time and the schedule's own delay of up to a minute, the same each time, so that the schedules due at one time do not all start their sandboxes at once. */
-            nextRunAt: string | null;
-            /** @description Why it paused itself: after 10 runs one after another failed. Null for one paused by hand, or running. */
+            /** @description Why it paused itself: after 10 runs one after another failed, or "its sandbox was deleted". Null for one paused by hand, or on. */
             pausedReason: string | null;
-            lastRun: components["schemas"]["ScheduleRun"] | null;
+            /** @description When it next runs. Null while it is paused, for one that ran once, and for one that runs only when asked. A cron's or a one-off's is its time and the job's own delay of up to a minute, the same each time, so that the jobs due at one time do not all start their sandboxes at once. */
+            nextRunAt: string | null;
+            lastRun: components["schemas"]["JobRun"] | null;
+            madeBy: {
+                /** @enum {string} */
+                kind: "person" | "key";
+                /** @description The person's name or email, or the API key's name. Null once the person's account was erased. */
+                name: string | null;
+            };
+            retries: number;
+            /** @enum {string} */
+            alerts: "email" | "webhook" | "both" | "none";
+            /** @description When its failing stretch began: the due time of its first run that failed for good since it last worked. Null while it works. */
+            failingSince: string | null;
+            /** @description The variables a run may be given, by name: each with its default (a secret one's as ••••), or null for one a run must be given. */
+            inputs: {
+                [key: string]: {
+                    default: string | null;
+                    secret: boolean;
+                };
+            };
             createdAt: string;
             updatedAt: string;
         };
-        ScheduleRun: {
+        JobRun: {
             /** @example run_0123456789abcdef */
             id: string;
-            scheduleId: string;
-            sandboxId: string;
-            /** @description When it came due. */
+            /** @example job_0123456789abcdef */
+            jobId: string;
+            /** @description Its job's name. Null for a job deleted while it ran. */
+            jobName: string | null;
+            /** @description The sandbox it ran in. Null for a fresh run whose sandbox is not made yet, or could not be. */
+            sandboxId: string | null;
+            /** @description Whether it ran in a fresh sandbox, made from its job's template for this run. */
+            fresh: boolean;
+            /** @description When it came due, or was asked for. */
             dueAt: string;
             /** @description When its command began. Null for one that did not run. */
             startedAt: string | null;
             finishedAt: string | null;
             /**
-             * @description running; succeeded, failed or timed_out, as its command ended; replaced, by a later run of the same schedule; skipped, because the sandbox was stopped and the schedule runs only while it runs, or the last run was still going; missed, because it could not be made on time; could_not_start, because the sandbox could not be started; interrupted, because the API restarted while it ran.
+             * @description running; succeeded, failed or timed_out, as its command ended; replaced, by a later run of the same job; skipped, because the sandbox was stopped and the job runs only while it runs, or the last run was still going; missed, because it could not be made on time; could_not_start, because the sandbox could not be started; interrupted, because the API restarted while it ran; cancelled, because someone stopped or deleted its fresh sandbox while it ran.
              * @enum {string}
              */
-            outcome: "running" | "succeeded" | "failed" | "timed_out" | "replaced" | "skipped" | "missed" | "could_not_start" | "interrupted";
+            outcome: "running" | "succeeded" | "failed" | "timed_out" | "replaced" | "skipped" | "missed" | "could_not_start" | "interrupted" | "cancelled";
             /** @description Why it ended as it did, in words, where that is not plain from the outcome. */
             reason: string | null;
             exitCode: number | null;
-            /** @description Its command, whose output GET /v1/sandboxes/{id}/commands/{commandId} gives. */
+            /** @description Its command in the sandbox. GET /v1/jobs/{id}/runs/{runId} gives its output. */
             commandId: string | null;
             /** @description Whether this run started its sandbox, which was stopped. */
             startedSandbox: boolean;
@@ -4502,32 +4708,50 @@ export interface components {
              * @enum {string|null}
              */
             stoppedSandbox: "disk" | "memory" | null;
-            /** @description Whether this run deleted its sandbox after its command exited 0, as its schedule's deleteAfter asks. Where it did not, a schedule with deleteAfter says why in reason. */
+            /** @description Whether this run's sandbox was deleted by it: a fresh one after the run, at once where it succeeded, or once keepFailedFor passed; or a kept one after its command exited 0, as its job's after: delete asks. Where it did not, a job with after: delete says why in reason. */
             deletedSandbox: boolean;
-        };
-        CreateSchedule: {
             /**
-             * @description Lower-case letters, digits and dashes, unique on the sandbox. Left out, schedule-1, schedule-2 and so on.
-             * @example scrape-prices
+             * @description What started it: timer, its time came; run_now, a person signed in asked (Run now in the console); api, an API key asked; http, a call of one of its addresses.
+             * @enum {string}
+             */
+            startedBy: "timer" | "run_now" | "api" | "http";
+            /** @description A failed fresh run's: until when its sandbox is kept, stopped, to be looked at, then deleted. It can be started meanwhile, and the time does not move. Null otherwise. */
+            keepUntil: string | null;
+            /** @description Whether its fresh sandbox was kept for good, by POST /v1/jobs/{id}/runs/{runId}/keep-sandbox: an ordinary sandbox now. */
+            sandboxKept: boolean;
+            /** @description Which try of its due time it is: 1, then 2 and on for its job's retries. A try again after one that could not get a sandbox keeps its number. */
+            attempt: number;
+            /** @description Whether it failed with no tries left: what the job's alerts are sent for. */
+            failedForGood: boolean;
+            /** @description What it was given, by name, as variables of its command: a secret one as ••••. */
+            inputs: {
+                [key: string]: string;
+            };
+        };
+        CreateJob: {
+            /**
+             * @description Lower-case letters, digits and dashes, unique in the organization. Left out, job-1, job-2 and so on.
+             * @example nightly-report
              */
             name?: string;
+            target: components["schemas"]["JobTarget"];
             /**
              * @description What to run, through sh -c, with the sandbox's variables and files as any command has them.
-             * @example python scrape.py
+             * @example python report.py
              */
             command: string;
             /**
-             * @description How often: a number and m, h or d, from 5m to 31d. Give this or cron. What has to run more often is better left running in the sandbox.
+             * @description How often: a number and m, h or d, from 1m to 31d. Give this, cron or at, or none of them for a job that runs only when asked.
              * @example 1h
              */
             every?: string | null;
             /**
-             * @description When, as five cron fields: minute, hour, day of the month, month, day of the week, with no two runs less than 5 minutes apart. Give this, every or at.
+             * @description When, as five cron fields: minute, hour, day of the month, month, day of the week. Give this, every or at.
              * @example 0 7 * * 1-5
              */
             cron?: string | null;
             /**
-             * @description Once, at this date and time, up to a year away: an agent's follow-up, such as a check at 09:00. Give this, every or cron.
+             * @description Once, at this date and time, up to a year away. Give this, every or cron.
              * @example 2026-11-04T09:00:00Z
              */
             at?: string | null;
@@ -4539,45 +4763,88 @@ export interface components {
             /** @description How long a run may take before it is given up, with exit code 124. Defaults to 600000, at most 21600000. */
             timeoutMs?: number;
             /**
+             * @description What a run does when the last run of this job is still going. skip, the default: it is skipped. replace: the last one is killed. parallel: both run, at most 5 at once.
+             * @enum {string}
+             */
+            overlap?: "skip" | "replace" | "parallel";
+            /**
              * @description What a run does when the sandbox is stopped. start, the default: start it, run, and stop it again after, unless someone else started using it meanwhile. skip: the run is skipped. start needs a key that may start and stop the sandbox.
              * @enum {string}
              */
             ifStopped?: "start" | "skip";
-            /** @description Whether a run that started the sandbox stops it with its memory kept, at the stopped price with memory. Defaults to false: its disk alone. A sandbox that was stopped with its memory is stopped so again whatever this says. */
-            keepMemory?: boolean;
             /**
-             * @description What a run does when the last run of this schedule is still going. skip, the default: it is skipped. replace: the last one is killed. parallel: both run.
+             * @description What a run does to the sandbox after. stop, the default: a run that started it stops it again, keeping its disk. stop_with_memory: keeping its memory too, at the stopped price with memory; a sandbox stopped with its memory is stopped so again either way. delete: for a job that runs once, with at: deletes the sandbox when its run's command exits 0, whether the run started it or it was running already, as DELETE /v1/sandboxes/{id} does; a run that fails leaves it, so that it can be looked at. delete takes a key that may delete the sandbox: sandbox.delete, or sandbox.delete-own for one the key made.
              * @enum {string}
              */
-            overlap?: "skip" | "replace" | "parallel";
-            /** @description For a schedule that runs once, with at: true deletes the sandbox when its run's command exits 0, whether the run started it or it was running already, as DELETE /v1/sandboxes/{id} does. A run that fails, times out, is skipped or could not start leaves it, so that it can be looked at, and its record says so. Defaults to false. It takes a key that may delete the sandbox: sandbox.delete, or sandbox.delete-own for one the key made. */
-            deleteAfter?: boolean;
+            after?: "stop" | "stop_with_memory" | "delete";
+            /**
+             * @description A job on fresh sandboxes only: how long the sandbox of a run that failed is kept, stopped with its disk, to be looked at, then deleted: 0 (deleted at once), or a number and m, h or d up to 7d. Defaults to 24h.
+             * @example 24h
+             */
+            keepFailedFor?: string;
+            /** @description How many times a run that failed or ran out of time is tried again, 0 to 5: after 30 seconds, then 2 minutes, 8, 32, and about 2 hours. Defaults to 0. A run that could not get a sandbox is tried again every 30 seconds within its timeout, whatever this says. */
+            retries?: number;
+            /**
+             * @description Who is told when a run fails for good, after its retries, and when the job works again. email, the default: its maker and the organization's owners and admins, once a stretch of failures, and once when it works again, and whenever it pauses itself. webhook: the events job.run_failed and job.recovered. both, or none.
+             * @enum {string}
+             */
+            alerts?: "email" | "webhook" | "both" | "none";
+            /**
+             * @description The variables a run may be given when it is asked for, by name (upper-case letters, digits and underscores), each its command's environment: a default, as {"REPORT_DAY": "yesterday"}; null for one a run must be given, which only a job that runs when asked may have; or {"default": "…", "secret": true} for one whose value is sealed when kept and masked as •••• in output. A run by the clock is given the defaults. Given, it replaces the inputs the job had.
+             * @example {
+             *       "REPORT_DAY": "yesterday"
+             *     }
+             */
+            inputs?: {
+                [key: string]: string | null | {
+                    default?: string | null;
+                    secret?: boolean;
+                };
+            };
             /** @description False pauses it. Defaults to true. */
             enabled?: boolean;
         };
-        UpdateSchedule: {
+        JobTarget: {
             /**
-             * @description Lower-case letters, digits and dashes, unique on the sandbox. Left out, schedule-1, schedule-2 and so on.
-             * @example scrape-prices
+             * @description A sandbox you keep, that each run runs in, by its id or its name. Give this or template.
+             * @example sbx_0123456789abcdef
+             */
+            sandbox?: string;
+            /**
+             * @description A template that a fresh sandbox is made from for each run, by its id or its name: deleted after a run that succeeds. Give this or sandbox.
+             * @example tpl_0123456789abcdef
+             */
+            template?: string;
+            /**
+             * @description With template: the size of each fresh sandbox. Left out, the template's.
+             * @example medium
+             */
+            size?: string;
+        };
+        UpdateJob: {
+            /**
+             * @description Lower-case letters, digits and dashes, unique in the organization. Left out, job-1, job-2 and so on.
+             * @example nightly-report
              */
             name?: string;
+            target?: components["schemas"]["JobTarget"];
             /**
              * @description What to run, through sh -c, with the sandbox's variables and files as any command has them.
-             * @example python scrape.py
+             * @example python report.py
              */
             command?: string;
             /**
-             * @description How often: a number and m, h or d, from 5m to 31d. Give this or cron. What has to run more often is better left running in the sandbox.
+             * @description How often: a number and m, h or d, from 1m to 31d. Give this, cron or at, or none of them for a job that runs only when asked.
              * @example 1h
              */
             every?: string | null;
             /**
-             * @description When, as five cron fields: minute, hour, day of the month, month, day of the week, with no two runs less than 5 minutes apart. Give this, every or at.
+             * @description When, as five cron fields: minute, hour, day of the month, month, day of the week. Give this, every or at.
              * @example 0 7 * * 1-5
              */
             cron?: string | null;
             /**
-             * @description Once, at this date and time, up to a year away: an agent's follow-up, such as a check at 09:00. Give this, every or cron.
+             * @description Once, at this date and time, up to a year away. Give this, every or cron.
              * @example 2026-11-04T09:00:00Z
              */
             at?: string | null;
@@ -4589,33 +4856,196 @@ export interface components {
             /** @description How long a run may take before it is given up, with exit code 124. Defaults to 600000, at most 21600000. */
             timeoutMs?: number;
             /**
+             * @description What a run does when the last run of this job is still going. skip, the default: it is skipped. replace: the last one is killed. parallel: both run, at most 5 at once.
+             * @enum {string}
+             */
+            overlap?: "skip" | "replace" | "parallel";
+            /**
              * @description What a run does when the sandbox is stopped. start, the default: start it, run, and stop it again after, unless someone else started using it meanwhile. skip: the run is skipped. start needs a key that may start and stop the sandbox.
              * @enum {string}
              */
             ifStopped?: "start" | "skip";
-            /** @description Whether a run that started the sandbox stops it with its memory kept, at the stopped price with memory. Defaults to false: its disk alone. A sandbox that was stopped with its memory is stopped so again whatever this says. */
-            keepMemory?: boolean;
             /**
-             * @description What a run does when the last run of this schedule is still going. skip, the default: it is skipped. replace: the last one is killed. parallel: both run.
+             * @description What a run does to the sandbox after. stop, the default: a run that started it stops it again, keeping its disk. stop_with_memory: keeping its memory too, at the stopped price with memory; a sandbox stopped with its memory is stopped so again either way. delete: for a job that runs once, with at: deletes the sandbox when its run's command exits 0, whether the run started it or it was running already, as DELETE /v1/sandboxes/{id} does; a run that fails leaves it, so that it can be looked at. delete takes a key that may delete the sandbox: sandbox.delete, or sandbox.delete-own for one the key made.
              * @enum {string}
              */
-            overlap?: "skip" | "replace" | "parallel";
-            /** @description For a schedule that runs once, with at: true deletes the sandbox when its run's command exits 0, whether the run started it or it was running already, as DELETE /v1/sandboxes/{id} does. A run that fails, times out, is skipped or could not start leaves it, so that it can be looked at, and its record says so. Defaults to false. It takes a key that may delete the sandbox: sandbox.delete, or sandbox.delete-own for one the key made. */
-            deleteAfter?: boolean;
+            after?: "stop" | "stop_with_memory" | "delete";
+            /**
+             * @description A job on fresh sandboxes only: how long the sandbox of a run that failed is kept, stopped with its disk, to be looked at, then deleted: 0 (deleted at once), or a number and m, h or d up to 7d. Defaults to 24h.
+             * @example 24h
+             */
+            keepFailedFor?: string;
+            /** @description How many times a run that failed or ran out of time is tried again, 0 to 5: after 30 seconds, then 2 minutes, 8, 32, and about 2 hours. Defaults to 0. A run that could not get a sandbox is tried again every 30 seconds within its timeout, whatever this says. */
+            retries?: number;
+            /**
+             * @description Who is told when a run fails for good, after its retries, and when the job works again. email, the default: its maker and the organization's owners and admins, once a stretch of failures, and once when it works again, and whenever it pauses itself. webhook: the events job.run_failed and job.recovered. both, or none.
+             * @enum {string}
+             */
+            alerts?: "email" | "webhook" | "both" | "none";
+            /**
+             * @description The variables a run may be given when it is asked for, by name (upper-case letters, digits and underscores), each its command's environment: a default, as {"REPORT_DAY": "yesterday"}; null for one a run must be given, which only a job that runs when asked may have; or {"default": "…", "secret": true} for one whose value is sealed when kept and masked as •••• in output. A run by the clock is given the defaults. Given, it replaces the inputs the job had.
+             * @example {
+             *       "REPORT_DAY": "yesterday"
+             *     }
+             */
+            inputs?: {
+                [key: string]: string | null | {
+                    default?: string | null;
+                    secret?: boolean;
+                };
+            };
             /** @description False pauses it. Defaults to true. */
             enabled?: boolean;
         };
-        ScheduleUsage: {
+        JobRunWithOutput: {
+            /** @example run_0123456789abcdef */
+            id: string;
+            /** @example job_0123456789abcdef */
+            jobId: string;
+            /** @description Its job's name. Null for a job deleted while it ran. */
+            jobName: string | null;
+            /** @description The sandbox it ran in. Null for a fresh run whose sandbox is not made yet, or could not be. */
+            sandboxId: string | null;
+            /** @description Whether it ran in a fresh sandbox, made from its job's template for this run. */
+            fresh: boolean;
+            /** @description When it came due, or was asked for. */
+            dueAt: string;
+            /** @description When its command began. Null for one that did not run. */
+            startedAt: string | null;
+            finishedAt: string | null;
+            /**
+             * @description running; succeeded, failed or timed_out, as its command ended; replaced, by a later run of the same job; skipped, because the sandbox was stopped and the job runs only while it runs, or the last run was still going; missed, because it could not be made on time; could_not_start, because the sandbox could not be started; interrupted, because the API restarted while it ran; cancelled, because someone stopped or deleted its fresh sandbox while it ran.
+             * @enum {string}
+             */
+            outcome: "running" | "succeeded" | "failed" | "timed_out" | "replaced" | "skipped" | "missed" | "could_not_start" | "interrupted" | "cancelled";
+            /** @description Why it ended as it did, in words, where that is not plain from the outcome. */
+            reason: string | null;
+            exitCode: number | null;
+            /** @description Its command in the sandbox. GET /v1/jobs/{id}/runs/{runId} gives its output. */
+            commandId: string | null;
+            /** @description Whether this run started its sandbox, which was stopped. */
+            startedSandbox: boolean;
+            /**
+             * @description How this run stopped the sandbox it started: keeping its disk, or its memory too. Null when it did not stop it.
+             * @enum {string|null}
+             */
+            stoppedSandbox: "disk" | "memory" | null;
+            /** @description Whether this run's sandbox was deleted by it: a fresh one after the run, at once where it succeeded, or once keepFailedFor passed; or a kept one after its command exited 0, as its job's after: delete asks. Where it did not, a job with after: delete says why in reason. */
+            deletedSandbox: boolean;
+            /**
+             * @description What started it: timer, its time came; run_now, a person signed in asked (Run now in the console); api, an API key asked; http, a call of one of its addresses.
+             * @enum {string}
+             */
+            startedBy: "timer" | "run_now" | "api" | "http";
+            /** @description A failed fresh run's: until when its sandbox is kept, stopped, to be looked at, then deleted. It can be started meanwhile, and the time does not move. Null otherwise. */
+            keepUntil: string | null;
+            /** @description Whether its fresh sandbox was kept for good, by POST /v1/jobs/{id}/runs/{runId}/keep-sandbox: an ordinary sandbox now. */
+            sandboxKept: boolean;
+            /** @description Which try of its due time it is: 1, then 2 and on for its job's retries. A try again after one that could not get a sandbox keeps its number. */
+            attempt: number;
+            /** @description Whether it failed with no tries left: what the job's alerts are sent for. */
+            failedForGood: boolean;
+            /** @description What it was given, by name, as variables of its command: a secret one as ••••. */
+            inputs: {
+                [key: string]: string;
+            };
+            /** @description The last 262,144 characters its command wrote to stdout, as it ran or, once it ended, as kept with the values of the sandbox's plain variables masked as ••••. Null where it has no command, its output is no longer kept (data retention), or outputHidden is true. */
+            stdout: string | null;
+            /** @description The last 262,144 characters its command wrote to stderr. Null as for stdout. */
+            stderr: string | null;
+            /** @description Whether stdout is the end of more than was kept. */
+            stdoutCut: boolean;
+            /** @description Whether stderr is the end of more than was kept. */
+            stderrCut: boolean;
+            /** @description True where the caller's API key may not run commands in the run's sandbox (exec there): its output is then not shown, and stdout and stderr are null. A person signed in sees it. */
+            outputHidden: boolean;
+        };
+        PutJob: {
+            target: components["schemas"]["JobTarget"];
+            /**
+             * @description What to run, through sh -c, with the sandbox's variables and files as any command has them.
+             * @example python report.py
+             */
+            command: string;
+            /**
+             * @description How often: a number and m, h or d, from 1m to 31d. Give this, cron or at, or none of them for a job that runs only when asked.
+             * @example 1h
+             */
+            every?: string | null;
+            /**
+             * @description When, as five cron fields: minute, hour, day of the month, month, day of the week. Give this, every or at.
+             * @example 0 7 * * 1-5
+             */
+            cron?: string | null;
+            /**
+             * @description Once, at this date and time, up to a year away. Give this, every or cron.
+             * @example 2026-11-04T09:00:00Z
+             */
+            at?: string | null;
+            /**
+             * @description The time zone cron is read in, as Europe/Sofia. Defaults to UTC.
+             * @example Europe/Sofia
+             */
+            timeZone?: string;
+            /** @description How long a run may take before it is given up, with exit code 124. Defaults to 600000, at most 21600000. */
+            timeoutMs?: number;
+            /**
+             * @description What a run does when the last run of this job is still going. skip, the default: it is skipped. replace: the last one is killed. parallel: both run, at most 5 at once.
+             * @enum {string}
+             */
+            overlap?: "skip" | "replace" | "parallel";
+            /**
+             * @description What a run does when the sandbox is stopped. start, the default: start it, run, and stop it again after, unless someone else started using it meanwhile. skip: the run is skipped. start needs a key that may start and stop the sandbox.
+             * @enum {string}
+             */
+            ifStopped?: "start" | "skip";
+            /**
+             * @description What a run does to the sandbox after. stop, the default: a run that started it stops it again, keeping its disk. stop_with_memory: keeping its memory too, at the stopped price with memory; a sandbox stopped with its memory is stopped so again either way. delete: for a job that runs once, with at: deletes the sandbox when its run's command exits 0, whether the run started it or it was running already, as DELETE /v1/sandboxes/{id} does; a run that fails leaves it, so that it can be looked at. delete takes a key that may delete the sandbox: sandbox.delete, or sandbox.delete-own for one the key made.
+             * @enum {string}
+             */
+            after?: "stop" | "stop_with_memory" | "delete";
+            /**
+             * @description A job on fresh sandboxes only: how long the sandbox of a run that failed is kept, stopped with its disk, to be looked at, then deleted: 0 (deleted at once), or a number and m, h or d up to 7d. Defaults to 24h.
+             * @example 24h
+             */
+            keepFailedFor?: string;
+            /** @description How many times a run that failed or ran out of time is tried again, 0 to 5: after 30 seconds, then 2 minutes, 8, 32, and about 2 hours. Defaults to 0. A run that could not get a sandbox is tried again every 30 seconds within its timeout, whatever this says. */
+            retries?: number;
+            /**
+             * @description Who is told when a run fails for good, after its retries, and when the job works again. email, the default: its maker and the organization's owners and admins, once a stretch of failures, and once when it works again, and whenever it pauses itself. webhook: the events job.run_failed and job.recovered. both, or none.
+             * @enum {string}
+             */
+            alerts?: "email" | "webhook" | "both" | "none";
+            /**
+             * @description The variables a run may be given when it is asked for, by name (upper-case letters, digits and underscores), each its command's environment: a default, as {"REPORT_DAY": "yesterday"}; null for one a run must be given, which only a job that runs when asked may have; or {"default": "…", "secret": true} for one whose value is sealed when kept and masked as •••• in output. A run by the clock is given the defaults. Given, it replaces the inputs the job had.
+             * @example {
+             *       "REPORT_DAY": "yesterday"
+             *     }
+             */
+            inputs?: {
+                [key: string]: string | null | {
+                    default?: string | null;
+                    secret?: boolean;
+                };
+            };
+            /** @description False pauses it. Defaults to true. */
+            enabled?: boolean;
+        };
+        JobUsage: {
             since: string;
             until: string;
             runningSeconds: number;
             listCostMicros: number;
-            schedules: {
-                scheduleId: string;
-                /** @description Null for a schedule deleted while a run of it went on. */
+            jobs: {
+                jobId: string;
+                /** @description Null for a job deleted while a run of it went on. */
                 name: string | null;
-                sandboxId: string;
-                sandboxName: string;
+                /** @description The sandbox it runs in. Null for a job on fresh sandboxes. */
+                sandboxId: string | null;
+                sandboxName: string | null;
+                /** @description The template its fresh sandboxes are made from. Null for a job on a sandbox it keeps. */
+                templateId: string | null;
+                templateName: string | null;
                 size: string;
                 runs: number;
                 startedSandbox: number;
@@ -4625,6 +5055,49 @@ export interface components {
                 runningSeconds: number;
                 listCostMicros: number;
             }[];
+        };
+        JobTrigger: {
+            /** @example trg_0123456789abcdef */
+            id: string;
+            jobId: string;
+            /**
+             * @description Its address: POST to it to start a run. Null where this deployment serves no addresses.
+             * @example https://agental.run/trg_0123456789abcdef
+             */
+            url: string | null;
+            /**
+             * @description How a caller proves it may call: bearer, the secret as Authorization: Bearer; github, X-Hub-Signature-256; stripe, Stripe-Signature; hmac-sha256, an HMAC-SHA256 of the body in header. The secret as a bearer token is always taken.
+             * @enum {string}
+             */
+            signature: "bearer" | "github" | "stripe" | "hmac-sha256";
+            header: string | null;
+            /**
+             * @description accepted: answered at once, 202 with the run's id. wait: held until the run ends, up to 60 seconds, and answered with its outcome and output. ?wait=N on a call says the same for that call.
+             * @enum {string}
+             */
+            respond: "accepted" | "wait";
+            ratePerMinute: number;
+            /** @description Whether the sender's own signing secret is set, which signatures are checked with: Stripe makes one for each endpoint, and a stripe trigger takes calls only once it is set. */
+            signingSecretSet: boolean;
+            createdAt: string;
+            rotatedAt: string | null;
+        };
+        JobTriggerWithSecret: {
+            trigger: components["schemas"]["JobTrigger"];
+            /** @description Its secret, shown this once. */
+            secret: string;
+        };
+        MakeJobTrigger: {
+            /** @enum {string} */
+            signature?: "bearer" | "github" | "stripe" | "hmac-sha256";
+            /** @description For hmac-sha256: the header the signature is sent in. X-Signature unless given. */
+            header?: string;
+            /** @enum {string} */
+            respond?: "accepted" | "wait";
+            /** @description Calls a minute it takes, 60 unless given, 600 at most. */
+            ratePerMinute?: number;
+            /** @description The secret the sender signs with where it makes its own, as Stripe does for each endpoint (whsec_…): signatures are checked with it in place of the trigger's. Make the trigger, give its address to Stripe, then set this with PATCH. null takes it away. */
+            signingSecret?: string | null;
         };
         Team: {
             id: string;
@@ -4782,7 +5255,7 @@ export interface components {
                  *       "exec"
                  *     ]
                  */
-                actions: ("sandbox.read" | "sandbox.create" | "sandbox.fork" | "sandbox.update" | "sandbox.auto-stop" | "sandbox.stop" | "sandbox.resume" | "sandbox.delete" | "sandbox.delete-own" | "exec" | "file.read" | "file.write" | "agent.prompt" | "ssh" | "desktop" | "host" | "network.write" | "secret.read" | "secret.write" | "email.read" | "email.send" | "email.manage" | "snapshot.read" | "snapshot.write" | "template.read" | "template.write" | "key.manage" | "account.read" | "account.admin" | "members.read" | "members.admin" | "*")[];
+                actions: ("sandbox.read" | "sandbox.create" | "sandbox.fork" | "sandbox.update" | "sandbox.auto-stop" | "sandbox.stop" | "sandbox.resume" | "sandbox.delete" | "sandbox.delete-own" | "exec" | "job.read" | "job.write" | "job.run" | "file.read" | "file.write" | "agent.prompt" | "ssh" | "desktop" | "host" | "network.write" | "secret.read" | "secret.write" | "email.read" | "email.send" | "email.manage" | "snapshot.read" | "snapshot.write" | "template.read" | "template.write" | "key.manage" | "account.read" | "account.admin" | "members.read" | "members.admin" | "*")[];
                 /** @description The sandboxes the key is limited to, together with templateIds. Empty, with templateIds also empty and madeOnly false, means every sandbox of the account. */
                 sandboxIds: string[];
                 /** @description True for a key that can reach only the sandboxes it created and their snapshots. */
@@ -5160,7 +5633,7 @@ export interface components {
              *       "exec"
              *     ]
              */
-            actions: ("sandbox.read" | "sandbox.create" | "sandbox.fork" | "sandbox.update" | "sandbox.auto-stop" | "sandbox.stop" | "sandbox.resume" | "sandbox.delete" | "sandbox.delete-own" | "exec" | "file.read" | "file.write" | "agent.prompt" | "ssh" | "desktop" | "host" | "network.write" | "secret.read" | "secret.write" | "email.read" | "email.send" | "email.manage" | "snapshot.read" | "snapshot.write" | "template.read" | "template.write" | "key.manage" | "account.read" | "account.admin" | "members.read" | "members.admin" | "*")[];
+            actions: ("sandbox.read" | "sandbox.create" | "sandbox.fork" | "sandbox.update" | "sandbox.auto-stop" | "sandbox.stop" | "sandbox.resume" | "sandbox.delete" | "sandbox.delete-own" | "exec" | "job.read" | "job.write" | "job.run" | "file.read" | "file.write" | "agent.prompt" | "ssh" | "desktop" | "host" | "network.write" | "secret.read" | "secret.write" | "email.read" | "email.send" | "email.manage" | "snapshot.read" | "snapshot.write" | "template.read" | "template.write" | "key.manage" | "account.read" | "account.admin" | "members.read" | "members.admin" | "*")[];
             /** @description The sandboxes the key is limited to, together with templateIds. Empty, with templateIds also empty and madeOnly false, means every sandbox of the account. */
             sandboxIds: string[];
             /** @description True for a key that can reach only the sandboxes it created and their snapshots. */
@@ -5202,7 +5675,7 @@ export interface components {
              *       "email.send"
              *     ]
              */
-            actions?: ("sandbox.read" | "sandbox.create" | "sandbox.fork" | "sandbox.update" | "sandbox.auto-stop" | "sandbox.stop" | "sandbox.resume" | "sandbox.delete" | "sandbox.delete-own" | "exec" | "file.read" | "file.write" | "agent.prompt" | "ssh" | "desktop" | "host" | "network.write" | "secret.read" | "secret.write" | "email.read" | "email.send" | "email.manage" | "snapshot.read" | "snapshot.write" | "template.read" | "template.write" | "key.manage" | "account.read" | "account.admin" | "members.read" | "members.admin" | "*")[];
+            actions?: ("sandbox.read" | "sandbox.create" | "sandbox.fork" | "sandbox.update" | "sandbox.auto-stop" | "sandbox.stop" | "sandbox.resume" | "sandbox.delete" | "sandbox.delete-own" | "exec" | "job.read" | "job.write" | "job.run" | "file.read" | "file.write" | "agent.prompt" | "ssh" | "desktop" | "host" | "network.write" | "secret.read" | "secret.write" | "email.read" | "email.send" | "email.manage" | "snapshot.read" | "snapshot.write" | "template.read" | "template.write" | "key.manage" | "account.read" | "account.admin" | "members.read" | "members.admin" | "*")[];
             /** @description Limits the key to these sandboxes, plus those created from templateIds. It can always reach the sandboxes it creates. Every other sandbox, snapshot and route of the account returns 404 to it. */
             sandboxIds?: string[];
             /**
@@ -7203,7 +7676,10 @@ export interface operations {
     };
     deleteSandbox: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description true deletes it even where jobs run in it, and pauses them with the reason "its sandbox was deleted". Without it, such a delete is refused with 409 in_use_by_jobs. */
+                pauseJobs?: "true" | "false";
+            };
             header?: never;
             path: {
                 /** @description The sandbox's ID. */
@@ -7249,6 +7725,15 @@ export interface operations {
             };
             /** @description Not found. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description in_use_by_jobs: jobs run in this sandbox; the message names them, and the error's jobs lists each one's id and name. Send it again with ?pauseJobs=true to delete it and pause them. Nothing was deleted. */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -12775,7 +13260,7 @@ export interface operations {
                      */
                     url: string;
                     /**
-                     * @description The events to send, at most 20 entries: sandbox.created, sandbox.started, sandbox.stopped, sandbox.archived, sandbox.error, sandbox.moved, sandbox.deleted, sandbox.auto_stop_set, sandbox.labels_changed, sandbox.scheduled_run, sandbox.schedule_paused, sandbox.low_cpu, prompt.created, email.received, email.delivered, email.bounced, member.invited, member.joined, member.removed, member.role_changed, key.revoked, template.created, template.updated, template.secrets_changed (named, never with a value), template.labels_changed, template.deleted, and Headroom's headroom.burst_started, headroom.burst_ended, headroom.refused, headroom.running_count_reached, headroom.budget_threshold and headroom.budget_reached, which concern the organization rather than a sandbox. A group name with .*, as headroom.* or sandbox.*, means every event in the group, including ones added later; * alone means every event, the default. A * anywhere else, or a name that is not one of these, is rejected. An event has the same id in every webhook it is sent to, and sandbox.* and headroom.* events are also sent as log records to the collector set with PUT /v1/telemetry.
+                     * @description The events to send, at most 20 entries: sandbox.created, sandbox.started, sandbox.stopped, sandbox.archived, sandbox.error, sandbox.moved, sandbox.deleted, sandbox.auto_stop_set, sandbox.labels_changed, sandbox.low_cpu, prompt.created, email.received, email.delivered, email.bounced, member.invited, member.joined, member.removed, member.role_changed, key.revoked, template.created, template.updated, template.secrets_changed (named, never with a value), template.labels_changed, template.deleted, and Headroom's headroom.burst_started, headroom.burst_ended, headroom.refused, headroom.running_count_reached, headroom.budget_threshold and headroom.budget_reached, which concern the organization rather than a sandbox, and a job's job.created, job.updated, job.deleted, job.run_started, job.run_finished, job.run_failed, job.recovered and job.paused. A group name with .*, as headroom.*, job.* or sandbox.*, means every event in the group, including ones added later; * alone means every event, the default. A * anywhere else, or a name that is not one of these, is rejected. An event has the same id in every webhook it is sent to, and sandbox.* and headroom.* events are also sent as log records to the collector set with PUT /v1/telemetry.
                      * @example [
                      *       "sandbox.created",
                      *       "sandbox.error",
@@ -12974,7 +13459,7 @@ export interface operations {
                      */
                     url?: string;
                     /**
-                     * @description The events to send, at most 20 entries: sandbox.created, sandbox.started, sandbox.stopped, sandbox.archived, sandbox.error, sandbox.moved, sandbox.deleted, sandbox.auto_stop_set, sandbox.labels_changed, sandbox.scheduled_run, sandbox.schedule_paused, sandbox.low_cpu, prompt.created, email.received, email.delivered, email.bounced, member.invited, member.joined, member.removed, member.role_changed, key.revoked, template.created, template.updated, template.secrets_changed (named, never with a value), template.labels_changed, template.deleted, and Headroom's headroom.burst_started, headroom.burst_ended, headroom.refused, headroom.running_count_reached, headroom.budget_threshold and headroom.budget_reached, which concern the organization rather than a sandbox. A group name with .*, as headroom.* or sandbox.*, means every event in the group, including ones added later; * alone means every event, the default. A * anywhere else, or a name that is not one of these, is rejected. An event has the same id in every webhook it is sent to, and sandbox.* and headroom.* events are also sent as log records to the collector set with PUT /v1/telemetry.
+                     * @description The events to send, at most 20 entries: sandbox.created, sandbox.started, sandbox.stopped, sandbox.archived, sandbox.error, sandbox.moved, sandbox.deleted, sandbox.auto_stop_set, sandbox.labels_changed, sandbox.low_cpu, prompt.created, email.received, email.delivered, email.bounced, member.invited, member.joined, member.removed, member.role_changed, key.revoked, template.created, template.updated, template.secrets_changed (named, never with a value), template.labels_changed, template.deleted, and Headroom's headroom.burst_started, headroom.burst_ended, headroom.refused, headroom.running_count_reached, headroom.budget_threshold and headroom.budget_reached, which concern the organization rather than a sandbox, and a job's job.created, job.updated, job.deleted, job.run_started, job.run_finished, job.run_failed, job.recovered and job.paused. A group name with .*, as headroom.*, job.* or sandbox.*, means every event in the group, including ones added later; * alone means every event, the default. A * anywhere else, or a name that is not one of these, is rejected. An event has the same id in every webhook it is sent to, and sandbox.* and headroom.* events are also sent as log records to the collector set with PUT /v1/telemetry.
                      * @example [
                      *       "sandbox.created",
                      *       "sandbox.error",
@@ -13495,25 +13980,28 @@ export interface operations {
             };
         };
     };
-    listSchedules: {
+    listJobs: {
         parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
+            query?: {
+                /** @description Only the jobs that run in this sandbox, by its id or its name. A deleted sandbox's id lists the jobs it leaves, paused. */
+                sandbox?: string;
+                /** @description Only the jobs whose fresh sandboxes are made from this template, by its id or its name. */
+                template?: string;
             };
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description The sandbox's schedules, oldest first, each with its last run. */
+            /** @description The organization's jobs, oldest first, each with its last run. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        schedules: components["schemas"]["Schedule"][];
+                        jobs: components["schemas"]["Job"][];
                     };
                 };
             };
@@ -13526,7 +14014,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Not found. */
+            /** @description not_found: there is no such job or sandbox, or none the caller reaches. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -13537,18 +14025,16 @@ export interface operations {
             };
         };
     };
-    createSchedule: {
+    createJob: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                id: string;
-            };
+            path?: never;
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CreateSchedule"];
+                "application/json": components["schemas"]["CreateJob"];
             };
         };
         responses: {
@@ -13558,10 +14044,10 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schedule"];
+                    "application/json": components["schemas"]["Job"];
                 };
             };
-            /** @description invalid_request: neither every nor cron, both, or one that is not right; an unknown time zone; a cron that names no time; or deleteAfter on a schedule that does not run once. */
+            /** @description invalid_request: more than one of every, cron and at, or one that is not right; an unknown time zone; a cron that names no time; after: delete on a job that does not run once; neither or both of target.sandbox and target.template; after or ifStopped on a job on fresh sandboxes, or keepFailedFor on one on a sandbox. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -13579,7 +14065,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description key_action_forbidden: a schedule that starts its sandbox, made with a key that may not start and stop it; or one that deletes it, with a key that may not delete it. */
+            /** @description key_action_forbidden: a key without exec; a job that starts its sandbox, made with a key that may not start and stop it; one that deletes it, with a key that may not delete it; or a job on fresh sandboxes, with a key that may not make sandboxes and delete those it made. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -13588,7 +14074,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Not found. */
+            /** @description not_found: there is no such job or sandbox, or none the caller reaches. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -13597,7 +14083,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description name_taken, or too_many_schedules: a sandbox has 20 at most. */
+            /** @description name_taken: the organization has a job of that name. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -13608,25 +14094,25 @@ export interface operations {
             };
         };
     };
-    getSchedule: {
+    getJob: {
         parameters: {
             query?: never;
             header?: never;
             path: {
+                /** @description The job's id or name. */
                 id: string;
-                scheduleId: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description The schedule, with its last run. */
+            /** @description The job, with its last run. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schedule"];
+                    "application/json": components["schemas"]["Job"];
                 };
             };
             /** @description Missing or invalid API key. */
@@ -13638,7 +14124,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Not found. */
+            /** @description not_found: there is no such job or sandbox, or none the caller reaches. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -13649,13 +14135,13 @@ export interface operations {
             };
         };
     };
-    deleteSchedule: {
+    deleteJob: {
         parameters: {
             query?: never;
             header?: never;
             path: {
+                /** @description The job's id or name. */
                 id: string;
-                scheduleId: string;
             };
             cookie?: never;
         };
@@ -13677,7 +14163,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Not found. */
+            /** @description not_found: there is no such job or sandbox, or none the caller reaches. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -13688,29 +14174,29 @@ export interface operations {
             };
         };
     };
-    updateSchedule: {
+    updateJob: {
         parameters: {
             query?: never;
             header?: never;
             path: {
+                /** @description The job's id or name. */
                 id: string;
-                scheduleId: string;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["UpdateSchedule"];
+                "application/json": components["schemas"]["UpdateJob"];
             };
         };
         responses: {
-            /** @description Changed. What was left out is as it was. A change of when it runs, or a resume, sets its next run from now. A run under way goes on as it began, save that turning deleteAfter off while it runs keeps its sandbox. */
+            /** @description Changed. What was left out is as it was; any of every, cron and at sent, even as null, says anew when it runs, and all three null makes it run only when asked. enabled false pauses it and true resumes it. A change of when it runs, or a resume, sets its next run from now. A run under way goes on as it began, save that turning after: delete off while it runs keeps its sandbox. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schedule"];
+                    "application/json": components["schemas"]["Job"];
                 };
             };
             /** @description invalid_request: as for a new one. */
@@ -13740,7 +14226,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Not found. */
+            /** @description not_found: there is no such job or sandbox, or none the caller reaches. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -13760,25 +14246,46 @@ export interface operations {
             };
         };
     };
-    runSchedule: {
+    runJob: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Seconds to wait for the run to end, up to 300: it is answered with 200 and its output if it ends within them, else with 202 as it is then. The call is held 90 seconds at most, whatever is asked: read the run after for a longer wait, as the SDKs and agental job run --wait do. */
+                wait?: number | null;
+            };
             header?: never;
             path: {
+                /** @description The job's id or name. */
                 id: string;
-                scheduleId: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description A run, made now by the schedule's own rules, whether or not it is paused. Its next run does not move. Read how it ends with GET .../runs. */
+            /** @description With wait: the run ended within it, and here it is with its output, as GET /v1/jobs/{id}/runs/{runId} gives it. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRunWithOutput"];
+                };
+            };
+            /** @description A run, made now by the job's own rules, whether or not it is paused. Its next run does not move. Read how it ends with GET /v1/jobs/{id}/runs/{runId}. With wait, the run had not ended within it; or the call was not held, with the header Agental-Wait: not-held, where the account holds 10 calls waiting already or the API 200. */
             202: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ScheduleRun"];
+                    "application/json": components["schemas"]["JobRun"];
+                };
+            };
+            /** @description unknown_input: an input the job does not name. input_required: an input with no default that was not given. invalid_request: an input's value is too long. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Missing or invalid API key. */
@@ -13790,7 +14297,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description key_action_forbidden: a schedule that starts its sandbox, run with a key that may not start and stop it; or one that deletes it, with a key that may not delete it. */
+            /** @description key_action_forbidden: a job that starts its sandbox, run with a key that may not start and stop it; one that deletes it, with a key that may not delete it; or a job on fresh sandboxes, with a key that may not make sandboxes and delete those it made. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -13799,7 +14306,169 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Not found. */
+            /** @description not_found: there is no such job or sandbox, or none the caller reaches. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description sandbox_deleted: the sandbox it runs in was deleted. template_deleted: the template its fresh sandboxes are made from was deleted. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    runJobAgain: {
+        parameters: {
+            query?: {
+                /** @description Seconds to wait for the run to end, up to 300: it is answered with 200 and its output if it ends within them, else with 202 as it is then. The call is held 90 seconds at most, whatever is asked: read the run after for a longer wait, as the SDKs and agental job run --wait do. */
+                wait?: number | null;
+            };
+            header?: never;
+            path: {
+                /** @description The job's id or name. */
+                id: string;
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description With wait: the new run ended within it, with its output. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRunWithOutput"];
+                };
+            };
+            /** @description The new run, under way: as POST /v1/jobs/{id}/run answers. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRun"];
+                };
+            };
+            /** @description input_required: the job now needs an input this run was not given. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description key_action_forbidden: as for POST /v1/jobs/{id}/run. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description not_found: there is no such job or sandbox, or none the caller reaches. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description sandbox_deleted, template_deleted: as for POST /v1/jobs/{id}/run. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    putJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Lower-case letters, digits and dashes, unique in the organization. Left out, job-1, job-2 and so on. */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PutJob"];
+            };
+        };
+        responses: {
+            /** @description It was there: changed to this, or as it was where it was this already (the header Agental-Changed says which). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Job"];
+                };
+            };
+            /** @description Made. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Job"];
+                };
+            };
+            /** @description invalid_request: as for POST /v1/jobs. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description key_action_forbidden: as for POST /v1/jobs. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description not_found: there is no such job or sandbox, or none the caller reaches. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -13810,7 +14479,191 @@ export interface operations {
             };
         };
     };
-    getScheduleUsage: {
+    listJobRuns: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The job's id or name. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Its runs, the latest first: 100 unless limit says, at most 500. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        runs: components["schemas"]["JobRun"][];
+                    };
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description not_found: there is no such job or sandbox, or none the caller reaches. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getJobRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The job's id or name. */
+                id: string;
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One run, with its command's output as it is kept. The output is shown to a person signed in, and to a key that may run commands in the run's sandbox (exec); to another key, outputHidden is true and stdout and stderr are null. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRunWithOutput"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description not_found: there is no such job or sandbox, or none the caller reaches. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    keepJobRunSandbox: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The job's id or name. */
+                id: string;
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kept: the run, with sandboxKept true. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRun"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description not_found: there is no such job or sandbox, or none the caller reaches. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description not_fresh: the run ran in the job's own sandbox. run_running: the run has not ended. sandbox_gone: its sandbox was deleted, or never made. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listAllJobRuns: {
+        parameters: {
+            query?: {
+                limit?: number;
+                /** @description Only this job's, by its id or its name. */
+                job?: string;
+                /** @description Only the runs that ended so, or are running. */
+                outcome?: "running" | "succeeded" | "failed" | "timed_out" | "replaced" | "skipped" | "missed" | "could_not_start" | "interrupted" | "cancelled";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Every job's runs in the organization, the latest first: 100 unless limit says, at most 500. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        runs: components["schemas"]["JobRun"][];
+                    };
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description not_found: there is no such job or sandbox, or none the caller reaches. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getJobUsage: {
         parameters: {
             query?: {
                 /** @description Count the runs due from this moment. The start of this month in UTC when left out. */
@@ -13824,13 +14677,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Each schedule of the caller's sandboxes that had runs due in the window, the costliest first: how many runs, how many started their sandbox, failed, were skipped or were missed, and the running time they caused and what it comes to at the list price. Running time is counted from each run that started a stopped sandbox to its end, the stop after it included. A run in a sandbox that was running already adds none: it is the sandbox's own, as /v1/usage counts it. Stopped time between runs is the sandbox's, in /v1/usage. */
+            /** @description Each job of the caller's organization that had runs due in the window, the costliest first (for a key held to some sandboxes, the jobs that run in them; for a member of a team, not an owner or admin, the jobs they made, themselves or by a key of theirs): how many runs, how many started their sandbox, failed, were skipped or were missed, and the running time they caused and what it comes to at the list price. Running time is counted from each run that started a stopped sandbox to its end, the stop after it included. A run in a sandbox that was running already adds none: it is the sandbox's own, as /v1/usage counts it. Stopped time between runs is the sandbox's, in /v1/usage. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ScheduleUsage"];
+                    "application/json": components["schemas"]["JobUsage"];
                 };
             };
             /** @description invalid_request: since is not before until, or the two are more than 366 days apart. */
@@ -13853,28 +14706,26 @@ export interface operations {
             };
         };
     };
-    listScheduleRuns: {
+    listJobTriggers: {
         parameters: {
-            query?: {
-                limit?: number;
-            };
+            query?: never;
             header?: never;
             path: {
+                /** @description The job's id or name. */
                 id: string;
-                scheduleId: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Its runs, the latest first: 100 unless limit says, at most 500. */
+            /** @description The job's HTTP triggers, oldest first. Their secrets are never shown again. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        runs: components["schemas"]["ScheduleRun"][];
+                        triggers: components["schemas"]["JobTrigger"][];
                     };
                 };
             };
@@ -13887,7 +14738,261 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Not found. */
+            /** @description not_found: there is no such job or trigger, or none the caller reaches. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    makeJobTrigger: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The job's id or name. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MakeJobTrigger"];
+            };
+        };
+        responses: {
+            /** @description Made, with its secret, shown this once. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobTriggerWithSecret"];
+                };
+            };
+            /** @description invalid_request: header given for a signature other than hmac-sha256, or not a header's name. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description key_action_forbidden: the key may not make a job's runs, as a change of the job would need. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description not_found: there is no such job or trigger, or none the caller reaches. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description too_many_triggers: the job has 10 addresses already. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deleteJobTrigger: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                triggerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted: its address no longer starts a run. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description not_found: there is no such job or trigger, or none the caller reaches. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    updateJobTrigger: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                triggerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    respond?: "accepted" | "wait";
+                    /** @description Calls a minute it takes, 60 unless given, 600 at most. */
+                    ratePerMinute?: number;
+                    /** @description The secret the sender signs with where it makes its own, as Stripe does for each endpoint (whsec_…): signatures are checked with it in place of the trigger's. Make the trigger, give its address to Stripe, then set this with PATCH. null takes it away. */
+                    signingSecret?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Changed. Its secret stays. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobTrigger"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description not_found: there is no such job or trigger, or none the caller reaches. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    rotateJobTrigger: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                triggerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Its new secret, shown this once. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobTriggerWithSecret"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description not_found: there is no such job or trigger, or none the caller reaches. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listRefusedJobCalls: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The job's id or name. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Refused calls, 100 at most. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        calls: {
+                            id: string;
+                            triggerId: string;
+                            at: string;
+                            status: number;
+                            reason: string;
+                            from: string | null;
+                        }[];
+                    };
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description not_found: there is no such job or trigger, or none the caller reaches. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -15144,7 +16249,10 @@ export interface operations {
     };
     deleteTemplate: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description true deletes it even where jobs make their fresh sandboxes from it, and pauses them with the reason "its template was deleted". Without it, such a delete is refused with 409 in_use_by_jobs. */
+                pauseJobs?: "true" | "false";
+            };
             header?: never;
             path: {
                 /** @description The template's ID. */
@@ -15179,7 +16287,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description template_in_use: sandboxes are on it, and the message says how many. default_template: default cannot be deleted. Nothing was deleted. */
+            /** @description template_in_use: sandboxes are on it, and the message says how many. default_template: default cannot be deleted. in_use_by_jobs: jobs make their fresh sandboxes from it; the message names them, and the error's jobs lists each one's id and name. Send it again with ?pauseJobs=true to delete it and pause them. Nothing was deleted. */
             409: {
                 headers: {
                     [name: string]: unknown;
