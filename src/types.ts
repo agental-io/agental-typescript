@@ -78,6 +78,8 @@ export type UpdateJob = Schemas["UpdateJob"];
 export type PutJob = Schemas["PutJob"];
 /** A job's inputs, by name: a default, null for one a run must be given, or { default, secret }. */
 export type JobInputs = NonNullable<CreateJob["inputs"]>;
+/** An event that starts a job, as create(), update() and put() take it: another job's run ending ({ on: "job.run_finished", job, outcome }), or mail to a sandbox ({ on: "email.received", sandbox }). */
+export type JobEvent = NonNullable<CreateJob["events"]>[number];
 /** A job's HTTP address: POST to its url starts a run, from anywhere, with the secret it was made with. */
 export type JobTrigger = Schemas["JobTrigger"];
 /** A trigger with its secret, as jobs.triggers.create() and rotate() answer it: the secret is shown this once. */

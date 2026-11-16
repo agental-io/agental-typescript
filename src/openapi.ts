@@ -4039,6 +4039,16 @@ export interface components {
             size: string | null;
             /** @description Whether the sandbox it was taken of has been deleted. The snapshot is kept either way, and a new sandbox can still be made from it. */
             sandboxDeleted: boolean;
+            /**
+             * @description The name of the sandbox it was taken of, kept after that sandbox is deleted. Null when no record of it is left.
+             * @example agent-review-41
+             */
+            sandboxName: string | null;
+            /**
+             * @description The status of the sandbox it was taken of, as GET /v1/sandboxes/{id} shows it: deleted once it is.
+             * @enum {string}
+             */
+            sandboxStatus: "creating" | "running" | "stopped" | "error" | "deleted" | "restoring" | "migrating";
         };
         DesktopState: {
             /** @description Whether a desktop is turned on for the sandbox. It stays so through a stop and a start, and a move to another server: the desktop is started again by itself, with nothing open on it. */
@@ -4672,6 +4682,20 @@ export interface components {
                     secret: boolean;
                 };
             };
+            /** @description The events that start it: another job's run ending, or mail arriving at a sandbox. */
+            events: ({
+                /** @enum {string} */
+                on: "job.run_finished";
+                job: string;
+                jobName: string | null;
+                /** @enum {string} */
+                outcome: "succeeded" | "failed" | "any";
+            } | {
+                /** @enum {string} */
+                on: "email.received";
+                sandbox: string;
+                sandboxName: string | null;
+            })[];
             createdAt: string;
             updatedAt: string;
         };
@@ -4711,10 +4735,10 @@ export interface components {
             /** @description Whether this run's sandbox was deleted by it: a fresh one after the run, at once where it succeeded, or once keepFailedFor passed; or a kept one after its command exited 0, as its job's after: delete asks. Where it did not, a job with after: delete says why in reason. */
             deletedSandbox: boolean;
             /**
-             * @description What started it: timer, its time came; run_now, a person signed in asked (Run now in the console); api, an API key asked; http, a call of one of its addresses.
+             * @description What started it: timer, its time came; run_now, a person signed in asked (Run now in the console); api, an API key asked; http, a call of one of its addresses; event, one of its events (trigger says which).
              * @enum {string}
              */
-            startedBy: "timer" | "run_now" | "api" | "http";
+            startedBy: "timer" | "run_now" | "api" | "http" | "event";
             /** @description A failed fresh run's: until when its sandbox is kept, stopped, to be looked at, then deleted. It can be started meanwhile, and the time does not move. Null otherwise. */
             keepUntil: string | null;
             /** @description Whether its fresh sandbox was kept for good, by POST /v1/jobs/{id}/runs/{runId}/keep-sandbox: an ordinary sandbox now. */
@@ -4727,6 +4751,28 @@ export interface components {
             inputs: {
                 [key: string]: string;
             };
+            /** @description The event that started it, where startedBy is event; null otherwise. */
+            trigger: {
+                /** @enum {string} */
+                on: "job.run_finished";
+                /** @description The job whose run ended. */
+                job: string;
+                jobName: string | null;
+                /** @description That run, as AGENTAL_TRIGGER_RUN. */
+                run: string;
+                /**
+                 * @description How it ended, as AGENTAL_TRIGGER_OUTCOME.
+                 * @enum {string}
+                 */
+                outcome: "running" | "succeeded" | "failed" | "timed_out" | "replaced" | "skipped" | "missed" | "could_not_start" | "interrupted" | "cancelled";
+            } | {
+                /** @enum {string} */
+                on: "email.received";
+                sandbox: string;
+                sandboxName: string | null;
+                /** @description The message's id, as AGENTAL_TRIGGER_EMAIL: GET /v1/sandboxes/{id}/email/messages/{messageId} reads it. */
+                email: string;
+            } | null;
         };
         CreateJob: {
             /**
@@ -4801,6 +4847,17 @@ export interface components {
                     secret?: boolean;
                 };
             };
+            /**
+             * @description What else starts it, at most 10: another job's run ending (job.run_finished), its command given AGENTAL_TRIGGER_JOB, AGENTAL_TRIGGER_RUN and AGENTAL_TRIGGER_OUTCOME; or mail arriving at a sandbox's address (email.received), given AGENTAL_TRIGGER_SANDBOX and AGENTAL_TRIGGER_EMAIL, the message's id. A run an event starts is given the inputs' defaults, and goes by overlap as any run; events that start 60 runs of a job within a minute pause it. A chain that comes back to the job itself is refused, and a job with after: delete takes none. A sandbox's address takes mail from anyone. Given, it replaces the events the job had; [] takes them all away.
+             * @example [
+             *       {
+             *         "on": "job.run_finished",
+             *         "job": "build",
+             *         "outcome": "succeeded"
+             *       }
+             *     ]
+             */
+            events?: (components["schemas"]["JobRunFinishedEvent"] | components["schemas"]["EmailReceivedEvent"])[];
             /** @description False pauses it. Defaults to true. */
             enabled?: boolean;
         };
@@ -4820,6 +4877,29 @@ export interface components {
              * @example medium
              */
             size?: string;
+        };
+        JobRunFinishedEvent: {
+            /** @enum {string} */
+            on: "job.run_finished";
+            /**
+             * @description The other job, by its id or its name.
+             * @example build
+             */
+            job: string;
+            /**
+             * @description Which of its ends start this job: succeeded; failed, for good, after its retries; or any, the default.
+             * @enum {string}
+             */
+            outcome?: "succeeded" | "failed" | "any";
+        };
+        EmailReceivedEvent: {
+            /** @enum {string} */
+            on: "email.received";
+            /**
+             * @description The sandbox whose mail starts it, by its id or its name.
+             * @example inbox
+             */
+            sandbox: string;
         };
         UpdateJob: {
             /**
@@ -4894,6 +4974,17 @@ export interface components {
                     secret?: boolean;
                 };
             };
+            /**
+             * @description What else starts it, at most 10: another job's run ending (job.run_finished), its command given AGENTAL_TRIGGER_JOB, AGENTAL_TRIGGER_RUN and AGENTAL_TRIGGER_OUTCOME; or mail arriving at a sandbox's address (email.received), given AGENTAL_TRIGGER_SANDBOX and AGENTAL_TRIGGER_EMAIL, the message's id. A run an event starts is given the inputs' defaults, and goes by overlap as any run; events that start 60 runs of a job within a minute pause it. A chain that comes back to the job itself is refused, and a job with after: delete takes none. A sandbox's address takes mail from anyone. Given, it replaces the events the job had; [] takes them all away.
+             * @example [
+             *       {
+             *         "on": "job.run_finished",
+             *         "job": "build",
+             *         "outcome": "succeeded"
+             *       }
+             *     ]
+             */
+            events?: (components["schemas"]["JobRunFinishedEvent"] | components["schemas"]["EmailReceivedEvent"])[];
             /** @description False pauses it. Defaults to true. */
             enabled?: boolean;
         };
@@ -4933,10 +5024,10 @@ export interface components {
             /** @description Whether this run's sandbox was deleted by it: a fresh one after the run, at once where it succeeded, or once keepFailedFor passed; or a kept one after its command exited 0, as its job's after: delete asks. Where it did not, a job with after: delete says why in reason. */
             deletedSandbox: boolean;
             /**
-             * @description What started it: timer, its time came; run_now, a person signed in asked (Run now in the console); api, an API key asked; http, a call of one of its addresses.
+             * @description What started it: timer, its time came; run_now, a person signed in asked (Run now in the console); api, an API key asked; http, a call of one of its addresses; event, one of its events (trigger says which).
              * @enum {string}
              */
-            startedBy: "timer" | "run_now" | "api" | "http";
+            startedBy: "timer" | "run_now" | "api" | "http" | "event";
             /** @description A failed fresh run's: until when its sandbox is kept, stopped, to be looked at, then deleted. It can be started meanwhile, and the time does not move. Null otherwise. */
             keepUntil: string | null;
             /** @description Whether its fresh sandbox was kept for good, by POST /v1/jobs/{id}/runs/{runId}/keep-sandbox: an ordinary sandbox now. */
@@ -4949,6 +5040,28 @@ export interface components {
             inputs: {
                 [key: string]: string;
             };
+            /** @description The event that started it, where startedBy is event; null otherwise. */
+            trigger: {
+                /** @enum {string} */
+                on: "job.run_finished";
+                /** @description The job whose run ended. */
+                job: string;
+                jobName: string | null;
+                /** @description That run, as AGENTAL_TRIGGER_RUN. */
+                run: string;
+                /**
+                 * @description How it ended, as AGENTAL_TRIGGER_OUTCOME.
+                 * @enum {string}
+                 */
+                outcome: "running" | "succeeded" | "failed" | "timed_out" | "replaced" | "skipped" | "missed" | "could_not_start" | "interrupted" | "cancelled";
+            } | {
+                /** @enum {string} */
+                on: "email.received";
+                sandbox: string;
+                sandboxName: string | null;
+                /** @description The message's id, as AGENTAL_TRIGGER_EMAIL: GET /v1/sandboxes/{id}/email/messages/{messageId} reads it. */
+                email: string;
+            } | null;
             /** @description The last 262,144 characters its command wrote to stdout, as it ran or, once it ended, as kept with the values of the sandbox's plain variables masked as ••••. Null where it has no command, its output is no longer kept (data retention), or outputHidden is true. */
             stdout: string | null;
             /** @description The last 262,144 characters its command wrote to stderr. Null as for stdout. */
@@ -5028,6 +5141,17 @@ export interface components {
                     secret?: boolean;
                 };
             };
+            /**
+             * @description What else starts it, at most 10: another job's run ending (job.run_finished), its command given AGENTAL_TRIGGER_JOB, AGENTAL_TRIGGER_RUN and AGENTAL_TRIGGER_OUTCOME; or mail arriving at a sandbox's address (email.received), given AGENTAL_TRIGGER_SANDBOX and AGENTAL_TRIGGER_EMAIL, the message's id. A run an event starts is given the inputs' defaults, and goes by overlap as any run; events that start 60 runs of a job within a minute pause it. A chain that comes back to the job itself is refused, and a job with after: delete takes none. A sandbox's address takes mail from anyone. Given, it replaces the events the job had; [] takes them all away.
+             * @example [
+             *       {
+             *         "on": "job.run_finished",
+             *         "job": "build",
+             *         "outcome": "succeeded"
+             *       }
+             *     ]
+             */
+            events?: (components["schemas"]["JobRunFinishedEvent"] | components["schemas"]["EmailReceivedEvent"])[];
             /** @description False pauses it. Defaults to true. */
             enabled?: boolean;
         };

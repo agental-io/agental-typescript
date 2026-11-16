@@ -90,6 +90,7 @@ export type {
   UpdateJobTrigger,
   JobTriggerSignature,
   RefusedJobCall,
+  JobEvent,
   JobInputs,
   SecretVariable,
   SendEmail,

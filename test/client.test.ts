@@ -2054,6 +2054,7 @@ function jobRun(changes: Partial<JobRun> = {}): JobRun {
     attempt: 1,
     failedForGood: false,
     inputs: {},
+    trigger: null,
     ...changes,
   };
 }
@@ -2083,6 +2084,7 @@ function job(changes: Partial<Job> = {}): Job {
     alerts: "email",
     failingSince: null,
     inputs: {},
+    events: [],
     createdAt: "2026-11-03T16:00:00.000Z",
     updatedAt: "2026-11-03T16:00:00.000Z",
     ...changes,
@@ -2421,4 +2423,28 @@ test("a connection's sessions are listed", async () => {
   const { agental, sent } = scripted(json(200, { data: [session] }));
   assert.deepEqual(await agental.listClaudeSessions("ccn_7f3a91c2d04e5b18"), [session]);
   assert.deepEqual([sent[0]?.method, sent[0]?.path], ["GET", "/v1/claude/connections/ccn_7f3a91c2d04e5b18/sessions"]);
+});
+
+test("a job is made with events that start it, and a run says which event started it", async () => {
+  const events: Job["events"] = [
+    { on: "job.run_finished", job: "job_build", jobName: "build", outcome: "succeeded" },
+    { on: "email.received", sandbox: "sbx_inbox", sandboxName: "inbox" },
+  ];
+  const trigger = { on: "job.run_finished" as const, job: "job_build", jobName: "build", run: "run_9", outcome: "succeeded" as const };
+  const { agental, sent } = scripted(json(201, job({ events })), json(200, { runs: [jobRun({ startedBy: "event", trigger })] }));
+  const made = await agental.jobs.create({
+    target: { sandbox: "box" },
+    command: "./deploy.sh",
+    events: [
+      { on: "job.run_finished", job: "build", outcome: "succeeded" },
+      { on: "email.received", sandbox: "inbox" },
+    ],
+  });
+  assert.deepEqual(made.events, events);
+  assert.deepEqual((sent[0]?.body as { events: unknown }).events, [
+    { on: "job.run_finished", job: "build", outcome: "succeeded" },
+    { on: "email.received", sandbox: "inbox" },
+  ]);
+  const [run] = await agental.jobs.runs("job_1");
+  assert.deepEqual(run?.trigger, trigger);
 });
