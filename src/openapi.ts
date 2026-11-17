@@ -6577,7 +6577,7 @@ export interface components {
         };
         Telemetry: {
             /**
-             * @description The collector's OTLP/HTTP base URL. Metrics are POSTed to <endpoint>/v1/metrics and events to <endpoint>/v1/logs.
+             * @description The collector's OTLP/HTTP base URL. Metrics are POSTed to <endpoint>/v1/metrics, events to <endpoint>/v1/logs, and each job run that ended as a job.run span to <endpoint>/v1/traces, with a log record of its end.
              * @example https://otlp.example.com
              */
             endpoint: string;
@@ -6602,7 +6602,7 @@ export interface components {
         };
         TelemetryInput: {
             /**
-             * @description The collector's OTLP/HTTP base URL: https://, on port 443 or 4318, on the public internet. A trailing /v1/metrics or /v1/logs is removed. Redirects are not followed.
+             * @description The collector's OTLP/HTTP base URL: https://, on port 443 or 4318, on the public internet. A trailing /v1/metrics, /v1/logs or /v1/traces is removed. Redirects are not followed.
              * @example https://otlp.datadoghq.com
              */
             endpoint: string;
