@@ -299,7 +299,10 @@ class Jobs {
    * the last fails for good (failedForGood). alerts says who is told when a run fails for good and
    * when the job works again: "email" by default, its maker and the organization's owners and
    * admins; "webhook", the events job.run_failed and job.recovered; "both"; or "none". failingSince
-   * says since when a job has been failing, null while it works.
+   * says since when a job has been failing, null while it works. maxMonthlySpendMicros (from
+   * 10000, $0.01) is the most its runs may cost in a calendar month (UTC), at the list price of the
+   * running time they cause: reached, the job pauses itself, says why in pausedReason, and mails as
+   * alerts says; spentThisMonthMicros is what they cost so far. Null, the default: no limit.
    */
   async create(job: CreateJob): Promise<Job> {
     return (await this.http.json<Job>({ method: "POST", path: "/v1/jobs", body: job })).body;

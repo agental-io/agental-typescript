@@ -2085,6 +2085,8 @@ function job(changes: Partial<Job> = {}): Job {
     failingSince: null,
     inputs: {},
     events: [],
+    maxMonthlySpendMicros: null,
+    spentThisMonthMicros: null,
     createdAt: "2026-11-03T16:00:00.000Z",
     updatedAt: "2026-11-03T16:00:00.000Z",
     ...changes,
@@ -2305,6 +2307,18 @@ test("a job's retries and alerts are sent as given, and its runs say which try e
       [1, false],
     ],
   );
+});
+
+test("a job's monthly spending limit is sent as given, null takes it away, and it is read back with what the month cost", async () => {
+  const limited = job({ maxMonthlySpendMicros: 25_000_000, spentThisMonthMicros: 1_200_000 });
+  const { agental, sent } = scripted(json(201, limited), json(200, job()));
+  const body = { name: "scrape", target: { sandbox: "box" }, command: "python scrape.py", every: "1h", maxMonthlySpendMicros: 25_000_000 };
+  const made = await agental.jobs.create(body);
+  assert.deepEqual(sent[0]?.body, body);
+  assert.deepEqual([made.maxMonthlySpendMicros, made.spentThisMonthMicros], [25_000_000, 1_200_000]);
+  const cleared = await agental.jobs.update("scrape", { maxMonthlySpendMicros: null });
+  assert.deepEqual(sent[1]?.body, { maxMonthlySpendMicros: null });
+  assert.equal(cleared.maxMonthlySpendMicros, null);
 });
 
 test("a delete of a template that jobs make their fresh sandboxes from pauses them only when asked", async () => {

@@ -4696,6 +4696,10 @@ export interface components {
                 sandbox: string;
                 sandboxName: string | null;
             })[];
+            /** @description The most its runs may cost in a calendar month (UTC), in micro-dollars. Null: no limit. */
+            maxMonthlySpendMicros: number | null;
+            /** @description What its runs' running time cost this calendar month (UTC) so far, in micro-dollars, as its limit counts it. Null where it has no limit. */
+            spentThisMonthMicros: number | null;
             createdAt: string;
             updatedAt: string;
         };
@@ -4858,6 +4862,11 @@ export interface components {
              *     ]
              */
             events?: (components["schemas"]["JobRunFinishedEvent"] | components["schemas"]["EmailReceivedEvent"])[];
+            /**
+             * @description The most its runs may cost in a calendar month (UTC), in micro-dollars, from 10000 ($0.01) to 100000000000: the running time they cause at the list price of the sandbox's size, from the start of a sandbox a run started or made to the run's end; not a kept sandbox's stopped time, nor burst fees. Reached, it pauses itself, says so in pausedReason and job.paused, and mails as its alerts say; a run under way goes on to its end, and a run that comes due is skipped. It stays paused into the next month until it is resumed. Left out of a new one, or null: no limit. A key with job.write alone may lower it; raising it or taking it away takes what its runs do.
+             * @example 25000000
+             */
+            maxMonthlySpendMicros?: number | null;
             /** @description False pauses it. Defaults to true. */
             enabled?: boolean;
         };
@@ -4985,6 +4994,11 @@ export interface components {
              *     ]
              */
             events?: (components["schemas"]["JobRunFinishedEvent"] | components["schemas"]["EmailReceivedEvent"])[];
+            /**
+             * @description The most its runs may cost in a calendar month (UTC), in micro-dollars, from 10000 ($0.01) to 100000000000: the running time they cause at the list price of the sandbox's size, from the start of a sandbox a run started or made to the run's end; not a kept sandbox's stopped time, nor burst fees. Reached, it pauses itself, says so in pausedReason and job.paused, and mails as its alerts say; a run under way goes on to its end, and a run that comes due is skipped. It stays paused into the next month until it is resumed. Left out of a new one, or null: no limit. A key with job.write alone may lower it; raising it or taking it away takes what its runs do.
+             * @example 25000000
+             */
+            maxMonthlySpendMicros?: number | null;
             /** @description False pauses it. Defaults to true. */
             enabled?: boolean;
         };
@@ -5152,6 +5166,11 @@ export interface components {
              *     ]
              */
             events?: (components["schemas"]["JobRunFinishedEvent"] | components["schemas"]["EmailReceivedEvent"])[];
+            /**
+             * @description The most its runs may cost in a calendar month (UTC), in micro-dollars, from 10000 ($0.01) to 100000000000: the running time they cause at the list price of the sandbox's size, from the start of a sandbox a run started or made to the run's end; not a kept sandbox's stopped time, nor burst fees. Reached, it pauses itself, says so in pausedReason and job.paused, and mails as its alerts say; a run under way goes on to its end, and a run that comes due is skipped. It stays paused into the next month until it is resumed. Left out of a new one, or null: no limit. A key with job.write alone may lower it; raising it or taking it away takes what its runs do.
+             * @example 25000000
+             */
+            maxMonthlySpendMicros?: number | null;
             /** @description False pauses it. Defaults to true. */
             enabled?: boolean;
         };
