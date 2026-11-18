@@ -252,7 +252,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Stops a running sandbox and returns it stopped, with 200. Its disk is kept and every process ends, unless keepMemory is sent, which keeps its memory too. A stopped sandbox is charged its stopped price. A stopped sandbox is returned as it is. The response header Stop-Id names the stop, for GET /v1/stops/{id}. */
+        /** @description Stops a running sandbox and returns it stopped, with 200. Its disk is kept and every process ends, unless keepMemory is sent, which keeps its memory too. A stopped sandbox is free for 14 days after its stop, then $0.05 a GB a month of what it stores, until it is started or deleted. Until the account's first top-up, keepMemory is refused with 409 memory_needs_top_up, and a stop that would take what its stopped sandboxes store past 20 GB with 409 stopped_storage_limit; the sandbox goes on running. A stopped sandbox is returned as it is. The response header Stop-Id names the stop, for GET /v1/stops/{id}. */
         post: operations["stopSandbox"];
         delete?: never;
         options?: never;
@@ -3488,7 +3488,7 @@ export interface components {
             archivedAt: string | null;
             /** @description When the service last stopped the sandbox, while it was running, to move it to another server. It was stopped, moved and started again, so its disk is as it was and what was running in it then is gone: start that again. It is set also when the move could not be made and the sandbox was started again where it was. Null if it never happened. A move of a sandbox that was already stopped does not set it, and neither does a move of one while it runs, which stops nothing. */
             migratedAt: string | null;
-            /** @description True while it is stopped with its memory kept, by POST /v1/sandboxes/{id}/stop with keepMemory: a start puts back every process as it was, and its clock is set again. It costs 10% of its running price meanwhile, archived or not: where its server can, it is archived with its memory, and put back from the archive once. A snapshot put back while it is stopped lets the memory go. False whenever it is not stopped. */
+            /** @description True while it is stopped with its memory kept, by POST /v1/sandboxes/{id}/stop with keepMemory: a start puts back every process as it was, and its clock is set again. Its memory counts in what it stores, and so in its price once its free days are over, archived or not: where its server can, it is archived with its memory, and put back from the archive once. A snapshot put back while it is stopped lets the memory go. False whenever it is not stopped. */
             memoryKept: boolean;
             /** @description Why the memory its last stop kept was not put back by its last start, which started it from its disk: as after an upgrade of the server it is on, which the memory cannot be put back across. Null when it was put back, or none was kept. */
             memoryLost: string | null;
@@ -3764,10 +3764,21 @@ export interface components {
                     spentMicros: number;
                 };
             };
-            /** @description What the running among them would cost an hour stopped, with their disks kept, and with their memory kept too. */
+            /** @description What the running among them would cost an hour stopped: free for their first freeDays, and at most afterFreeDays… after, priced by what each stores. */
             ifStopped: {
+                /** @description What the running among them would cost an hour stopped now, their disks kept: 0, as a stop is free for its first freeDays. */
                 microsPerHour: number;
+                /** @description The same with their memory kept too: 0, as a stop is free for its first freeDays whatever it keeps. */
                 withMemoryMicrosPerHour: number;
+                /**
+                 * @description The days after each stop a stopped sandbox is free, whatever it stores.
+                 * @example 14
+                 */
+                freeDays: number;
+                /** @description The most they would cost an hour stopped once their free days are over: their whole disks stored, at $0.05 a GB a month. Most store much less. */
+                afterFreeDaysMicrosPerHour: number;
+                /** @description The same with their whole memory kept too. */
+                afterFreeDaysWithMemoryMicrosPerHour: number;
             };
             /** @description Each field asked for in facets, by its name. */
             facets: {
@@ -4282,7 +4293,7 @@ export interface components {
             stopped: {
                 /** @description Whole seconds stopped inside the window, with the disk kept. A sandbox deleted while its snapshots kept its machine counts as stopped until the last of them goes. */
                 seconds: number;
-                /** @description Those seconds at the stopped price, 5% of the running price, in millionths of a US dollar. Not a charge: GET /v1/billing shows what is charged. */
+                /** @description Those seconds at the stopped price, in millionths of a US dollar: nothing in the first 14 days after each stop, then $0.05 a GB a month of what the sandbox stores. Not a charge: GET /v1/billing shows what is charged. */
                 listCostMicros: number;
             };
             /** @description Snapshots past the free ones in the window. Zero with apiKeyId, as snapshots are the account's and not a key's. */
@@ -4372,7 +4383,7 @@ export interface components {
                 stopped: {
                     /** @description Whole seconds stopped inside the window, with the disk kept. A sandbox deleted while its snapshots kept its machine counts as stopped until the last of them goes. */
                     seconds: number;
-                    /** @description Those seconds at the stopped price, 5% of the running price, in millionths of a US dollar. Not a charge: GET /v1/billing shows what is charged. */
+                    /** @description Those seconds at the stopped price, in millionths of a US dollar: nothing in the first 14 days after each stop, then $0.05 a GB a month of what the sandbox stores. Not a charge: GET /v1/billing shows what is charged. */
                     listCostMicros: number;
                 };
                 /** @description Snapshots past the free ones that day. Zero with apiKeyId. */
@@ -4428,9 +4439,28 @@ export interface components {
             stopped: {
                 /** @description Whole seconds stopped inside the window, with the disk kept. A sandbox deleted while its snapshots kept its machine counts as stopped until the last of them goes. */
                 seconds: number;
-                /** @description Those seconds at the stopped price, 5% of the running price, in millionths of a US dollar. Not a charge: GET /v1/billing shows what is charged. */
+                /** @description Those seconds at the stopped price, in millionths of a US dollar: nothing in the first 14 days after each stop, then $0.05 a GB a month of what the sandbox stores. Not a charge: GET /v1/billing shows what is charged. */
                 listCostMicros: number;
             };
+            /** @description While the sandbox is stopped: what it stores and its price now. Null while it runs. */
+            storage: {
+                /** @description What it stores now, in bytes: its pack's size once archived, else what its server said its disk and kept memory took at its stop, else its whole disk (and memory). */
+                storedBytes: number;
+                /** @description When the free days of its stretch end: 14 days after its stop. From then it costs microsPerGbMonth for what it stores. */
+                freeUntil: string | null;
+                /** @description What it costs an hour now, in millionths of a US dollar: 0 in its free days. */
+                microsPerHour: number;
+                /**
+                 * @description What a stopped sandbox costs past its free days, for each GB (10^9 bytes) it stores, a month: $0.05.
+                 * @example 50000
+                 */
+                microsPerGbMonth: number;
+                /**
+                 * @description The days after each stop a stopped sandbox is free.
+                 * @example 14
+                 */
+                freeDays: number;
+            } | null;
             /** @description Mail in the window. It is counted by UTC day, so every day the window touches is counted in full. Deleting a message or a sandbox does not reduce it. */
             mail: {
                 /** @description Messages accepted for a sandbox. */
@@ -4834,7 +4864,7 @@ export interface components {
              */
             ifStopped?: "start" | "skip";
             /**
-             * @description What a run does to the sandbox after. stop, the default: a run that started it stops it again, keeping its disk. stop_with_memory: keeping its memory too, at the stopped price with memory; a sandbox stopped with its memory is stopped so again either way. delete: for a job that runs once, with at: deletes the sandbox when its run's command exits 0, whether the run started it or it was running already, as DELETE /v1/sandboxes/{id} does; a run that fails leaves it, so that it can be looked at. delete takes a key that may delete the sandbox: sandbox.delete, or sandbox.delete-own for one the key made.
+             * @description What a run does to the sandbox after. stop, the default: a run that started it stops it again, keeping its disk. stop_with_memory: keeping its memory too; a sandbox stopped with its memory is stopped so again either way. delete: for a job that runs once, with at: deletes the sandbox when its run's command exits 0, whether the run started it or it was running already, as DELETE /v1/sandboxes/{id} does; a run that fails leaves it, so that it can be looked at. delete takes a key that may delete the sandbox: sandbox.delete, or sandbox.delete-own for one the key made.
              * @enum {string}
              */
             after?: "stop" | "stop_with_memory" | "delete";
@@ -4966,7 +4996,7 @@ export interface components {
              */
             ifStopped?: "start" | "skip";
             /**
-             * @description What a run does to the sandbox after. stop, the default: a run that started it stops it again, keeping its disk. stop_with_memory: keeping its memory too, at the stopped price with memory; a sandbox stopped with its memory is stopped so again either way. delete: for a job that runs once, with at: deletes the sandbox when its run's command exits 0, whether the run started it or it was running already, as DELETE /v1/sandboxes/{id} does; a run that fails leaves it, so that it can be looked at. delete takes a key that may delete the sandbox: sandbox.delete, or sandbox.delete-own for one the key made.
+             * @description What a run does to the sandbox after. stop, the default: a run that started it stops it again, keeping its disk. stop_with_memory: keeping its memory too; a sandbox stopped with its memory is stopped so again either way. delete: for a job that runs once, with at: deletes the sandbox when its run's command exits 0, whether the run started it or it was running already, as DELETE /v1/sandboxes/{id} does; a run that fails leaves it, so that it can be looked at. delete takes a key that may delete the sandbox: sandbox.delete, or sandbox.delete-own for one the key made.
              * @enum {string}
              */
             after?: "stop" | "stop_with_memory" | "delete";
@@ -5138,7 +5168,7 @@ export interface components {
              */
             ifStopped?: "start" | "skip";
             /**
-             * @description What a run does to the sandbox after. stop, the default: a run that started it stops it again, keeping its disk. stop_with_memory: keeping its memory too, at the stopped price with memory; a sandbox stopped with its memory is stopped so again either way. delete: for a job that runs once, with at: deletes the sandbox when its run's command exits 0, whether the run started it or it was running already, as DELETE /v1/sandboxes/{id} does; a run that fails leaves it, so that it can be looked at. delete takes a key that may delete the sandbox: sandbox.delete, or sandbox.delete-own for one the key made.
+             * @description What a run does to the sandbox after. stop, the default: a run that started it stops it again, keeping its disk. stop_with_memory: keeping its memory too; a sandbox stopped with its memory is stopped so again either way. delete: for a job that runs once, with at: deletes the sandbox when its run's command exits 0, whether the run started it or it was running already, as DELETE /v1/sandboxes/{id} does; a run that fails leaves it, so that it can be looked at. delete takes a key that may delete the sandbox: sandbox.delete, or sandbox.delete-own for one the key made.
              * @enum {string}
              */
             after?: "stop" | "stop_with_memory" | "delete";
@@ -5906,7 +5936,7 @@ export interface components {
             browser: boolean;
             /** @description Whether a sandbox's terminal can be opened: a login shell in it, typed in from a browser or a program over a WebSocket. Where it can, POST /v1/sandboxes/{id}/terminal gives a ticket to open it with. */
             terminal: boolean;
-            /** @description Whether a sandbox can be stopped with its memory kept: POST /v1/sandboxes/{id}/stop with keepMemory, after which a start puts back every process as it was. A stopped sandbox that keeps its memory costs 10% of its running price, and 5% without. */
+            /** @description Whether a sandbox can be stopped with its memory kept: POST /v1/sandboxes/{id}/stop with keepMemory, after which a start puts back every process as it was. A stopped sandbox is free for 14 days after its stop, memory kept or not, then $0.05 a GB a month of what it stores, its memory included. An account keeps memory at a stop from its first top-up. */
             keepMemory: boolean;
             /** @description Whether a stopped sandbox can be archived: its machine kept in storage until it is started again. An archived sandbox is still stopped and loses nothing, and a start of it answers 202 and takes longer. */
             archiving: boolean;
@@ -5976,10 +6006,20 @@ export interface components {
                 memoryMb: number;
                 diskGb: number;
                 listPriceMicrosPerHour: number;
-                /** @description What an hour of it stopped costs, with its disk kept: 5% of listPriceMicrosPerHour. */
+                /** @description The most an hour of it stopped costs once its free days are over: its whole disk stored, at stoppedMicrosPerGbMonth. A stopped sandbox is free for stoppedFreeDays after each stop, then priced by what it stores, which is most often much less than its whole disk. */
                 stoppedMicrosPerHour: number;
-                /** @description What an hour of it stopped with its memory kept costs, its disk kept too: 10% of listPriceMicrosPerHour. */
+                /** @description The same with its whole memory kept too. */
                 stoppedWithMemoryMicrosPerHour: number;
+                /**
+                 * @description What a stopped sandbox costs past its free days, for each GB (10^9 bytes) it stores, a month: $0.05. The same for every size.
+                 * @example 50000
+                 */
+                stoppedMicrosPerGbMonth: number;
+                /**
+                 * @description The days after each stop a stopped sandbox is free, whatever it stores: its disk and a kept memory.
+                 * @example 14
+                 */
+                stoppedFreeDays: number;
                 /** @enum {string} */
                 currency: "usd";
                 /** @enum {string} */
@@ -6106,18 +6146,33 @@ export interface components {
                 fromMicros: number;
                 percent: number;
             }[];
-            /** @description What a stopped sandbox's disk and snapshots past the free ones cost, by the second, from the plan's credits and then the top-ups. */
+            /** @description What a stopped sandbox and snapshots past the free ones cost, by the second, from the plan's credits and then the top-ups. */
             storage: {
                 /**
-                 * @description What a stopped sandbox costs, as a share of its running price. Each size's is in plans[].stoppedMicrosPerHour.
-                 * @example 5
+                 * @description Retired, always 0: a stopped sandbox is no longer priced as a share of its running price, but free for stoppedFreeDays, then at stoppedMicrosPerGbMonth for what it stores. Sent for clients that read it.
+                 * @example 0
                  */
                 stoppedPercent: number;
                 /**
-                 * @description What a sandbox stopped with its memory kept costs, as a share of its running price. Each size's is in plans[].stoppedWithMemoryMicrosPerHour.
-                 * @example 10
+                 * @description Retired, always 0, as stoppedPercent.
+                 * @example 0
                  */
                 stoppedWithMemoryPercent: number;
+                /**
+                 * @description What a stopped sandbox costs once its free days are over, for each GB (10^9 bytes) it stores, a month, by the second: $0.05.
+                 * @example 50000
+                 */
+                stoppedMicrosPerGbMonth: number;
+                /**
+                 * @description The days after each stop a stopped sandbox is free, whatever it stores: its disk, and its memory where it is kept. A start ends them; the next stop begins them again.
+                 * @example 14
+                 */
+                stoppedFreeDays: number;
+                /**
+                 * @description What an account that has not paid for anything yet stores at most in its stopped sandboxes, in bytes: 20 GB. Until its first top-up it keeps no memory at a stop, and a stopped sandbox whose free days end while it has no credits is deleted instead of charged, after an email 3 days before.
+                 * @example 20000000000
+                 */
+                neverPaidMaxStoredBytes: number;
                 /**
                  * @description How many of an account's snapshots cost nothing: its oldest ones.
                  * @example 10
@@ -6134,8 +6189,8 @@ export interface components {
                 /** @enum {string} */
                 planId: "free";
                 /**
-                 * @description What each calendar month's use (UTC) on the free plan is free up to, at list price, in millionths of a US dollar: running time, mail and the rest, together. 4,950,000 is 183 hours of a small sandbox, 366 of a tiny one, or 11,000 minutes of CI on small. It does not carry over. It needs a card saved, once a card.
-                 * @example 4950000
+                 * @description What each calendar month's use (UTC) on the free plan is free up to, at list price, in millionths of a US dollar: running time, mail and the rest, together. 5,000,000 is 185 hours of a small sandbox, 370 of a tiny one, or 11,100 minutes of CI on small. It does not carry over. It needs a card saved, once a card.
+                 * @example 5000000
                  */
                 allowanceMicros: number;
                 /**
@@ -6217,7 +6272,7 @@ export interface components {
                 unpaidUnits: number;
                 /**
                  * @description What this month's use is free up to, at list price: the free plan's allowance, or 0 where the card the account saved had it on another account. The same as includedMicros.
-                 * @example 4950000
+                 * @example 5000000
                  */
                 allowanceMicros: number;
                 /**
@@ -6241,8 +6296,29 @@ export interface components {
             };
             /** @description The part of usedMicros that is mail: 500 a message, received or sent, which is $0.50 a thousand. */
             mailMicros: number;
-            /** @description The part of usedMicros that is stopped sandboxes, at 5% of their running price, or 10% while one keeps its memory. */
+            /** @description The part of usedMicros that is stopped sandboxes past their free days, at stoppedStorage.microsPerGbMonth for what each stores. */
             stoppedMicros: number;
+            /** @description The account's stopped sandboxes: their price, what they store, and the limits an account that has not paid yet has. */
+            stoppedStorage: {
+                /**
+                 * @description What a stopped sandbox costs past its free days, for each GB (10^9 bytes) it stores, a month: $0.05.
+                 * @example 50000
+                 */
+                microsPerGbMonth: number;
+                /**
+                 * @description The days after each stop a stopped sandbox is free, whatever it stores.
+                 * @example 14
+                 */
+                freeDays: number;
+                /** @description What the account's stopped sandboxes store now, in bytes, deleted ones kept for their snapshots included: a pack's size once archived, else what its server said at its stop, else its whole disk. */
+                storedBytes: number;
+                /** @description The part of storedBytes still in its free days. */
+                freeStoredBytes: number;
+                /** @description What the account may store at most: 20 GB until its first top-up, else null, no limit. A stop that would go past it is refused. */
+                maxStoredBytes: number | null;
+                /** @description Whether a stop may keep a sandbox's memory: not until the account's first top-up. */
+                keepsMemory: boolean;
+            };
             /** @description The part of usedMicros that is snapshots past the free ones. */
             snapshotMicros: number;
             /** @description The part of usedMicros that is burst fees: what starts faster than the plan's free burst cost. GET /v1/burst says where the account stands. */
@@ -8171,7 +8247,7 @@ export interface operations {
         requestBody?: {
             content: {
                 "application/json": {
-                    /** @description Keep its memory as well as its disk, so that a start puts back every process as it was: shells, servers, a browser and what is in /dev/shm. Writing the memory takes about a second for every 2 to 3 GiB the sandbox has, and the sandbox runs and is metered as running until it is written. Stopped so, it costs 10% of its running price, and 5% without. GET /v1/policy says whether it is offered as keepMemory. */
+                    /** @description Keep its memory as well as its disk, so that a start puts back every process as it was: shells, servers, a browser and what is in /dev/shm. Writing the memory takes about a second for every 2 to 3 GiB the sandbox has, and the sandbox runs and is metered as running until it is written. Stopped so, it is free for 14 days like any stop, then its memory counts in what it stores. Refused with 409 memory_needs_top_up until the account's first top-up. GET /v1/policy says whether it is offered as keepMemory. */
                     keepMemory?: boolean;
                 };
             };
@@ -8278,7 +8354,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description The sandbox, with its new size, or with pendingSize, the size its next start gives it. A stopped one is billed its new size's stopped price from now, and every start is billed the price of the size it runs at. Memory its last stop kept is let go, and memoryLost says why: a machine of another size cannot take it back. */
+            /** @description The sandbox, with its new size, or with pendingSize, the size its next start gives it. A stopped one is priced by what it stores, as before, and every start is billed the price of the size it runs at. Memory its last stop kept is let go, and memoryLost says why: a machine of another size cannot take it back. */
             200: {
                 headers: {
                     [name: string]: unknown;

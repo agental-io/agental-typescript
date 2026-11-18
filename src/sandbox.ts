@@ -197,7 +197,7 @@ export interface ResizeOptions {
 /** How to stop a sandbox. */
 export interface StopOptions {
   /**
-   * Keep its memory as well as its disk, at 10% of the running price, so that start() puts
+   * Keep its memory as well as its disk, free for 14 days like any stop, so that start() puts
    * back every process as it was. The stop answers once the memory is written, about a
    * second for every 2 to 3 GiB the sandbox has. info.memoryKept says whether it was.
    */
@@ -1053,8 +1053,8 @@ export class Sandbox {
   }
 
   /**
-   * Stops it. The disk is kept, with everything on it, at 5% of the running price where that
-   * is charged. What was running is not, unless keepMemory: then start() puts it back, and
+   * Stops it. The disk is kept, with everything on it, free for 14 days, then $0.05 a GB a
+   * month of what it stores, where that is charged. What was running is not, unless keepMemory: then start() puts it back, and
    * info.memoryLost says why when it could not.
    */
   async stop(options: StopOptions = {}): Promise<this> {
