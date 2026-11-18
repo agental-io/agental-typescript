@@ -205,7 +205,7 @@ export interface paths {
         delete: operations["deleteSandbox"];
         options?: never;
         head?: never;
-        /** @description Changes a sandbox's name, ttlSeconds, subdomain, tags or metadata, and returns it. Fields left out stay as they are. Running or stopped, nothing is restarted. */
+        /** @description Changes a sandbox's name, ttlSeconds, onTimeout, subdomain, tags or metadata, and returns it. Fields left out stay as they are. Running or stopped, nothing is restarted. */
         patch: operations["updateSandbox"];
         trace?: never;
     };
@@ -3456,6 +3456,11 @@ export interface components {
             stoppedAt: string | null;
             /** @description Seconds the sandbox runs after a start before it is stopped. Stop keeps the disk. Null uses the deployment default. The count begins again at every start, the one that follows a move to another server included. PUT /v1/sandboxes/{id}/auto-stop moves the stop of the run under way. */
             ttlSeconds: number | null;
+            /**
+             * @description What its time limit does when it runs out: delete, or stop and keep its disk. Sandboxes made before 18 November 2026 are stop.
+             * @enum {string}
+             */
+            onTimeout: "delete" | "stop";
             /** @description When this running sandbox will be stopped: the time PUT /v1/sandboxes/{id}/auto-stop set for the run under way, or else its last start plus ttlSeconds. Null when it is not running, or has no time limit: it then runs until it is stopped. */
             autoStopAt: string | null;
             /** @description Stored only. This is not registered in DNS. */
@@ -3483,7 +3488,7 @@ export interface components {
             archivedAt: string | null;
             /** @description When the service last stopped the sandbox, while it was running, to move it to another server. It was stopped, moved and started again, so its disk is as it was and what was running in it then is gone: start that again. It is set also when the move could not be made and the sandbox was started again where it was. Null if it never happened. A move of a sandbox that was already stopped does not set it, and neither does a move of one while it runs, which stops nothing. */
             migratedAt: string | null;
-            /** @description True while it is stopped with its memory kept, by POST /v1/sandboxes/{id}/stop with keepMemory: a start puts back every process as it was, and its clock is set again. It costs 10% of its running price meanwhile, and is not archived. A snapshot put back while it is stopped lets the memory go. False whenever it is not stopped. */
+            /** @description True while it is stopped with its memory kept, by POST /v1/sandboxes/{id}/stop with keepMemory: a start puts back every process as it was, and its clock is set again. It costs 10% of its running price meanwhile, archived or not: where its server can, it is archived with its memory, and put back from the archive once. A snapshot put back while it is stopped lets the memory go. False whenever it is not stopped. */
             memoryKept: boolean;
             /** @description Why the memory its last stop kept was not put back by its last start, which started it from its disk: as after an upgrade of the server it is on, which the memory cannot be put back across. Null when it was put back, or none was kept. */
             memoryLost: string | null;
@@ -3622,6 +3627,12 @@ export interface components {
              * @example tpl_0123456789abcdef
              */
             templateId?: string;
+            /**
+             * @description What its time limit does when it runs out. delete (the default): the sandbox is deleted, with its disk. stop: it is stopped and its disk kept, as a stop asked for keeps it. A stop asked for always keeps the disk, whatever this says.
+             * @example stop
+             * @enum {string}
+             */
+            onTimeout?: "delete" | "stop";
             /**
              * @description Seconds the sandbox runs after each start before it is stopped. Left out, it is what the template's start says, and where that says none, the deployment's default. Null is the deployment's default, whatever the template says. At most maxTtlSeconds of GET /v1/policy. PATCH /v1/sandboxes/{id} changes it later, and PUT /v1/sandboxes/{id}/auto-stop moves the stop of the run under way.
              * @example 7200
@@ -6118,15 +6129,15 @@ export interface components {
                  */
                 snapshotMicrosPerHour: number;
             };
-            /** @description The free plan: nothing a month, and what it runs is paid from top-ups and its one credit. It needs a card saved, charged nothing: POST /v1/billing/checkout with {"card": true}. */
+            /** @description The free plan: nothing a month, each month's use free up to allowanceMicros, and what it uses past that paid from top-ups. It needs a card saved, charged nothing: POST /v1/billing/checkout with {"card": true}. */
             free: {
                 /** @enum {string} */
                 planId: "free";
                 /**
-                 * @description The credit an account on the free plan is given once, when it first saves a card, in millionths of a US dollar. It does not expire.
-                 * @example 10000000
+                 * @description What each calendar month's use (UTC) on the free plan is free up to, at list price, in millionths of a US dollar: running time, mail and the rest, together. 4,950,000 is 183 hours of a small sandbox, 366 of a tiny one, or 11,000 minutes of CI on small. It does not carry over. It needs a card saved, once a card.
+                 * @example 4950000
                  */
-                creditMicros: number;
+                allowanceMicros: number;
                 /**
                  * @description Small sandboxes the free plan runs and starts at once, at most, until the account has paid for something, a top-up of any size. Then the plan's runningUnits. A tiny counts half.
                  * @example 2
@@ -6191,20 +6202,31 @@ export interface components {
                 };
                 sizes: ("tiny" | "small" | "medium" | "large")[];
             } | null;
-            /** @description The month the plan is in. On the free plan, from where its use was last settled against its credits to the next month's start, in UTC. */
+            /** @description The month the plan is in. On the free plan, from where its use was last settled against its allowance and its credits to the next month's start, in UTC. */
             period: {
                 start: string;
                 end: string;
             } | null;
             /** @description Set while the account is on the free plan. */
             free: {
-                /** @description Whether the account has a card saved, which it must before it runs anything, and so has had its credit. */
+                /** @description Whether the account has a card saved, which it must before it runs anything. */
                 cardSaved: boolean;
                 /** @description Whether it has paid for anything. Until it has, it runs and starts at most unpaidUnits small sandboxes at once. */
                 paid: boolean;
                 /** @example 2 */
                 unpaidUnits: number;
+                /**
+                 * @description What this month's use is free up to, at list price: the free plan's allowance, or 0 where the card the account saved had it on another account. The same as includedMicros.
+                 * @example 4950000
+                 */
+                allowanceMicros: number;
+                /**
+                 * @description How much of the allowance this month's use has taken. What it used past the allowance comes out of topUpMicros.
+                 * @example 1200000
+                 */
+                allowanceUsedMicros: number;
             } | null;
+            /** @description What the plan's month includes: a plan's credits, or on the free plan its monthly allowance. */
             includedMicros: number;
             /** @description What has been used this month at list price: running time, mail, stopped sandboxes and snapshots past the free ones. */
             usedMicros: number;
@@ -6225,9 +6247,9 @@ export interface components {
             snapshotMicros: number;
             /** @description The part of usedMicros that is burst fees: what starts faster than the plan's free burst cost. GET /v1/burst says where the account stands. */
             burstMicros: number;
-            /** @description What an earlier month ran past its plan and its top-ups. This month's credits pay it first, then the top-ups. On the free plan, what the account owes now: what it has run past its credits. */
+            /** @description What an earlier month ran past its plan and its top-ups. This month's credits pay it first, then the top-ups. On the free plan, what the account owes now: what it has run past its allowance and its credits. */
             carriedMicros: number;
-            /** @description What is left of the credits bought on top of the plan, and of the free plan's credit. It is used after the month's credits, and it does not expire. */
+            /** @description What is left of the credits bought on top of the plan. It is used after the month's credits, or the free plan's allowance, and it does not expire. */
             topUpMicros: number;
             /**
              * @deprecated
@@ -6245,10 +6267,10 @@ export interface components {
             } | null;
             /** @description Whether an auto-reload can be set: Stripe sells here, and the account has saved a card there, or bought a plan or a top-up. */
             canAutoReload: boolean;
-            /** @description Set while the account has no card saved, or has used its credits, and still holds sandboxes or snapshots. The account is emailed when it begins, 7 days before deletesAt and the day before; the account itself stays open. A top-up that pays what is owed, a card saved, a plan started, or deleting everything ends it. Null otherwise, and always where plans are not enforced. */
+            /** @description Set while the account has no card saved, or has used its free allowance and its credits, and still holds sandboxes or snapshots. The account is emailed when it begins, 7 days before deletesAt and the day before; the account itself stays open. A top-up that pays what is owed, a card saved, a plan started, or deleting everything ends it. Null otherwise, and always where plans are not enforced. */
             lapse: {
                 /**
-                 * @description no_plan: the account is on the free plan with no card saved. out_of_credit: it is on the free plan and its credits are used. unpaid: it has a plan bought by the month and owes for what it used past the plan's credits and its top-ups, from a month that has closed.
+                 * @description no_plan: the account is on the free plan with no card saved. out_of_credit: it is on the free plan and this month's free allowance and its credits are used. unpaid: it has a plan bought by the month and owes for what it used past the plan's credits and its top-ups, from a month that has closed.
                  * @enum {string}
                  */
                 reason: "no_plan" | "unpaid" | "out_of_credit";
@@ -7261,7 +7283,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description billing_required: the account is on the free plan with no card saved. out_of_credit: its credits, the plan's and the top-ups, are used. size_not_on_plan: the plan does not make sandboxes of this size, and the message names the plan that does. Nothing was created. */
+            /** @description billing_required: the account is on the free plan with no card saved. out_of_credit: its credits, the plan's or the free plan's monthly allowance and the top-ups, are used. size_not_on_plan: the plan does not make sandboxes of this size, and the message names the plan that does. Nothing was created. */
             402: {
                 headers: {
                     [name: string]: unknown;
@@ -7912,6 +7934,11 @@ export interface operations {
                     name?: string;
                     /** @description Seconds the sandbox runs after each start before it is stopped, from 60 to maxTtlSeconds of GET /v1/policy. Null sets the deployment's default, which the response gives as the number. Omitted leaves the current value. Changed while it runs, its stop becomes its last start plus this, replacing a stop moved with PUT /v1/sandboxes/{id}/auto-stop. */
                     ttlSeconds?: number | null;
+                    /**
+                     * @description What its time limit does when it runs out: delete, or stop and keep its disk. Omitted leaves it as it is.
+                     * @enum {string}
+                     */
+                    onTimeout?: "delete" | "stop";
                     /** @description Stored only. Null clears it. This is not a DNS name. */
                     subdomain?: string | null;
                     /**
@@ -8937,7 +8964,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description billing_required: the account is on the free plan with no card saved. out_of_credit: its credits, the plan's and the top-ups, are used. size_not_on_plan: the plan does not make sandboxes of the source's size, and the message names the plan that does. Nothing was forked. */
+            /** @description billing_required: the account is on the free plan with no card saved. out_of_credit: its credits, the plan's or the free plan's monthly allowance and the top-ups, are used. size_not_on_plan: the plan does not make sandboxes of the source's size, and the message names the plan that does. Nothing was forked. */
             402: {
                 headers: {
                     [name: string]: unknown;
@@ -19023,7 +19050,7 @@ export interface operations {
                     plan: "plan100" | "plan500" | "plan2000";
                 } | {
                     /**
-                     * @description Save a card for the free plan, charging nothing. Once Stripe says it was saved, the account is given the free plan's credit, once an account and once a card, and may run sandboxes.
+                     * @description Save a card for the free plan, charging nothing. Once Stripe says it was saved, the account has the free plan's monthly allowance, once an account and once a card, and may run sandboxes.
                      * @enum {boolean}
                      */
                     card: true;
@@ -20590,6 +20617,15 @@ export interface operations {
             };
             /** @description Missing or invalid API key. */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description out_of_credit: the account has nothing left to pay for mail with: on the free plan, this month's allowance and its credits are used; on a plan, its credits and top-ups. Nothing was sent. */
+            402: {
                 headers: {
                     [name: string]: unknown;
                 };

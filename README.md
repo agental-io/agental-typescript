@@ -401,7 +401,7 @@ A sandbox has no point for a moment it was stopped at, and its `reading` is then
 const billing = await agental.billing();
 console.log(billing.usedMicros, billing.topUpMicros);
 
-// What is sold: plans with the sizes each makes, top-ups and their bonus, the free plan's credit and the hourly prices.
+// What is sold: plans with the sizes each makes, top-ups and their bonus, the free plan's monthly allowance and the hourly prices.
 const prices = await agental.prices();
 
 // On the free plan, save a card first: nothing is charged, and the account is given $10 of credit once.

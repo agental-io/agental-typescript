@@ -60,6 +60,7 @@ function sandbox(changes: Partial<SandboxInfo> = {}): SandboxInfo {
     updatedAt: "2026-10-13T00:00:00.000Z",
     stoppedAt: null,
     ttlSeconds: null,
+    onTimeout: "delete",
     autoStopAt: null,
     subdomain: null,
     shared: false,
@@ -1355,7 +1356,7 @@ test("on the free plan, billing says whether a card is saved, and the checkout c
     status: "none",
     plan: { id: "free", dollarsPerMonth: 0, includedMicros: 0, runningUnits: 20, freeBurstUnits: 20, sizes: ["tiny", "small"] },
     period: { start: "2026-11-01T00:00:00.000Z", end: "2026-12-01T00:00:00.000Z" },
-    free: { cardSaved: false, paid: false, unpaidUnits: 2 },
+    free: { cardSaved: false, paid: false, unpaidUnits: 2, allowanceMicros: 0, allowanceUsedMicros: 0 },
     includedMicros: 0,
     usedMicros: 0,
     mailMicros: 0,
@@ -1371,7 +1372,7 @@ test("on the free plan, billing says whether a card is saved, and the checkout c
   };
   const { agental, sent } = scripted(json(200, standing), json(200, { url: "https://pay.example/card", changed: false }), refusal(409, "card_saved"));
   const billing = await agental.billing();
-  assert.deepEqual([billing.plan?.id, billing.free, billing.needsPlan, billing.reason], ["free", { cardSaved: false, paid: false, unpaidUnits: 2 }, true, "billing_required"]);
+  assert.deepEqual([billing.plan?.id, billing.free, billing.needsPlan, billing.reason], ["free", { cardSaved: false, paid: false, unpaidUnits: 2, allowanceMicros: 0, allowanceUsedMicros: 0 }, true, "billing_required"]);
   assert.deepEqual(await agental.checkout({ card: true }), { url: "https://pay.example/card", changed: false });
   assert.deepEqual([sent[1]?.method, sent[1]?.path, sent[1]?.body], ["POST", "/v1/billing/checkout", { card: true }]);
   await assert.rejects(agental.checkout({ card: true }), (error: unknown) => error instanceof ApiError && error.status === 409 && error.code === "card_saved");
@@ -2461,4 +2462,14 @@ test("a job is made with events that start it, and a run says which event starte
   ]);
   const [run] = await agental.jobs.runs("job_1");
   assert.deepEqual(run?.trigger, trigger);
+});
+
+test("what a sandbox's time limit does is sent when it is said, on a create and an update", async () => {
+  const { agental, sent } = scripted(json(201, sandbox({ ttlSeconds: 7200, onTimeout: "stop" })), json(200, sandbox({ onTimeout: "delete" })));
+  const box = await agental.sandboxes.create({ name: "timed-stop", ttlSeconds: 7200, onTimeout: "stop" });
+  assert.deepEqual(sent[0]?.body, { name: "timed-stop", ttlSeconds: 7200, onTimeout: "stop" });
+  assert.equal(box.info.onTimeout, "stop");
+  await box.update({ onTimeout: "delete" });
+  assert.deepEqual(sent[1]?.body, { onTimeout: "delete" });
+  assert.equal(box.info.onTimeout, "delete");
 });

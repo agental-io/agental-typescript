@@ -514,6 +514,7 @@ class Sandboxes {
       ...(options.region === undefined ? {} : Array.isArray(options.region) ? { regions: options.region } : { region: options.region }),
       ...(options.snapshotId !== undefined ? { snapshotId: options.snapshotId } : {}),
       ...(options.ttlSeconds !== undefined ? { ttlSeconds: options.ttlSeconds } : {}),
+      ...(options.onTimeout !== undefined ? { onTimeout: options.onTimeout } : {}),
       ...(options.network ? { network: options.network } : {}),
       ...(options.egress ? { egress: options.egress } : {}),
       ...(options.sshKeys !== undefined ? { sshKeys: options.sshKeys } : {}),
@@ -816,7 +817,7 @@ export class Agental {
   /**
    * What is sold: the list price an hour of each size, the plans, the free one first, the
    * top-ups offered with what each adds, the range a top-up may be and its bonus, and the free
-   * plan's credit and what it runs at once before the account has paid. It needs no key.
+   * plan's monthly allowance and what it runs at once before the account has paid. It needs no key.
    */
   async prices(): Promise<Prices> {
     return (await this.http.json<Prices>({ method: "GET", path: "/v1/billing/plans", replay: true })).body;
@@ -825,7 +826,7 @@ export class Agental {
   /**
    * Where the account stands: its plan, the free one included, what it has used this month at list price,
    * what is left of its credits, and whether it may run a sandbox. On the free plan, `free` says whether a
-   * card is saved and whether the account has paid for anything. Amounts are millionths of a US dollar.
+   * card is saved, whether the account has paid for anything, and its monthly allowance and how much of it is used. Amounts are millionths of a US dollar.
    */
   async billing(): Promise<Billing> {
     return (await this.http.json<Billing>({ method: "GET", path: "/v1/billing", replay: true })).body;
@@ -835,7 +836,7 @@ export class Agental {
    * Starts a purchase, or a card saved, and gives the address of the page, for a person to
    * open: a plan; a top-up of credits that do not expire, any whole number of US dollars from
    * 15 to 100,000; or `{ card: true }`, which saves a card for the free plan and charges
-   * nothing. Once the card is saved, the account is given the free plan's credit, once, and may
+   * nothing. Once the card is saved, the account has the free plan's monthly allowance, once a card, and may
    * run sandboxes; an account with a card saved already is refused with 409 card_saved.
    * From $200 a top-up adds a bonus, 2% there and growing to 25% at $10,000: $500 adds $537.
    * prices() says what each adds. An account that already has a plan and asks for another is

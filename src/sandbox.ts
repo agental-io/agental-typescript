@@ -112,6 +112,11 @@ export interface CreateOptions extends BurstOptions {
    */
   ttlSeconds?: number | null;
   /**
+   * What its time limit does when it runs out: "delete" (the default) deletes it with its
+   * disk; "stop" stops it and keeps its disk. A stop() always keeps the disk.
+   */
+  onTimeout?: "delete" | "stop";
+  /**
    * Addresses it may reach on top of its template's outbound rule, from its first boot:
    * { allow: ["192.0.2.99", "198.51.100.0/24"] }. The rule itself is the template's, set
    * with Template.setNetwork(). Left out, it has none of its own. Only where policy() says
@@ -158,6 +163,8 @@ export interface CreateOptions extends BurstOptions {
 export interface SandboxChanges {
   name?: string;
   ttlSeconds?: number | null;
+  /** What its time limit does when it runs out: "delete", or "stop" and keep its disk. */
+  onTimeout?: "delete" | "stop";
   /** Its own tags, in place of the ones it has. */
   tags?: string[];
   /** Merged into its own metadata. null takes a key away. */
