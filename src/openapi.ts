@@ -3646,10 +3646,10 @@ export interface components {
         };
         CreateSandbox: {
             /**
-             * @description Lowercase letters, digits, and hyphens. 1–63 characters. Must not start or end with a hyphen.
+             * @description Lowercase letters, digits, and hyphens. 1–63 characters. Must not start or end with a hyphen. No two of your sandboxes share one. Left out, it is made up as sbx- and 12 hex characters, the same for the same Idempotency-Key, and the answer says it.
              * @example agent-1
              */
-            name: string;
+            name?: string;
             /**
              * @description Fixed size. Left out, it is the size the template starts sandboxes as, or the size the snapshot was taken on when snapshotId is given.
              * @example small
