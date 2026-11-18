@@ -2475,3 +2475,13 @@ test("what a sandbox's time limit does is sent when it is said, on a create and 
   assert.deepEqual(sent[1]?.body, { onTimeout: "delete" });
   assert.equal(box.info.onTimeout, "delete");
 });
+
+test("an upload or download link is asked for by path, with its time when given", async () => {
+  const link = { url: "https://api.example/v1/file-links/afl_x", method: "PUT", path: "/opt/agental/a.tgz", expiresAt: "2026-11-18T12:15:00.000Z", mostBytes: 10_000_000 };
+  const { agental, sent } = scripted(json(200, sandbox()), json(200, link), json(200, { ...link, method: "GET" }));
+  const box = await agental.sandboxes.get("sbx_0123456789abcdef");
+  assert.deepEqual(await box.files.uploadLink("a.tgz"), link);
+  assert.deepEqual([sent[1]?.method, sent[1]?.path, sent[1]?.body], ["POST", "/v1/sandboxes/sbx_0123456789abcdef/files/upload-link", { path: "a.tgz" }]);
+  await box.files.downloadLink("a.tgz", { expiresInSeconds: 120 });
+  assert.deepEqual([sent[2]?.path, sent[2]?.body], ["/v1/sandboxes/sbx_0123456789abcdef/files/download-link", { path: "a.tgz", expiresInSeconds: 120 }]);
+});

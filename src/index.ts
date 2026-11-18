@@ -47,6 +47,7 @@ export type {
   ExecResult,
   FileContents,
   FileWritten,
+  FileLink,
   Folder,
   FolderEntry,
   HiddenVariable,

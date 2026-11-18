@@ -115,6 +115,7 @@ export type SshKey = Schemas["SshKey"];
 export type FileContents = Schemas["FileContents"];
 /** A file written into a sandbox: its path, its size, and when it was last changed. */
 export type FileWritten = Schemas["FileWritten"];
+export type FileLink = Schemas["FileLink"];
 /** A folder in a sandbox and what it holds, by name. */
 export type Folder = Schemas["Folder"];
 /** One thing in a folder: a file, a folder, a link or something else, with its size and when it was last changed. */

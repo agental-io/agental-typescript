@@ -34,6 +34,7 @@ import type {
   EgressInput,
   FileContents,
   FileWritten,
+  FileLink,
   Folder,
 } from "./types.js";
 
@@ -370,6 +371,21 @@ export class Files {
     };
     // Sent again after a lost answer, a write made on a time would be refused by its own change.
     return (await this.http.json<FileWritten>({ method: "PUT", path: this.path, body, replay: options.ifModifiedAt === undefined })).body;
+  }
+
+  /**
+   * An address that writes one file, path, with no key, until expiresAt (15 minutes unless
+   * expiresInSeconds says, up to an hour): a PUT of the file's bytes to url, such as
+   * `curl -T build.tgz "$URL"`, up to 10 MB. For a computer or a program that holds no API key.
+   * Anyone who has it can use it until it ends, or the sandbox stops: keep it secret.
+   */
+  async uploadLink(path: string, options: { expiresInSeconds?: number } = {}): Promise<FileLink> {
+    return (await this.http.json<FileLink>({ method: "POST", path: `${this.path}/upload-link`, body: { path, ...options } })).body;
+  }
+
+  /** An address that reads one file, path, with no key, until expiresAt: a GET of url answers its bytes. As uploadLink, otherwise. */
+  async downloadLink(path: string, options: { expiresInSeconds?: number } = {}): Promise<FileLink> {
+    return (await this.http.json<FileLink>({ method: "POST", path: `${this.path}/download-link`, body: { path, ...options } })).body;
   }
 
   /** What a folder holds, by name: its first 10,000 entries, and truncated if there are more. */

@@ -1458,6 +1458,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/sandboxes/{id}/files/upload-link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Makes an address that writes one file, path, into the sandbox, for a short time and with no key: send the file's bytes as the body of a PUT to url, such as `curl -T build.tgz "$URL"`. Up to 10000000 bytes, replacing what is there and making its folders. It is for sending a file from a computer whose shell has no API key, and for binary files. The sandbox must be running. It may be used any number of times until it ends: at expiresAt, when the sandbox stops, or when whoever made it may no longer reach the sandbox. A key that may be used only from some addresses makes links that may too. */
+        post: operations["createFileUploadLink"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sandboxes/{id}/files/download-link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Makes an address that reads one file, path, from the sandbox, for a short time and with no key: a GET of url answers its raw bytes, such as `curl -o out.tgz "$URL"`. Up to 10000000 bytes. As an upload link, it is made for a running sandbox, and ends at expiresAt, when the sandbox stops, or when whoever made it may no longer reach the sandbox. */
+        post: operations["createFileDownloadLink"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/file-links/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Answers the raw bytes of the file a download link is for. No key: the link is the permission. */
+        get: operations["downloadThroughFileLink"];
+        /** @description Writes the body, as it is, to the file an upload link is for. No key: the link is the permission. Up to 10000000 bytes. */
+        put: operations["uploadThroughFileLink"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/sandboxes/{id}/terminal": {
         parameters: {
             query?: never;
@@ -4576,6 +4628,23 @@ export interface components {
                 what: string;
                 kept: string;
             }[];
+        };
+        FileLink: {
+            /** @description The address. Anyone who has it can use it until it ends, with no key: treat it as a secret. */
+            url: string;
+            /** @enum {string} */
+            method: "PUT" | "GET";
+            /** @description The file it is for, as the sandbox sees it. */
+            path: string;
+            expiresAt: string;
+            /** @description The largest file it takes or gives. */
+            mostBytes: number;
+        };
+        FileLinkRequest: {
+            /** @description Relative to the work folder, /opt/agental, or absolute. Outside the work folder, an API key needs the action exec as well. */
+            path: string;
+            /** @description How long the link works, in seconds. 900 unless sent. */
+            expiresInSeconds?: number;
         };
         SandboxTerminal: {
             /** @description Whether a terminal can be opened on it now: it is running, and terminals are offered here. */
@@ -14004,6 +14073,285 @@ export interface operations {
             };
             /** @description github_not_connected. */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    createFileUploadLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The sandbox's ID. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FileLinkRequest"];
+            };
+        };
+        responses: {
+            /** @description The upload link. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FileLink"];
+                };
+            };
+            /** @description invalid_request: expiresInSeconds is out of range. invalid_path: the path is not one a file can have, or is over 2048 bytes. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description key_action_forbidden: the API key lacks file.write, or the path is outside /opt/agental and the key lacks exec. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description sandbox_not_running: a link is made for a running sandbox, and ends when it stops. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    createFileDownloadLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The sandbox's ID. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FileLinkRequest"];
+            };
+        };
+        responses: {
+            /** @description The download link. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FileLink"];
+                };
+            };
+            /** @description invalid_request: expiresInSeconds is out of range. invalid_path: the path is not one a file can have, or is over 2048 bytes. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description key_action_forbidden: the API key lacks file.read, or the path is outside /opt/agental and the key lacks exec. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description sandbox_not_running: a link is made for a running sandbox, and ends when it stops. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    downloadThroughFileLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The link's token, as the upload or download link gave it. */
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Raw file bytes. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            /** @description wrong_method: it is an upload link. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description forbidden: the key that made the link may be used only from some addresses, and this is not one. account_suspended: the account is suspended. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description not_found: no such link. file_not_found: nothing is at its path. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description link_expired: the link has ended: its time ran out, its sandbox stopped or was deleted since it was made, or whoever made it may no longer reach the sandbox (its API key deleted or expired, or its account out of the sandbox's organization). Make a new one. */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    uploadThroughFileLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The link's token, as the upload or download link gave it. */
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/octet-stream": string;
+            };
+        };
+        responses: {
+            /** @description File written. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        path: string;
+                        bytes: number;
+                        modifiedAt: string | null;
+                    };
+                };
+            };
+            /** @description invalid_request: the file is over 10000000 bytes. wrong_method: it is a download link. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description forbidden: the key that made the link may be used only from some addresses, and this is not one. account_suspended: the account is suspended. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description not_found: no such link. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description invalid_state: the sandbox is neither running nor stopped. sandbox_archived: it is archived; start it first. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description link_expired: the link has ended: its time ran out, its sandbox stopped or was deleted since it was made, or whoever made it may no longer reach the sandbox (its API key deleted or expired, or its account out of the sandbox's organization). Make a new one. */
+            410: {
                 headers: {
                     [name: string]: unknown;
                 };
