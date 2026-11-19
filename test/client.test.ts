@@ -1660,6 +1660,7 @@ function hook(changes: Partial<Webhook> = {}): Webhook {
     enabled: true,
     disabledAt: null,
     disabledReason: null,
+    enabledAt: null,
     deliveries: [],
     ...changes,
   };
@@ -1700,13 +1701,14 @@ test("webhooks are listed, added, read, changed, given a new secret and deleted 
 
 test("a webhook is turned off and on again by calls of their own, and says when and why it is off", async () => {
   const off = hook({ enabled: false, disabledAt: "2026-11-22T08:00:00.000Z", disabledReason: "Turned off by hand." });
-  const { agental, sent } = scripted(json(200, off), json(200, hook()));
+  const { agental, sent } = scripted(json(200, off), json(200, hook({ enabledAt: "2026-11-23T08:00:00.000Z" })));
 
   const turnedOff = await agental.disableWebhook("wh_5b0e1d7c93a24f68");
   assert.deepEqual([turnedOff.enabled, turnedOff.disabledAt, turnedOff.disabledReason], [false, "2026-11-22T08:00:00.000Z", "Turned off by hand."]);
   assert.deepEqual([sent[0]?.method, sent[0]?.path, sent[0]?.body], ["PATCH", "/v1/webhooks/wh_5b0e1d7c93a24f68", { enabled: false }]);
 
-  assert.equal((await agental.enableWebhook("wh_5b0e1d7c93a24f68")).enabled, true);
+  const on = await agental.enableWebhook("wh_5b0e1d7c93a24f68");
+  assert.deepEqual([on.enabled, on.enabledAt], [true, "2026-11-23T08:00:00.000Z"]);
   assert.deepEqual([sent[1]?.method, sent[1]?.path, sent[1]?.body], ["PATCH", "/v1/webhooks/wh_5b0e1d7c93a24f68", { enabled: true }]);
   assert.equal(sent.length, 2);
 });

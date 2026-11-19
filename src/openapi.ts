@@ -13527,6 +13527,8 @@ export interface operations {
                             disabledAt: string | null;
                             /** @description Why it is off, in words: "Every try failed for 3 days." or "Turned off by hand." Null while it is on. */
                             disabledReason: string | null;
+                            /** @description When it was last turned on again, by PATCH with enabled: true; null for one never turned off and on. An event queued before it and not delivered was given up as the webhook went off, and is not tried again. */
+                            enabledAt: string | null;
                             /** @description Returned only by create and rotate. */
                             signingSecret?: string;
                             deliveries: {
@@ -13614,6 +13616,8 @@ export interface operations {
                         disabledAt: string | null;
                         /** @description Why it is off, in words: "Every try failed for 3 days." or "Turned off by hand." Null while it is on. */
                         disabledReason: string | null;
+                        /** @description When it was last turned on again, by PATCH with enabled: true; null for one never turned off and on. An event queued before it and not delivered was given up as the webhook went off, and is not tried again. */
+                        enabledAt: string | null;
                         /** @description Returned only by create and rotate. */
                         signingSecret?: string;
                         deliveries: {
@@ -13699,6 +13703,8 @@ export interface operations {
                         disabledAt: string | null;
                         /** @description Why it is off, in words: "Every try failed for 3 days." or "Turned off by hand." Null while it is on. */
                         disabledReason: string | null;
+                        /** @description When it was last turned on again, by PATCH with enabled: true; null for one never turned off and on. An event queued before it and not delivered was given up as the webhook went off, and is not tried again. */
+                        enabledAt: string | null;
                         /** @description Returned only by create and rotate. */
                         signingSecret?: string;
                         deliveries: {
@@ -13827,6 +13833,8 @@ export interface operations {
                         disabledAt: string | null;
                         /** @description Why it is off, in words: "Every try failed for 3 days." or "Turned off by hand." Null while it is on. */
                         disabledReason: string | null;
+                        /** @description When it was last turned on again, by PATCH with enabled: true; null for one never turned off and on. An event queued before it and not delivered was given up as the webhook went off, and is not tried again. */
+                        enabledAt: string | null;
                         /** @description Returned only by create and rotate. */
                         signingSecret?: string;
                         deliveries: {
@@ -13903,6 +13911,8 @@ export interface operations {
                         disabledAt: string | null;
                         /** @description Why it is off, in words: "Every try failed for 3 days." or "Turned off by hand." Null while it is on. */
                         disabledReason: string | null;
+                        /** @description When it was last turned on again, by PATCH with enabled: true; null for one never turned off and on. An event queued before it and not delivered was given up as the webhook went off, and is not tried again. */
+                        enabledAt: string | null;
                         /** @description Returned only by create and rotate. */
                         signingSecret?: string;
                         deliveries: {
