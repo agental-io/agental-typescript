@@ -455,6 +455,17 @@ console.log(week.series.map((point) => point.peakRunningMb / 4096));
 await agental.setHeadroomBudget(10_000_000);
 ```
 
+`replayLastMonth()` prices your last full month on every plan: the same use at list price, each plan's burst fees worked out again against its free burst, and its price and included credits. Your own plan is the month as charged. A plan that would have refused the month has no amount, and neither has any plan in a month whose creates or starts were refused.
+
+```ts
+const month = await agental.replayLastMonth();
+const yours = month.plans.find((plan) => plan.planId === month.yours);
+for (const plan of month.plans) {
+  if (plan.billMicros !== null && yours?.billMicros != null) console.log(plan.planId, (plan.billMicros - yours.billMicros) / 1_000_000); // dollars more (or less) than yours
+  else console.log(plan.planId, plan.why); // size, running_count, members, budget or refused
+}
+```
+
 A create, fork or start takes `maxBurstFeeMicros`, the most it may pay, and the sandbox's `burstFeeMicros` says what it paid:
 
 ```ts

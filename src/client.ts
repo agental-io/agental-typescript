@@ -9,6 +9,7 @@ import type {
   Billing,
   Headroom,
   HeadroomNow,
+  PlanReplay,
   HeadroomRange,
   Catalog,
   HostRoute,
@@ -916,6 +917,19 @@ export class Agental {
     const iso = (at: Date | string | undefined): string | undefined => (at instanceof Date ? at.toISOString() : at);
     const query = { from: iso(range.from), to: iso(range.to), step: range.step };
     return (await this.http.json<Headroom>({ method: "GET", path: "/v1/headroom", query, replay: true })).body;
+  }
+
+  /**
+   * Your account's last full month priced on every plan: the same use at list price, each
+   * plan's burst fees worked out again against its free burst, and its price and included
+   * credits (Free: your allowance). Your own plan (yours) is the month as charged. A plan
+   * that would have refused the month (outcome not_allowed, why: size, running_count,
+   * members, budget), or any plan in a month whose creates or starts were refused (unknown),
+   * has no amount. period is null where that month is not known whole. Amounts are
+   * millionths of a US dollar, before tax.
+   */
+  async replayLastMonth(): Promise<PlanReplay> {
+    return (await this.http.json<PlanReplay>({ method: "GET", path: "/v1/burst/replay", replay: true })).body;
   }
 
   /**

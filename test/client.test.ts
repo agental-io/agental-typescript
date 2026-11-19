@@ -796,6 +796,22 @@ function headroom(): Record<string, unknown> {
   };
 }
 
+test("last month is read priced on every plan, with no amount where a plan would have refused it", async () => {
+  const month = {
+    period: { start: "2026-10-01T00:00:00.000Z", end: "2026-11-01T00:00:00.000Z" },
+    yours: "plan100",
+    plans: [
+      { planId: "free", outcome: "not_allowed", why: "running_count", burstFeesMicros: null, billMicros: null },
+      { planId: "plan100", outcome: "worked", why: null, burstFeesMicros: 640_000_000, billMicros: 820_000_000 },
+    ],
+  };
+  const { agental, sent } = scripted(json(200, month), json(200, { period: null, yours: null, plans: [] }));
+  const read = await agental.replayLastMonth();
+  assert.deepEqual([read.yours, read.plans[0]?.why, read.plans[1]?.billMicros], ["plan100", "running_count", 820_000_000]);
+  assert.deepEqual([sent[0]?.method, sent[0]?.path], ["GET", "/v1/burst/replay"]);
+  assert.equal((await agental.replayLastMonth()).period, null);
+});
+
 test("the headroom is read, over today or a range, and its budget is set and cleared", async () => {
   const { agental, sent } = scripted(json(200, headroom()), json(200, headroom()), json(200, burst({ budgetMicros: 0, budgetSet: true })), new TypeError("fetch failed"), json(200, burst()));
   const today = await agental.headroom();

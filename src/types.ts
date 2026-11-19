@@ -148,6 +148,13 @@ export type HeadroomNow = Omit<Schemas["Burst"], "quote"> & {
  * did not start and why, and how fast what started ran.
  */
 export type Headroom = Omit<Schemas["Headroom"], "now"> & { now: HeadroomNow };
+/**
+ * Your account's last full month priced on every plan (GET /v1/burst/replay): the same use at list
+ * price, each plan's burst fees worked out again against its free burst, and its price and included
+ * credits. Your own plan is the month as charged. A plan that would have refused the month, or a
+ * month whose starts were refused, has no amount. period is null where that month is not known whole.
+ */
+export type PlanReplay = operations["replayLastMonth"]["responses"][200]["content"]["application/json"];
 /** How often headroom() reads its series: every 10 minutes, hour or day. */
 export type HeadroomStep = Schemas["Headroom"]["step"];
 /** The range headroom() covers. Left out, today (UTC) to now. */

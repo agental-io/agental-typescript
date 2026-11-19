@@ -20,6 +20,7 @@ export type {
   BurstQuote,
   Headroom,
   HeadroomNow,
+  PlanReplay,
   HeadroomRange,
   HeadroomStep,
   Catalog,
