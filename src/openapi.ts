@@ -5020,7 +5020,7 @@ export interface components {
              */
             ifStopped?: "start" | "skip";
             /**
-             * @description What a run does to the sandbox after. stop, the default: a run that started it stops it again, keeping its disk. stop_with_memory: keeping its memory too; a sandbox stopped with its memory is stopped so again either way. delete: for a job that runs once, with at: deletes the sandbox when its run's command exits 0, whether the run started it or it was running already, as DELETE /v1/sandboxes/{id} does; a run that fails leaves it, so that it can be looked at. delete takes a key that may delete the sandbox: sandbox.delete, or sandbox.delete-own for one the key made.
+             * @description What a run does to the sandbox after. stop, the default: a run that started it stops it again, keeping its disk. stop_with_memory: keeping its memory too, for an account that has made its first top-up (before it, 409 memory_needs_top_up); a sandbox stopped with its memory is stopped so again either way. delete: for a job that runs once, with at: deletes the sandbox when its run's command exits 0, whether the run started it or it was running already, as DELETE /v1/sandboxes/{id} does; a run that fails leaves it, so that it can be looked at. delete takes a key that may delete the sandbox: sandbox.delete, or sandbox.delete-own for one the key made.
              * @enum {string}
              */
             after?: "stop" | "stop_with_memory" | "delete";
@@ -5152,7 +5152,7 @@ export interface components {
              */
             ifStopped?: "start" | "skip";
             /**
-             * @description What a run does to the sandbox after. stop, the default: a run that started it stops it again, keeping its disk. stop_with_memory: keeping its memory too; a sandbox stopped with its memory is stopped so again either way. delete: for a job that runs once, with at: deletes the sandbox when its run's command exits 0, whether the run started it or it was running already, as DELETE /v1/sandboxes/{id} does; a run that fails leaves it, so that it can be looked at. delete takes a key that may delete the sandbox: sandbox.delete, or sandbox.delete-own for one the key made.
+             * @description What a run does to the sandbox after. stop, the default: a run that started it stops it again, keeping its disk. stop_with_memory: keeping its memory too, for an account that has made its first top-up (before it, 409 memory_needs_top_up); a sandbox stopped with its memory is stopped so again either way. delete: for a job that runs once, with at: deletes the sandbox when its run's command exits 0, whether the run started it or it was running already, as DELETE /v1/sandboxes/{id} does; a run that fails leaves it, so that it can be looked at. delete takes a key that may delete the sandbox: sandbox.delete, or sandbox.delete-own for one the key made.
              * @enum {string}
              */
             after?: "stop" | "stop_with_memory" | "delete";
@@ -5324,7 +5324,7 @@ export interface components {
              */
             ifStopped?: "start" | "skip";
             /**
-             * @description What a run does to the sandbox after. stop, the default: a run that started it stops it again, keeping its disk. stop_with_memory: keeping its memory too; a sandbox stopped with its memory is stopped so again either way. delete: for a job that runs once, with at: deletes the sandbox when its run's command exits 0, whether the run started it or it was running already, as DELETE /v1/sandboxes/{id} does; a run that fails leaves it, so that it can be looked at. delete takes a key that may delete the sandbox: sandbox.delete, or sandbox.delete-own for one the key made.
+             * @description What a run does to the sandbox after. stop, the default: a run that started it stops it again, keeping its disk. stop_with_memory: keeping its memory too, for an account that has made its first top-up (before it, 409 memory_needs_top_up); a sandbox stopped with its memory is stopped so again either way. delete: for a job that runs once, with at: deletes the sandbox when its run's command exits 0, whether the run started it or it was running already, as DELETE /v1/sandboxes/{id} does; a run that fails leaves it, so that it can be looked at. delete takes a key that may delete the sandbox: sandbox.delete, or sandbox.delete-own for one the key made.
              * @enum {string}
              */
             after?: "stop" | "stop_with_memory" | "delete";
@@ -14858,7 +14858,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description name_taken: the organization has a job of that name. */
+            /** @description name_taken: the organization has a job of that name. memory_needs_top_up: after stop_with_memory, before the account's first top-up. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -15010,7 +15010,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description name_taken. */
+            /** @description name_taken, or memory_needs_top_up: after stop_with_memory before the account's first top-up. */
             409: {
                 headers: {
                     [name: string]: unknown;
