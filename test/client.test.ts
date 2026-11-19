@@ -2360,6 +2360,13 @@ test("every job's runs are read with limit, job and outcome, and job usage over 
   assert.deepEqual([sent[1]?.method, sent[1]?.path], ["GET", "/v1/usage/jobs?since=2026-11-01T00%3A00%3A00.000Z"]);
 });
 
+test("usage by day reads GET /v1/usage/days over a window", async () => {
+  const { agental, sent } = scripted(json(200, { since: "2026-11-01T00:00:00.000Z", until: "2026-11-03T00:00:00.000Z", days: [], snapshots: { kept: 0, free: 10, chargedSeconds: 0, listCostMicros: 0 } }));
+  const usage = await agental.usageByDay({ since: new Date("2026-11-01T00:00:00Z"), until: "2026-11-03T00:00:00Z" });
+  assert.equal(usage.snapshots.free, 10);
+  assert.deepEqual([sent[0]?.method, sent[0]?.path], ["GET", "/v1/usage/days?since=2026-11-01T00%3A00%3A00.000Z&until=2026-11-03T00%3A00%3A00Z"]);
+});
+
 function egressAccount(changes: Partial<EgressAccount> = {}): EgressAccount {
   return {
     offered: true,

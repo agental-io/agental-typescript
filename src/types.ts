@@ -130,6 +130,8 @@ export type Catalog = Schemas["Catalog"];
 /** A region sandboxes can be made in: what it is called, where its servers are, and the sizes it has room for now. */
 export type Region = Schemas["Region"];
 export type Usage = Schemas["Usage"];
+/** Usage by UTC day, and the snapshots kept: GET /v1/usage/days. */
+export type UsageDays = Schemas["UsageDays"];
 /**
  * Where your account stands against its plan now: what it runs against its running count,
  * what its burst meter reads against the free burst, what it spent on burst fees this month

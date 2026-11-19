@@ -1269,6 +1269,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/usage/days": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Returns the caller's usage by UTC day and nothing else: each day's running time and its cost at list price, with stopped time, snapshots beyond the free ones and mail beside it, as GET /v1/usage's days, and the snapshots kept. Lighter than GET /v1/usage on a busy account, as it has no line per sandbox, key, member or hour. Without since, the window is the current UTC month to date. List-price figures are not charges: GET /v1/billing shows what is charged. */
+        get: operations["getUsageDays"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/sandboxes/{id}/usage": {
         parameters: {
             query?: never;
@@ -4475,6 +4492,59 @@ export interface components {
             cost: null;
             /** @enum {string} */
             billing: "not_configured";
+        };
+        UsageDays: {
+            since: string;
+            until: string;
+            /** @description A line for every UTC day the window touches, days nothing ran included, as GET /v1/usage gives them: running time and listCostMicros, and beside it the day's stopped time, snapshots and mail. */
+            days: {
+                /**
+                 * @description The day in UTC.
+                 * @example 2026-10-10
+                 */
+                day: string;
+                /** @description Whole seconds of running time in the window. A sandbox still running is counted up to now. */
+                seconds: number;
+                /** @description Those seconds at list price, in millionths of a US dollar (27000 is $0.027). Not a charge. */
+                listCostMicros: number;
+                /** @description Stopped time, counted separately from the running time in seconds and listCostMicros. */
+                stopped: {
+                    /** @description Whole seconds stopped inside the window, with the disk kept. A sandbox deleted while its snapshots kept its machine counts as stopped until the last of them goes. */
+                    seconds: number;
+                    /** @description Those seconds at the stopped price, in millionths of a US dollar: nothing in the first 14 days after each stop, then $0.05 a GB a month of what the sandbox stores. Not a charge: GET /v1/billing shows what is charged. */
+                    listCostMicros: number;
+                };
+                /** @description Snapshots past the free ones that day. Zero with apiKeyId. */
+                snapshots: {
+                    /** @description Seconds of snapshots kept past the free ones that day. */
+                    chargedSeconds: number;
+                    /** @description What they come to, in millionths of a US dollar. */
+                    listCostMicros: number;
+                };
+                /** @description Mail that day. */
+                mail: {
+                    /** @description Messages accepted for a sandbox. */
+                    received: number;
+                    /** @description Messages a sandbox sent. */
+                    sent: number;
+                    /** @description Their cost at 500 millionths of a US dollar per message ($0.50 per thousand), paid from what the plan includes, as machine time is. */
+                    costMicros: number;
+                };
+            }[];
+            /** @description Snapshots past the free ones in the window, and how many were kept at its end. */
+            snapshots: {
+                /** @description Snapshots kept at the end of the window, of sandboxes the account has and of ones it deleted. */
+                kept: number;
+                /**
+                 * @description How many of the oldest cost nothing.
+                 * @example 10
+                 */
+                free: number;
+                /** @description Seconds of snapshots kept past the free ones: two of them for an hour is 7200. */
+                chargedSeconds: number;
+                /** @description What they come to at 2329 an hour each, $1.70 over a month, in millionths of a US dollar. Not a charge here: GET /v1/billing says what is. */
+                listCostMicros: number;
+            };
         };
         SandboxUsage: {
             sandboxId: string;
@@ -13161,6 +13231,58 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Usage"];
+                };
+            };
+            /** @description invalid_request: since is not before until, or the window is longer than 366 days. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getUsageDays: {
+        parameters: {
+            query?: {
+                /** @description Start of the window, as an ISO 8601 time. */
+                since?: string;
+                /** @description End of the window, as an ISO 8601 time. Default now; a later time is treated as now. */
+                until?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Usage by day in the window. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsageDays"];
                 };
             };
             /** @description invalid_request: since is not before until, or the window is longer than 366 days. */

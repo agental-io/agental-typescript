@@ -45,6 +45,7 @@ import type {
   RunsOnRepository,
   RunsOnRepositories,
   Usage,
+  UsageDays,
   Webhook,
   EgressAccount,
   CreateJob,
@@ -963,6 +964,16 @@ export class Agental {
     const keys = options.apiKeyId;
     const query = { since: iso(options.since), until: iso(options.until), apiKeyId: Array.isArray(keys) ? keys.join(",") : keys };
     return (await this.http.json<Usage>({ method: "GET", path: "/v1/usage", query, replay: true })).body;
+  }
+
+  /**
+   * Usage by UTC day and nothing else: each day's running time and list cost, with stopped time, snapshots and mail beside
+   * it, as usage() gives its days, and the snapshots kept. Lighter than usage() on a busy account. Without since, this
+   * UTC month to date.
+   */
+  async usageByDay(window: { since?: string | Date; until?: string | Date } = {}): Promise<UsageDays> {
+    const query = { since: iso(window.since), until: iso(window.until) };
+    return (await this.http.json<UsageDays>({ method: "GET", path: "/v1/usage/days", query, replay: true })).body;
   }
 
   /**

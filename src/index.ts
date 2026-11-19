@@ -120,6 +120,7 @@ export type {
   TemplateStart,
   TemplateSsh,
   Usage,
+  UsageDays,
   Webhook,
   WebhookDelivery,
 } from "./types.js";
