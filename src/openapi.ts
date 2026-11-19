@@ -3255,6 +3255,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/burst/replay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Replays the caller's account's last full month on every plan: its starts against each plan's running count, free burst and sizes, and the month priced on each, at the same list price, with that plan's burst fees and included credits. A plan that would not have allowed the month is not priced, and no plan is where creates or starts were refused in it for a limit, a size or the bill, since what they would have used is not known. */
+        get: operations["replayLastMonth"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/headroom/budget": {
         parameters: {
             query?: never;
@@ -22012,6 +22029,78 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Burst"];
+                };
+            };
+            /** @description invalid_request: the key belongs to no account. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description not_found: the account behind the key no longer exists. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    replayLastMonth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The month and each plan's outcome. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The month replayed: the one before the account's current month. Null where that month is not known whole: the account is younger than it, or its current month did not begin as months do (a free month after a plan ended mid-month, a paid one begun after the 28th). */
+                        period: {
+                            start: string;
+                            end: string;
+                        } | null;
+                        /** @description The plan the account is on now. Its outcome is the month as charged: what it used, with the burst fees it paid. */
+                        yours: string | null;
+                        plans: {
+                            planId: string;
+                            /**
+                             * @description worked: the month is priced on this plan. not_allowed: the plan would have refused some of it (see why). unknown: starts were refused for a limit in the month, so what they would have run is not known.
+                             * @enum {string}
+                             */
+                            outcome: "worked" | "not_allowed" | "unknown";
+                            /**
+                             * @description size: a size it does not make was started. running_count: more ran at once than it allows. members: members started sandboxes, and it takes none. budget: its burst fees would have passed the account's budget. refused: see unknown.
+                             * @enum {string|null}
+                             */
+                            why: "size" | "running_count" | "members" | "budget" | "refused" | null;
+                            /** @description The month's burst fees on this plan, in millionths of a US dollar. Null unless worked. */
+                            burstFeesMicros: number | null;
+                            /** @description The plan's price and what the month used past its included credits (Free: its monthly allowance), in millionths of a US dollar, before tax. Null unless worked. */
+                            billMicros: number | null;
+                        }[];
+                    };
                 };
             };
             /** @description invalid_request: the key belongs to no account. */
