@@ -511,6 +511,34 @@ test("a fork, a snapshot and a port ask for what the API needs of them", async (
   assert.equal((sent[5]?.body as { snapshotId: string }).snapshotId, "snap_1");
 });
 
+test("a sandbox's sites are its public routes not taken away, added from a port and removed by their id", async () => {
+  const route = (id: string, port: number, changes: Record<string, unknown> = {}) => ({ id, sandboxId: "sbx_0123456789abcdef", port, title: `port-${port}`, public: true, hidden: false, url: `https://${id}.agental.site`, ...changes });
+  const { agental, sent } = scripted(
+    json(200, sandbox()),
+    json(200, { routes: [route("rte_1", 3000), route("rte_2", 4000, { public: false, url: null }), route("rte_3", 5000, { hidden: true, url: null })] }),
+    json(201, route("rte_4", 8080)),
+    json(201, route("rte_5", 9000, { title: "Preview" })),
+    json(200, { routes: [route("rte_1", 3000), route("rte_2", 4000, { public: false, url: null })] }),
+    json(200, route("rte_1", 3000, { hidden: true, url: null })),
+    json(200, { routes: [route("rte_2", 4000, { public: false, url: null })] }),
+  );
+  const box = await agental.sandboxes.get("sbx_0123456789abcdef");
+  assert.deepEqual((await box.sites()).map((site) => site.id), ["rte_1"]);
+  assert.deepEqual([sent[1]?.method, sent[1]?.path], ["GET", "/v1/sandboxes/sbx_0123456789abcdef/host"]);
+
+  assert.equal((await box.addSite(8080)).url, "https://rte_4.agental.site");
+  assert.deepEqual([sent[2]?.path, sent[2]?.body], ["/v1/sandboxes/sbx_0123456789abcdef/host", { port: 8080, title: "port-8080", public: true }]);
+  await box.addSite(9000, { title: "Preview" });
+  assert.deepEqual(sent[3]?.body, { port: 9000, title: "Preview", public: true });
+
+  assert.equal((await box.removeSite("rte_1")).hidden, true);
+  assert.deepEqual([sent[5]?.method, sent[5]?.path], ["POST", "/v1/host-routes/rte_1/hide"]);
+
+  // An id that is not one of its sites, as a port reached only through the API, is refused and nothing is hidden.
+  await assert.rejects(box.removeSite("rte_2"), (error: unknown) => error instanceof ApiError && error.code === "not_found");
+  assert.equal(sent.length, 7);
+});
+
 function stopOf(changes: Partial<SandboxAutoStop> = {}): SandboxAutoStop {
   return { sandboxId: "sbx_0123456789abcdef", status: "running", autoStopAt: "2026-10-13T02:00:00.000Z", secondsLeft: 7200, ttlSeconds: 7200, setBy: "ttl", ...changes };
 }

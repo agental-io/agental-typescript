@@ -1282,6 +1282,30 @@ export class Sandbox {
     return (await this.http.json<{ routes: HostRoute[] }>({ method: "GET", path: `${this.path}/host`, replay: true })).body.routes;
   }
 
+  // A site is what the console, the CLI and the MCP tools call a port with a public address: a route with public true that is not hidden.
+
+  /** Its sites: its ports with a public url, oldest first, without those reached only through the API or taken away. */
+  async sites(): Promise<HostRoute[]> {
+    return (await this.routes()).filter((route) => route.public && !route.hidden);
+  }
+
+  /** Gives a port a public url that anyone can open while the sandbox runs. What listens must listen on 0.0.0.0. */
+  async addSite(port: number, options: { title?: string } = {}): Promise<HostRoute> {
+    return await this.expose(port, { title: options.title || `port-${port}`, public: true });
+  }
+
+  /**
+   * Takes a site away for good: its url stops working now, and adding the port again gives a new one. Only one of this
+   * sandbox's sites: any other id, of another sandbox or of a port reached only through the API, is refused as
+   * not_found before anything is taken away.
+   */
+  async removeSite(siteId: string): Promise<HostRoute> {
+    if (!(await this.sites()).some((site) => site.id === siteId)) {
+      throw new ApiError(404, "not_found", `${siteId} is not a site of this sandbox.`);
+    }
+    return (await this.http.json<HostRoute>({ method: "POST", path: `/v1/host-routes/${encodeURIComponent(siteId)}/hide`, replay: true })).body;
+  }
+
   /** How long it has run and what that comes to at the list price, and the mail it has had. Without since, its whole life. */
   async usage(window: { since?: string | Date; until?: string | Date } = {}): Promise<SandboxUsage> {
     const query = { since: iso(window.since), until: iso(window.until) };
