@@ -1387,7 +1387,7 @@ export interface paths {
         delete: operations["deleteWebhook"];
         options?: never;
         head?: never;
-        /** @description Changes a webhook's url, events or description. Fields left out keep their values. */
+        /** @description Changes a webhook's url, events or description, or turns it on or off with enabled. Fields left out keep their values. Turned off, a webhook is queued no events, and the events still owed to it are given up, kept as failed. Turned on again, it is sent the events made from then on, and none of those given up. */
         patch: operations["updateWebhook"];
         trace?: never;
     };
@@ -13521,6 +13521,12 @@ export interface operations {
                             description: string;
                             createdAt: string;
                             updatedAt: string;
+                            /** @description Whether events are sent to it. A webhook turns itself off when an event fails its last try and no try at it has been taken for 3 days; PATCH it with enabled: true to turn it on again. */
+                            enabled: boolean;
+                            /** @description When it was turned off, by hand or by itself; null while it is on. */
+                            disabledAt: string | null;
+                            /** @description Why it is off, in words: "Every try failed for 3 days." or "Turned off by hand." Null while it is on. */
+                            disabledReason: string | null;
                             /** @description Returned only by create and rotate. */
                             signingSecret?: string;
                             deliveries: {
@@ -13602,6 +13608,12 @@ export interface operations {
                         description: string;
                         createdAt: string;
                         updatedAt: string;
+                        /** @description Whether events are sent to it. A webhook turns itself off when an event fails its last try and no try at it has been taken for 3 days; PATCH it with enabled: true to turn it on again. */
+                        enabled: boolean;
+                        /** @description When it was turned off, by hand or by itself; null while it is on. */
+                        disabledAt: string | null;
+                        /** @description Why it is off, in words: "Every try failed for 3 days." or "Turned off by hand." Null while it is on. */
+                        disabledReason: string | null;
                         /** @description Returned only by create and rotate. */
                         signingSecret?: string;
                         deliveries: {
@@ -13681,6 +13693,12 @@ export interface operations {
                         description: string;
                         createdAt: string;
                         updatedAt: string;
+                        /** @description Whether events are sent to it. A webhook turns itself off when an event fails its last try and no try at it has been taken for 3 days; PATCH it with enabled: true to turn it on again. */
+                        enabled: boolean;
+                        /** @description When it was turned off, by hand or by itself; null while it is on. */
+                        disabledAt: string | null;
+                        /** @description Why it is off, in words: "Every try failed for 3 days." or "Turned off by hand." Null while it is on. */
+                        disabledReason: string | null;
                         /** @description Returned only by create and rotate. */
                         signingSecret?: string;
                         deliveries: {
@@ -13784,6 +13802,8 @@ export interface operations {
                     events?: string[];
                     /** @description A note for your own reference, up to 500 characters. */
                     description?: string;
+                    /** @description false turns the webhook off; true turns it on again, whether it was turned off by hand or turned itself off. Nothing given up while it was off is sent. */
+                    enabled?: boolean;
                 };
             };
         };
@@ -13801,6 +13821,12 @@ export interface operations {
                         description: string;
                         createdAt: string;
                         updatedAt: string;
+                        /** @description Whether events are sent to it. A webhook turns itself off when an event fails its last try and no try at it has been taken for 3 days; PATCH it with enabled: true to turn it on again. */
+                        enabled: boolean;
+                        /** @description When it was turned off, by hand or by itself; null while it is on. */
+                        disabledAt: string | null;
+                        /** @description Why it is off, in words: "Every try failed for 3 days." or "Turned off by hand." Null while it is on. */
+                        disabledReason: string | null;
                         /** @description Returned only by create and rotate. */
                         signingSecret?: string;
                         deliveries: {
@@ -13871,6 +13897,12 @@ export interface operations {
                         description: string;
                         createdAt: string;
                         updatedAt: string;
+                        /** @description Whether events are sent to it. A webhook turns itself off when an event fails its last try and no try at it has been taken for 3 days; PATCH it with enabled: true to turn it on again. */
+                        enabled: boolean;
+                        /** @description When it was turned off, by hand or by itself; null while it is on. */
+                        disabledAt: string | null;
+                        /** @description Why it is off, in words: "Every try failed for 3 days." or "Turned off by hand." Null while it is on. */
+                        disabledReason: string | null;
                         /** @description Returned only by create and rotate. */
                         signingSecret?: string;
                         deliveries: {

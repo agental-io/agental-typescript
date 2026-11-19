@@ -1125,9 +1125,27 @@ export class Agental {
     return (await this.http.json<Webhook>({ method: "GET", path: `/v1/webhooks/${encodeURIComponent(id)}`, replay: true })).body;
   }
 
-  /** Changes a webhook's url, events or description, and keeps what is left out. A changed url is used from the next try on. */
-  async updateWebhook(id: string, changes: { url?: string; events?: string[]; description?: string }): Promise<Webhook> {
+  /**
+   * Changes a webhook's url, events or description, and keeps what is left out. A changed url
+   * is used from the next try on. enabled turns it off (false) or on again (true), as
+   * disableWebhook and enableWebhook do.
+   */
+  async updateWebhook(id: string, changes: { url?: string; events?: string[]; description?: string; enabled?: boolean }): Promise<Webhook> {
     return (await this.http.json<Webhook>({ method: "PATCH", path: `/v1/webhooks/${encodeURIComponent(id)}`, body: changes, replay: true })).body;
+  }
+
+  /**
+   * Turns a webhook off: it is posted nothing, and the events still owed to it are given up.
+   * A webhook also turns itself off when an event fails its last try and none of its tries
+   * has been taken for 3 days; its disabledAt and disabledReason say when and why.
+   */
+  async disableWebhook(id: string): Promise<Webhook> {
+    return await this.updateWebhook(id, { enabled: false });
+  }
+
+  /** Turns a webhook on again. It is posted the events made from now on; none given up while it was off is sent. */
+  async enableWebhook(id: string): Promise<Webhook> {
+    return await this.updateWebhook(id, { enabled: true });
   }
 
   /** Gives a webhook a new signing secret, in its signingSecret, once. The old one stops working at once. */
