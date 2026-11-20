@@ -4649,7 +4649,7 @@ export interface components {
             storage: {
                 /** @description What it stores now, in bytes: its pack's size once archived, else what its server said its disk and kept memory took at its stop, else its whole disk (and memory). */
                 storedBytes: number;
-                /** @description When the free days of its stretch end: 14 days after its stop, or, where the account was told late that it would be deleted, 3 days after that notice. From then it costs microsPerGbMonth for what it stores, or, for an account that has never paid and has no credit, it is deleted. */
+                /** @description When the free days of its stretch end: 14 days after its stop, or, where the account was told late that it would be deleted, 3 days after that notice. From then it costs microsPerGbMonth for what it stores, or, for an account that has never paid and has neither the free plan's allowance nor credits left, it is deleted. */
                 freeUntil: string | null;
                 /** @description What it costs an hour now, in millionths of a US dollar: 0 in its free days. */
                 microsPerHour: number;
@@ -6389,7 +6389,7 @@ export interface components {
                  */
                 stoppedFreeDays: number;
                 /**
-                 * @description What an account that has not paid for anything yet stores at most in its stopped sandboxes, in bytes: 20 GB. Until its first top-up it keeps no memory at a stop, and a stopped sandbox whose free days end while it has no credits is deleted instead of charged, after an email 3 days before.
+                 * @description What an account that has not paid for anything yet stores at most in its stopped sandboxes, in bytes: 20 GB. Until its first top-up it keeps no memory at a stop, and its stopped sandboxes are paid from the month's free allowance past their free days; one stopped when the allowance and its credits are used is deleted instead of charged, after an email 3 days before.
                  * @example 20000000000
                  */
                 neverPaidMaxStoredBytes: number;
