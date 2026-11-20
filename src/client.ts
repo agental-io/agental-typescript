@@ -518,6 +518,7 @@ class Sandboxes {
       ...(options.ttlSeconds !== undefined ? { ttlSeconds: options.ttlSeconds } : {}),
       ...(options.onTimeout !== undefined ? { onTimeout: options.onTimeout } : {}),
       ...(options.network ? { network: options.network } : {}),
+      ...(options.spot !== undefined ? { spot: options.spot } : {}),
       ...(options.egress ? { egress: options.egress } : {}),
       ...(options.sshKeys !== undefined ? { sshKeys: options.sshKeys } : {}),
       ...(options.tags !== undefined ? { tags: options.tags } : {}),

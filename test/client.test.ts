@@ -61,6 +61,7 @@ function sandbox(changes: Partial<SandboxInfo> = {}): SandboxInfo {
     stoppedAt: null,
     ttlSeconds: null,
     onTimeout: "delete",
+    spot: null,
     autoStopAt: null,
     subdomain: null,
     shared: false,
@@ -2543,6 +2544,20 @@ test("what a sandbox's time limit does is sent when it is said, on a create and 
   await box.update({ onTimeout: "delete" });
   assert.deepEqual(sent[1]?.body, { onTimeout: "delete" });
   assert.equal(box.info.onTimeout, "delete");
+});
+
+test("a spot sandbox is asked for on a create, its chance read, what a reclaim does changed, and made normal with spot null", async () => {
+  const spot = { onReclaim: "upgrade" as const, warnAt: 0.3, reclaimChance: 0.12 };
+  const { agental, sent } = scripted(json(201, sandbox({ spot })), json(200, sandbox({ spot: { ...spot, onReclaim: "delete" } })), json(200, sandbox({ spot: null })));
+  const box = await agental.sandboxes.create({ name: "cheap", spot: { onReclaim: "upgrade", warnAt: 0.3 } });
+  assert.deepEqual(sent[0]?.body, { name: "cheap", spot: { onReclaim: "upgrade", warnAt: 0.3 } });
+  assert.deepEqual(box.spot, spot);
+  await box.update({ spot: { onReclaim: "delete" } });
+  assert.deepEqual([sent[1]?.method, sent[1]?.body], ["PATCH", { spot: { onReclaim: "delete" } }]);
+  assert.equal(box.spot?.onReclaim, "delete");
+  await box.update({ spot: null });
+  assert.deepEqual(sent[2]?.body, { spot: null });
+  assert.equal(box.spot, null);
 });
 
 test("an upload or download link is asked for by path, with its time when given", async () => {

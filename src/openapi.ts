@@ -205,7 +205,7 @@ export interface paths {
         delete: operations["deleteSandbox"];
         options?: never;
         head?: never;
-        /** @description Changes a sandbox's name, ttlSeconds, onTimeout, subdomain, tags or metadata, and returns it. Fields left out stay as they are. Running or stopped, nothing is restarted. */
+        /** @description Changes a sandbox's name, ttlSeconds, onTimeout, spot, subdomain, tags or metadata, and returns it. Fields left out stay as they are. Running or stopped, nothing is restarted. */
         patch: operations["updateSandbox"];
         trace?: never;
     };
@@ -252,7 +252,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Stops a running sandbox and returns it stopped, with 200. Its disk is kept and every process ends, unless keepMemory is sent, which keeps its memory too. A stopped sandbox is free for 14 days after its stop, then $0.05 a GB a month of what it stores, until it is started or deleted. Until the account's first top-up, keepMemory is refused with 409 memory_needs_top_up, and a stop that would take what its stopped sandboxes store past 20 GB with 409 stopped_storage_limit; the sandbox goes on running. A stopped sandbox is returned as it is. The response header Stop-Id names the stop, for GET /v1/stops/{id}. */
+        /** @description Stops a running sandbox and returns it stopped, with 200. Its disk is kept and every process ends, unless keepMemory is sent, which keeps its memory too. A stopped sandbox is free for 14 days after its stop, then $0.05 a GB a month of what it stores, until it is started or deleted. keepMemory on a spot sandbox is refused with 409 spot_keeps_no_memory, on every account. Until the account's first top-up, keepMemory is refused with 409 memory_needs_top_up, and a stop that would take what its stopped sandboxes store past 20 GB with 409 stopped_storage_limit; the sandbox goes on running. A stopped sandbox is returned as it is. The response header Stop-Id names the stop, for GET /v1/stops/{id}. */
         post: operations["stopSandbox"];
         delete?: never;
         options?: never;
@@ -3547,6 +3547,18 @@ export interface components {
              * @enum {string}
              */
             onTimeout: "delete" | "stop" | "stop_with_memory";
+            /** @description Set on a spot sandbox, null on a normal one. A spot sandbox runs at half the list price in room nobody else is paying for, and that room is taken back when a normal sandbox needs it, as onReclaim says. It never keeps its memory at a stop, and stays spot across a stop and start until it is made normal with PATCH /v1/sandboxes/{id}. */
+            spot: {
+                /**
+                 * @description What is done when its room is taken back: delete, stop (its disk kept, never its memory), or upgrade (it becomes a normal sandbox at the list price where that frees what was needed, and is stopped otherwise).
+                 * @enum {string}
+                 */
+                onReclaim: "delete" | "stop" | "upgrade";
+                /** @description The chance of being stopped, 0 to 1, at which sandbox.reclaim_chance is to be sent. */
+                warnAt: number;
+                /** @description The chance it is stopped in the next minute, 0 to 1, worked out each minute from how close its server is to its limits, how fast it has moved toward them over the last ten minutes, and where it stands in the order room is taken back in. A hint and not a promise: a burst of starts can stop it within seconds. sandbox.reclaim_chance is sent when it crosses warnAt, up or down. Null while it is not running, and until the first minute's pass. */
+                reclaimChance: number | null;
+            } | null;
             /** @description When this running sandbox will be stopped: the time PUT /v1/sandboxes/{id}/auto-stop set for the run under way, or else its last start plus ttlSeconds. Null when it is not running, or has no time limit: it then runs until it is stopped. */
             autoStopAt: string | null;
             /** @description Stored only. This is not registered in DNS. */
@@ -3719,6 +3731,7 @@ export interface components {
              * @enum {string}
              */
             onTimeout?: "delete" | "stop" | "stop_with_memory";
+            spot?: components["schemas"]["SpotInput"];
             /**
              * @description Seconds the sandbox runs after each start before it is stopped. Left out, it is what the template's start says, and where that says none, the deployment's default. Null is the deployment's default, whatever the template says. At most maxTtlSeconds of GET /v1/policy. PATCH /v1/sandboxes/{id} changes it later, and PUT /v1/sandboxes/{id}/auto-stop moves the stop of the run under way.
              * @example 7200
@@ -3751,6 +3764,25 @@ export interface components {
                 [key: string]: string;
             };
             egress?: components["schemas"]["EgressInput"];
+        };
+        /**
+         * @description Make it a spot sandbox: half the list price, in room nobody else is paying for, taken back when a normal sandbox needs it. It is placed only on a server with spare room now (409 spot_capacity_exceeded when none in its region has), and is not counted in the plan's running count. It never keeps its memory at a stop. Comes with the account's first top-up (before it, 409 spot_needs_top_up).
+         * @example {
+         *       "onReclaim": "stop"
+         *     }
+         */
+        SpotInput: {
+            /**
+             * @description What is done when its room is taken back. stop (the default): it is stopped, its disk kept, never its memory, and starts again as spot. delete: it is stopped and deleted. upgrade: it becomes a normal sandbox at the list price from that moment and keeps running, where another server in its region has room for what needed it; otherwise it is stopped as stop. Every reclaim sends sandbox.stopped with reason reclaimed, sandbox.deleted with reason reclaimed, or sandbox.upgraded, saying what was done and why.
+             * @example stop
+             * @enum {string}
+             */
+            onReclaim?: "delete" | "stop" | "upgrade";
+            /**
+             * @description The chance of being stopped, 0 to 1, at which sandbox.reclaim_chance is to be sent. Left out, 0.5.
+             * @example 0.5
+             */
+            warnAt?: number;
         };
         /** @description Addresses the sandbox may reach on top of its template's outbound rule. It is held to the two from its first boot, so it never runs open first. Left out, it has none of its own. The rule itself is its template's: PUT /v1/templates/{id}/network. PUT /v1/sandboxes/{id}/network changes its own addresses later, while it runs. A fork has its source's. Sending outbound here is refused with rule_on_template. Only where GET /v1/policy says networkPolicy. */
         SandboxOwnNetworkInput: {
@@ -3884,7 +3916,7 @@ export interface components {
             /** @enum {string} */
             action: "stop" | "start" | "archive" | "snapshot" | "auto-stop" | "labels" | "delete";
             options: {
-                /** @description For stop: keep their memory as well as their disks. */
+                /** @description For stop: keep their memory as well as their disks. A spot sandbox among them, which never keeps its memory, is stopped with its disk only, and its item says so. */
                 keepMemory?: boolean;
                 /** @description For snapshot: its name, checkpoint when left out. */
                 name?: string;
@@ -3923,7 +3955,7 @@ export interface components {
             /** @enum {string} */
             action: "stop" | "start" | "archive" | "snapshot" | "auto-stop" | "labels" | "delete";
             options: {
-                /** @description For stop: keep their memory as well as their disks. */
+                /** @description For stop: keep their memory as well as their disks. A spot sandbox among them, which never keeps its memory, is stopped with its disk only, and its item says so. */
                 keepMemory?: boolean;
                 /** @description For snapshot: its name, checkpoint when left out. */
                 name?: string;
@@ -7543,7 +7575,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description capacity_exceeded: no server in the region has room for it now; try again later. name_taken: one of your sandboxes has that name. account_limit_reached: your account holds as many sandboxes as it may at a time; delete one first. idempotency_conflict: the Idempotency-Key was used before with a different body. too_many_addresses: the template's rule and network.allow come to more than 100 addresses. */
+            /** @description capacity_exceeded: no server in the region has room for it now; try again later. name_taken: one of your sandboxes has that name. account_limit_reached: your account holds as many sandboxes as it may at a time; delete one first. idempotency_conflict: the Idempotency-Key was used before with a different body. too_many_addresses: the template's rule and network.allow come to more than 100 addresses. spot_capacity_exceeded: a spot sandbox, and no server in the region has spare room for one now; try again later. spot_needs_top_up: spot sandboxes come with the account's first top-up. spot_keeps_no_memory: onTimeout stop_with_memory on a spot sandbox, which never keeps its memory. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -7700,7 +7732,7 @@ export interface operations {
                     /** @enum {string} */
                     action: "stop" | "start" | "archive" | "snapshot" | "auto-stop" | "labels" | "delete";
                     options?: {
-                        /** @description For stop: keep their memory as well as their disks. */
+                        /** @description For stop: keep their memory as well as their disks. A spot sandbox among them, which never keeps its memory, is stopped with its disk only, and its item says so. */
                         keepMemory?: boolean;
                         /** @description For snapshot: its name, checkpoint when left out. */
                         name?: string;
@@ -7822,7 +7854,7 @@ export interface operations {
                     /** @enum {string} */
                     action?: "stop" | "start" | "archive" | "snapshot" | "auto-stop" | "labels" | "delete";
                     options?: {
-                        /** @description For stop: keep their memory as well as their disks. */
+                        /** @description For stop: keep their memory as well as their disks. A spot sandbox among them, which never keeps its memory, is stopped with its disk only, and its item says so. */
                         keepMemory?: boolean;
                         /** @description For snapshot: its name, checkpoint when left out. */
                         name?: string;
@@ -8172,6 +8204,20 @@ export interface operations {
                      * @enum {string}
                      */
                     onTimeout?: "delete" | "stop" | "stop_with_memory";
+                    /** @description On a spot sandbox: its onReclaim or warnAt, changed; null makes it a normal sandbox, metered at the list price from that moment, which sends sandbox.upgraded. Made normal while it runs, it needs what a normal start needs: room under the plan's running count (429 running_limit_reached), and credit or a card (402). A normal sandbox is never made spot (409 not_spot). Omitted leaves it as it is. */
+                    spot?: {
+                        /**
+                         * @description What is done when its room is taken back. stop (the default): it is stopped, its disk kept, never its memory, and starts again as spot. delete: it is stopped and deleted. upgrade: it becomes a normal sandbox at the list price from that moment and keeps running, where another server in its region has room for what needed it; otherwise it is stopped as stop. Every reclaim sends sandbox.stopped with reason reclaimed, sandbox.deleted with reason reclaimed, or sandbox.upgraded, saying what was done and why.
+                         * @example stop
+                         * @enum {string}
+                         */
+                        onReclaim?: "delete" | "stop" | "upgrade";
+                        /**
+                         * @description The chance of being stopped, 0 to 1, at which sandbox.reclaim_chance is to be sent. Left out, 0.5.
+                         * @example 0.5
+                         */
+                        warnAt?: number;
+                    } | null;
                     /** @description Stored only. Null clears it. This is not a DNS name. */
                     subdomain?: string | null;
                     /**
@@ -8232,7 +8278,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description name_taken: another of your sandboxes has that name. subdomain_taken: another sandbox has that subdomain. Nothing was changed. */
+            /** @description name_taken: another of your sandboxes has that name. subdomain_taken: another sandbox has that subdomain. not_spot: spot was given for a normal sandbox, which is never made spot. spot_keeps_no_memory: onTimeout stop_with_memory on a spot sandbox. running_limit_reached: made normal while it runs, it would take the account past its plan's running count. Nothing was changed. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -8294,7 +8340,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description invalid_state: the sandbox is neither running nor stopped, as one still being created or in error. under_way: it is being resized, and is started when that has ended. capacity_exceeded: its server has no room to start it now, and no other can take it; try again later. */
+            /** @description invalid_state: the sandbox is neither running nor stopped, as one still being created or in error. under_way: it is being resized, and is started when that has ended. capacity_exceeded: its server has no room to start it now, and no other can take it; try again later. spot_capacity_exceeded: a spot sandbox, and its server has no spare room for it now (or, archived, no server of its region has); try again later, or make it normal. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -13723,7 +13769,7 @@ export interface operations {
                      */
                     url: string;
                     /**
-                     * @description The events to send, at most 20 entries: sandbox.created, sandbox.started, sandbox.stopped, sandbox.archived, sandbox.error, sandbox.moved, sandbox.deleted, sandbox.auto_stop_set, sandbox.labels_changed, sandbox.low_cpu, prompt.created, email.received, email.delivered, email.bounced, member.invited, member.joined, member.removed, member.role_changed, key.revoked, template.created, template.updated, template.secrets_changed (named, never with a value), template.labels_changed, template.deleted, and Headroom's headroom.burst_started, headroom.burst_ended, headroom.refused, headroom.running_count_reached, headroom.budget_threshold and headroom.budget_reached, which concern the organization rather than a sandbox, and a job's job.created, job.updated, job.deleted, job.run_started, job.run_finished, job.run_failed, job.recovered and job.paused. A group name with .*, as headroom.*, job.* or sandbox.*, means every event in the group, including ones added later; * alone means every event, the default. A * anywhere else, or a name that is not one of these, is rejected. An event has the same id in every webhook it is sent to, and sandbox.* and headroom.* events are also sent as log records to the collector set with PUT /v1/telemetry.
+                     * @description The events to send, at most 20 entries: sandbox.created, sandbox.started, sandbox.stopped, sandbox.archived, sandbox.error, sandbox.moved, sandbox.deleted, sandbox.auto_stop_set, sandbox.labels_changed, sandbox.low_cpu, sandbox.upgraded (a spot sandbox made normal), sandbox.reclaim_chance (a spot sandbox's chance of being stopped crossed its warnAt), prompt.created, email.received, email.delivered, email.bounced, member.invited, member.joined, member.removed, member.role_changed, key.revoked, template.created, template.updated, template.secrets_changed (named, never with a value), template.labels_changed, template.deleted, and Headroom's headroom.burst_started, headroom.burst_ended, headroom.refused, headroom.running_count_reached, headroom.budget_threshold and headroom.budget_reached, which concern the organization rather than a sandbox, and a job's job.created, job.updated, job.deleted, job.run_started, job.run_finished, job.run_failed, job.recovered and job.paused. A group name with .*, as headroom.*, job.* or sandbox.*, means every event in the group, including ones added later; * alone means every event, the default. A * anywhere else, or a name that is not one of these, is rejected. An event has the same id in every webhook it is sent to, and sandbox.* and headroom.* events are also sent as log records to the collector set with PUT /v1/telemetry.
                      * @example [
                      *       "sandbox.created",
                      *       "sandbox.error",
@@ -13938,7 +13984,7 @@ export interface operations {
                      */
                     url?: string;
                     /**
-                     * @description The events to send, at most 20 entries: sandbox.created, sandbox.started, sandbox.stopped, sandbox.archived, sandbox.error, sandbox.moved, sandbox.deleted, sandbox.auto_stop_set, sandbox.labels_changed, sandbox.low_cpu, prompt.created, email.received, email.delivered, email.bounced, member.invited, member.joined, member.removed, member.role_changed, key.revoked, template.created, template.updated, template.secrets_changed (named, never with a value), template.labels_changed, template.deleted, and Headroom's headroom.burst_started, headroom.burst_ended, headroom.refused, headroom.running_count_reached, headroom.budget_threshold and headroom.budget_reached, which concern the organization rather than a sandbox, and a job's job.created, job.updated, job.deleted, job.run_started, job.run_finished, job.run_failed, job.recovered and job.paused. A group name with .*, as headroom.*, job.* or sandbox.*, means every event in the group, including ones added later; * alone means every event, the default. A * anywhere else, or a name that is not one of these, is rejected. An event has the same id in every webhook it is sent to, and sandbox.* and headroom.* events are also sent as log records to the collector set with PUT /v1/telemetry.
+                     * @description The events to send, at most 20 entries: sandbox.created, sandbox.started, sandbox.stopped, sandbox.archived, sandbox.error, sandbox.moved, sandbox.deleted, sandbox.auto_stop_set, sandbox.labels_changed, sandbox.low_cpu, sandbox.upgraded (a spot sandbox made normal), sandbox.reclaim_chance (a spot sandbox's chance of being stopped crossed its warnAt), prompt.created, email.received, email.delivered, email.bounced, member.invited, member.joined, member.removed, member.role_changed, key.revoked, template.created, template.updated, template.secrets_changed (named, never with a value), template.labels_changed, template.deleted, and Headroom's headroom.burst_started, headroom.burst_ended, headroom.refused, headroom.running_count_reached, headroom.budget_threshold and headroom.budget_reached, which concern the organization rather than a sandbox, and a job's job.created, job.updated, job.deleted, job.run_started, job.run_finished, job.run_failed, job.recovered and job.paused. A group name with .*, as headroom.*, job.* or sandbox.*, means every event in the group, including ones added later; * alone means every event, the default. A * anywhere else, or a name that is not one of these, is rejected. An event has the same id in every webhook it is sent to, and sandbox.* and headroom.* events are also sent as log records to the collector set with PUT /v1/telemetry.
                      * @example [
                      *       "sandbox.created",
                      *       "sandbox.error",
