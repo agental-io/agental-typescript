@@ -192,7 +192,7 @@ await sandbox.update({ spot: null }); // a normal sandbox, at the list price fro
 
 - `onReclaim` is what is done when its room is taken back: `"stop"` keeps its disk, never its memory, and it starts again as spot; `"delete"` deletes it; `"upgrade"` makes it normal at the list price and keeps it running where another server in its region has room, and stops it otherwise.
 - `reclaimChance`, 0 to 1, is its chance of being stopped in the next minute, worked out every minute while it runs. It is a hint, not a promise: a burst of starts can stop it within seconds. The event `sandbox.reclaim_chance` is sent when it crosses `warnAt`, up or down.
-- It is not counted in the plan's running count and pays no burst fee. A create throws an `ApiError` with `spot_capacity_exceeded` when no server in the region has spare room now (try again later), and `spot_needs_top_up` before the account's first payment. It never keeps its memory: `stop({ keepMemory: true })` throws `spot_keeps_no_memory`.
+- It is not counted in the plan's running count. Its starts count toward the free starts, and past them pay a burst fee at the spot price, half a normal start's. A create throws an `ApiError` with `spot_capacity_exceeded` when no server in the region has spare room now (try again later), and `spot_needs_top_up` before the account's first payment. It never keeps its memory: `stop({ keepMemory: true })` throws `spot_keeps_no_memory`.
 
 ## Regions
 

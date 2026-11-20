@@ -7632,7 +7632,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description running_limit_reached: the account runs as many sandboxes as its plan's runningUnits allows. burst_fee_too_high: the start would cost more in burst fees than the Agental-Max-Burst-Fee header allows. burst_budget_reached: the burst fee would take this month's fees past the account's budget. feeMicros says what the start would have cost; retryAfterSeconds and the Retry-After header say when it would cost nothing. refusedLastHour says how many of the account's creates and starts were refused with the same code in the last hour, this one with them, and headroomUrl where it sees them all (GET /v1/headroom). Nothing was created. */
+            /** @description running_limit_reached: the account runs as many sandboxes as its plan's runningUnits allows. burst_fee_too_high: the start would cost more in burst fees than the Agental-Max-Burst-Fee header allows. burst_budget_reached: the burst fee would take this month's fees past the account's budget. out_of_credit (402): the account has never paid, and its allowance and credits left cannot pay the burst fee. feeMicros says what the start would have cost; retryAfterSeconds and the Retry-After header say when it would cost nothing. refusedLastHour says how many of the account's creates and starts were refused with the same code in the last hour, this one with them, and headroomUrl where it sees them all (GET /v1/headroom). Nothing was created. */
             429: {
                 headers: {
                     [name: string]: unknown;
@@ -8388,7 +8388,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description running_limit_reached: the account runs as many sandboxes as its plan's runningUnits allows. burst_fee_too_high: the start would cost more in burst fees than the Agental-Max-Burst-Fee header allows. burst_budget_reached: the burst fee would take this month's fees past the account's budget. feeMicros says what the start would have cost; retryAfterSeconds and the Retry-After header say when it would cost nothing. refusedLastHour says how many of the account's creates and starts were refused with the same code in the last hour, this one with them, and headroomUrl where it sees them all (GET /v1/headroom). It is left stopped. */
+            /** @description running_limit_reached: the account runs as many sandboxes as its plan's runningUnits allows. burst_fee_too_high: the start would cost more in burst fees than the Agental-Max-Burst-Fee header allows. burst_budget_reached: the burst fee would take this month's fees past the account's budget. out_of_credit (402): the account has never paid, and its allowance and credits left cannot pay the burst fee. feeMicros says what the start would have cost; retryAfterSeconds and the Retry-After header say when it would cost nothing. refusedLastHour says how many of the account's creates and starts were refused with the same code in the last hour, this one with them, and headroomUrl where it sees them all (GET /v1/headroom). It is left stopped. */
             429: {
                 headers: {
                     [name: string]: unknown;
@@ -9138,7 +9138,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description running_limit_reached: the account runs as many sandboxes as its plan's runningUnits allows. burst_fee_too_high: the start would cost more in burst fees than the Agental-Max-Burst-Fee header allows. burst_budget_reached: the burst fee would take this month's fees past the account's budget. feeMicros says what the start would have cost; retryAfterSeconds and the Retry-After header say when it would cost nothing. refusedLastHour says how many of the account's creates and starts were refused with the same code in the last hour, this one with them, and headroomUrl where it sees them all (GET /v1/headroom). It is left stopped. */
+            /** @description running_limit_reached: the account runs as many sandboxes as its plan's runningUnits allows. burst_fee_too_high: the start would cost more in burst fees than the Agental-Max-Burst-Fee header allows. burst_budget_reached: the burst fee would take this month's fees past the account's budget. out_of_credit (402): the account has never paid, and its allowance and credits left cannot pay the burst fee. feeMicros says what the start would have cost; retryAfterSeconds and the Retry-After header say when it would cost nothing. refusedLastHour says how many of the account's creates and starts were refused with the same code in the last hour, this one with them, and headroomUrl where it sees them all (GET /v1/headroom). It is left stopped. */
             429: {
                 headers: {
                     [name: string]: unknown;
@@ -9200,7 +9200,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description The sandbox was not running, and bringing it back on is a start. running_limit_reached: the account runs as many sandboxes as its plan's runningUnits allows. burst_fee_too_high: the start would cost more in burst fees than the Agental-Max-Burst-Fee header allows. burst_budget_reached: the burst fee would take this month's fees past the account's budget. feeMicros says what the start would have cost; retryAfterSeconds and the Retry-After header say when it would cost nothing. refusedLastHour says how many of the account's creates and starts were refused with the same code in the last hour, this one with them, and headroomUrl where it sees them all (GET /v1/headroom). It is left as it was. */
+            /** @description The sandbox was not running, and bringing it back on is a start. running_limit_reached: the account runs as many sandboxes as its plan's runningUnits allows. burst_fee_too_high: the start would cost more in burst fees than the Agental-Max-Burst-Fee header allows. burst_budget_reached: the burst fee would take this month's fees past the account's budget. out_of_credit (402): the account has never paid, and its allowance and credits left cannot pay the burst fee. feeMicros says what the start would have cost; retryAfterSeconds and the Retry-After header say when it would cost nothing. refusedLastHour says how many of the account's creates and starts were refused with the same code in the last hour, this one with them, and headroomUrl where it sees them all (GET /v1/headroom). It is left as it was. */
             429: {
                 headers: {
                     [name: string]: unknown;
@@ -9318,7 +9318,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description running_limit_reached: the account runs as many sandboxes as its plan's runningUnits allows. burst_fee_too_high: the start would cost more in burst fees than the Agental-Max-Burst-Fee header allows. burst_budget_reached: the burst fee would take this month's fees past the account's budget. feeMicros says what the start would have cost; retryAfterSeconds and the Retry-After header say when it would cost nothing. refusedLastHour says how many of the account's creates and starts were refused with the same code in the last hour, this one with them, and headroomUrl where it sees them all (GET /v1/headroom). Nothing was forked. */
+            /** @description running_limit_reached: the account runs as many sandboxes as its plan's runningUnits allows. burst_fee_too_high: the start would cost more in burst fees than the Agental-Max-Burst-Fee header allows. burst_budget_reached: the burst fee would take this month's fees past the account's budget. out_of_credit (402): the account has never paid, and its allowance and credits left cannot pay the burst fee. feeMicros says what the start would have cost; retryAfterSeconds and the Retry-After header say when it would cost nothing. refusedLastHour says how many of the account's creates and starts were refused with the same code in the last hour, this one with them, and headroomUrl where it sees them all (GET /v1/headroom). Nothing was forked. */
             429: {
                 headers: {
                     [name: string]: unknown;
@@ -22371,6 +22371,15 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            /** @description sponsored: the account is sponsored, and its budget is $50 a month until a card ends the sponsorship. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     setBurstBudget: {
@@ -22424,6 +22433,15 @@ export interface operations {
             };
             /** @description not_found: the account behind the key no longer exists. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description sponsored: the account is sponsored, and its budget is $50 a month until a card ends the sponsorship. */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
