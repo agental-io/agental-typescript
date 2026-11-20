@@ -3543,10 +3543,10 @@ export interface components {
             /** @description Seconds the sandbox runs after a start before it is stopped. Stop keeps the disk. Null uses the deployment default. The count begins again at every start, the one that follows a move to another server included. PUT /v1/sandboxes/{id}/auto-stop moves the stop of the run under way. */
             ttlSeconds: number | null;
             /**
-             * @description What its time limit does when it runs out: delete, or stop and keep its disk. Sandboxes made before 18 November 2026 are stop.
+             * @description What its time limit does when it runs out: delete, stop and keep its disk, or stop_with_memory, keeping its memory too. Sandboxes made before 18 November 2026 are stop.
              * @enum {string}
              */
-            onTimeout: "delete" | "stop";
+            onTimeout: "delete" | "stop" | "stop_with_memory";
             /** @description When this running sandbox will be stopped: the time PUT /v1/sandboxes/{id}/auto-stop set for the run under way, or else its last start plus ttlSeconds. Null when it is not running, or has no time limit: it then runs until it is stopped. */
             autoStopAt: string | null;
             /** @description Stored only. This is not registered in DNS. */
@@ -3714,11 +3714,11 @@ export interface components {
              */
             templateId?: string;
             /**
-             * @description What its time limit does when it runs out. delete (the default): the sandbox is deleted, with its disk. stop: it is stopped and its disk kept, as a stop asked for keeps it. A stop asked for always keeps the disk, whatever this says.
+             * @description What its time limit does when it runs out. delete (the default): the sandbox is deleted, with its disk. stop: it is stopped and its disk kept, as a stop asked for keeps it. stop_with_memory: it is stopped with its memory kept too, as a stop with keepMemory, and its next start carries on where it was; for an account that has made its first top-up (before it, 409 memory_needs_top_up), where the deployment keeps memory (otherwise 501). A stop asked for always keeps the disk, whatever this says.
              * @example stop
              * @enum {string}
              */
-            onTimeout?: "delete" | "stop";
+            onTimeout?: "delete" | "stop" | "stop_with_memory";
             /**
              * @description Seconds the sandbox runs after each start before it is stopped. Left out, it is what the template's start says, and where that says none, the deployment's default. Null is the deployment's default, whatever the template says. At most maxTtlSeconds of GET /v1/policy. PATCH /v1/sandboxes/{id} changes it later, and PUT /v1/sandboxes/{id}/auto-stop moves the stop of the run under way.
              * @example 7200
@@ -8167,10 +8167,10 @@ export interface operations {
                     /** @description Seconds the sandbox runs after each start before it is stopped, from 60 to maxTtlSeconds of GET /v1/policy. Null sets the deployment's default, which the response gives as the number. Omitted leaves the current value. Changed while it runs, its stop becomes its last start plus this, replacing a stop moved with PUT /v1/sandboxes/{id}/auto-stop. */
                     ttlSeconds?: number | null;
                     /**
-                     * @description What its time limit does when it runs out: delete, or stop and keep its disk. Omitted leaves it as it is.
+                     * @description What its time limit does when it runs out: delete, stop and keep its disk, or stop_with_memory, keeping its memory too (409 memory_needs_top_up before the account's first top-up). Omitted leaves it as it is.
                      * @enum {string}
                      */
-                    onTimeout?: "delete" | "stop";
+                    onTimeout?: "delete" | "stop" | "stop_with_memory";
                     /** @description Stored only. Null clears it. This is not a DNS name. */
                     subdomain?: string | null;
                     /**
