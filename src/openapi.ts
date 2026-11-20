@@ -2467,6 +2467,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/sponsor-invites/{id}/public": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getPublicSponsorInvite"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sponsor-invites/{id}/redeem": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["redeemSponsorInvite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/api-keys": {
         parameters: {
             query?: never;
@@ -6468,6 +6500,13 @@ export interface components {
                  * @example 1200000
                  */
                 allowanceUsedMicros: number;
+            } | null;
+            /** @description Set while agental sponsors the account: it runs on Fleet free of charge, nothing is owed, and plan is Fleet with includedMicros 0. Its use is metered and shown at list price. Adding a card ends the sponsorship from that moment, and what it used before is never charged; until then plans and top-ups are refused with sponsored. */
+            sponsored: {
+                /** @description When the sponsorship began. */
+                since: string;
+                /** @description True while a card cannot be added, because payments here are in test mode: the account stays sponsored until it can. */
+                cardRefused: boolean;
             } | null;
             /** @description What the plan's month includes: a plan's credits, or on the free plan its monthly allowance. */
             includedMicros: number;
@@ -19042,6 +19081,101 @@ export interface operations {
             };
         };
     };
+    getPublicSponsorInvite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description What the invite's page shows anyone with the link: whether it is open, and until when. Never who it is for. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        status: "open" | "used" | "revoked" | "expired";
+                        expiresAt: string;
+                    };
+                };
+            };
+            /** @description not_found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    redeemSponsorInvite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sponsored: the caller's own account runs on Fleet free of charge until they add a card. Redeeming an invite again answers the same. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        orgId: string;
+                    };
+                };
+            };
+            /** @description session_required: only a person, signed in, redeems an invite. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description not_found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description pays_already: the account has a card saved or a plan, so it pays as it is. already_sponsored: it is sponsored already. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description invite_closed: the invite was revoked, has expired, or has been used. */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     listApiKeys: {
         parameters: {
             query?: never;
@@ -19740,7 +19874,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description billing_not_configured: nothing is sold on this deployment. already_on_plan: the account is already on that plan. card_saved: a card is already saved. payment_late: the plan's last payment has not gone through, so the plan cannot change until it has. */
+            /** @description billing_not_configured: nothing is sold on this deployment. sponsored: the account is sponsored, so it adds a card before it buys a plan or a top-up. test_mode: the account is sponsored and payments here are in test mode, so a card cannot be added yet. already_on_plan: the account is already on that plan. card_saved: a card is already saved. payment_late: the plan's last payment has not gone through, so the plan cannot change until it has. */
             409: {
                 headers: {
                     [name: string]: unknown;
