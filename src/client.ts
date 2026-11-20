@@ -899,16 +899,16 @@ export class Agental {
   }
 
   /**
-   * How close your account runs to its plan's limits. `now` is where it stands: how many small
-   * sandboxes it runs and may run at once (runningUnits; a tiny counts half, a medium 2, a
-   * large 4), what its burst meter reads against the free burst, what it has spent on burst
+   * How close your account runs to its plan's limits. `now` is where it stands: how many units
+   * it runs and may run at once (runningUnits; a tiny sandbox is 1, a small 2, a medium 4, a
+   * large 8), what it started in the last 15 minutes against its free starts, what it has spent on burst
    * fees this month against its budget, and what one sandbox of each size would cost to start
    * now. Over the range, today (UTC) unless from and to say otherwise: what it ran against its
    * running count (series, atRunningCountMs), each burst, what did not start and why
    * (refused), and how fast what started ran (speed). A range covers 90 days at most.
    *
    * Where `now.enforced` is true, a create, fork or start past the running count throws an
-   * `ApiError` 429 `running_limit_reached`; one faster than the free burst costs a burst fee,
+   * `ApiError` 429 `running_limit_reached`; one past the free starts costs a burst fee,
    * and is refused with `burst_budget_reached` past the monthly budget.
    * On the free plan, until the account has paid for something (`now.unpaid`), the running
    * count is `free.unpaidUnits` of prices(). Amounts are millionths of a US dollar.
@@ -921,7 +921,7 @@ export class Agental {
 
   /**
    * Your account's last full month priced on every plan: the same use at list price, each
-   * plan's burst fees worked out again against its free burst, and its price and included
+   * plan's burst fees worked out again against its free starts, and its price and included
    * credits (Free: your allowance). Your own plan (yours) is the month as charged. A plan
    * that would have refused the month (outcome not_allowed, why: size, running_count,
    * members, budget), or any plan in a month whose creates or starts were refused (unknown),

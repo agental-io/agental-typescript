@@ -433,14 +433,14 @@ The free plan makes tiny and small sandboxes, the $100 plan medium ones too, and
 
 ## How many you run, and how fast you start them
 
-Each plan runs so many small sandboxes at once, its running count, and starts so many at once for nothing, its free burst: a tiny counts half, a medium 2 and a large 4. The free plan runs 20 and bursts 20, though only 2 at once until the account has paid for something (`headroom().now.unpaid`, `prices().free.unpaidUnits`), the $100 plan 100 and 100, the $500 plan 600 and 200, the $2000 plan 2000 and 400; `prices().tiers` gives each plan's `runningUnits` and `freeBurstUnits`, and `burstFee` how fees are worked out. Each start adds its memory to a burst meter that halves every 15 minutes. Starting faster than the free burst is never refused for speed: it costs a burst fee, which grows with how far over the meter goes.
+Each plan runs so many units at once, its running count, and starts three times that for nothing in any 15 minutes, its free starts. A unit is a tiny sandbox's memory: a tiny counts 1, a small 2, a medium 4 and a large 8. The free plan runs 40 and starts 120, though only 4 and 12 until the account has paid for something (`headroom().now.unpaid`, `prices().free.unpaidUnits`), the $100 plan 200 and 600, the $500 plan 1,200 and 3,600, the $2000 plan 4,000 and 12,000; `prices().tiers` gives each plan's `runningUnits` and `freeBurstUnits`, and `burstFee` how fees are worked out (`windowMinutes`, `freeStartsPerRunning`, `feeMicrosPerUnit`, `defaultBudgetMicros`). Before each start, the units the account started in the 15 minutes before it are counted (a moving window, so a start counts until it is 15 minutes old). Starting more than the free starts is never refused for speed: a start past them pays a burst fee of one hour of a tiny's list price, $0.0135, for each unit over, so one wholly past the line pays one hour of its own size's price (a small $0.027, a large $0.108) and one that straddles it pays only for the units past it.
 
-`headroom()` says how close the account runs to these limits: `now`, where it stands, and over a range (today, UTC, unless `from` and `to` say otherwise, 90 days at most) what it ran against its running count, each burst (a stretch when the meter was over the free burst, so every start in it paid a fee), what did not start and why, and how fast what started ran.
+`headroom()` says how close the account runs to these limits: `now`, where it stands, and over a range (today, UTC, unless `from` and `to` say otherwise, 90 days at most) what it ran against its running count, each burst (a stretch when the account was past its free starts, so every start in it paid a fee), what did not start and why, and how fast what started ran.
 
 ```ts
 const { now, atRunningCountMs, bursts, refused } = await agental.headroom();
-console.log(now.runningMb / 4096, now.runningUnits); // small sandboxes running, of 100
-console.log(now.freeNowMb / 4096); // small sandboxes you may start now for nothing
+console.log(now.runningMb / 2048, now.runningUnits); // units running, of 200
+console.log(now.freeNowMb / 2048); // units you may start now for nothing
 console.log(now.spentMicros, now.budgetMicros); // burst fees this month, and the most you spend on them
 console.log(now.nextStart); // what one sandbox of each size would cost to start now
 console.log(atRunningCountMs / 60_000); // minutes today at the running count
@@ -449,13 +449,13 @@ console.log(refused.total, refused.byReason); // what did not start today: runni
 
 // The last week, read every hour.
 const week = await agental.headroom({ from: new Date(Date.now() - 7 * 86_400_000), step: "hour" });
-console.log(week.series.map((point) => point.peakRunningMb / 4096));
+console.log(week.series.map((point) => point.peakRunningMb / 2048));
 
 // Spend at most $10 a month on burst fees; 0 refuses every start that would cost one, null puts back the default ($50).
 await agental.setHeadroomBudget(10_000_000);
 ```
 
-`replayLastMonth()` prices your last full month on every plan: the same use at list price, each plan's burst fees worked out again against its free burst, and its price and included credits. Your own plan is the month as charged. A plan that would have refused the month has no amount, and neither has any plan in a month whose creates or starts were refused.
+`replayLastMonth()` prices your last full month on every plan: the same use at list price, each plan's burst fees worked out again against its free starts, and its price and included credits. Your own plan is the month as charged. A plan that would have refused the month has no amount, and neither has any plan in a month whose creates or starts were refused.
 
 ```ts
 const month = await agental.replayLastMonth();
@@ -470,7 +470,7 @@ A create, fork or start takes `maxBurstFeeMicros`, the most it may pay, and the 
 
 ```ts
 const sandbox = await agental.sandboxes.create({ maxBurstFeeMicros: 50_000 }); // at most 5 cents
-console.log(sandbox.burstFeeMicros); // 0 within the free burst
+console.log(sandbox.burstFeeMicros); // 0 within the free starts
 await sandbox.start({ maxBurstFeeMicros: 0, maxBurstWaitMs: 300_000 }); // free, waiting up to 5 minutes for it to be
 ```
 
@@ -610,7 +610,7 @@ await agental.rotateWebhookSecret(hook.id); // a new signingSecret; the old one 
 await agental.deleteWebhook(hook.id);
 ```
 
-`events` takes the kinds of event, such as `sandbox.started`, `sandbox.stopped` and `sandbox.error`. `sandbox.auto_stop_set` is a running sandbox's stop moved: its `data` has `autoStopAt`, `previousAutoStopAt`, and `by`, `account` or `sandbox`. A group by its name and `.*`, such as `headroom.*` or `sandbox.*`, takes every kind of the group and any added to it later; a `*` anywhere else is refused. The `headroom.*` events are your organization's, about no sandbox: `headroom.burst_started` and `headroom.burst_ended` (a stretch over the free burst, with what it cost), `headroom.refused` (starts refused, at most one a minute for each reason), `headroom.running_count_reached`, `headroom.budget_threshold` (burst fees past 80% of the month's budget) and `headroom.budget_reached` (the budget refused a start). Money is in micros of a dollar, memory in MB.
+`events` takes the kinds of event, such as `sandbox.started`, `sandbox.stopped` and `sandbox.error`. `sandbox.auto_stop_set` is a running sandbox's stop moved: its `data` has `autoStopAt`, `previousAutoStopAt`, and `by`, `account` or `sandbox`. A group by its name and `.*`, such as `headroom.*` or `sandbox.*`, takes every kind of the group and any added to it later; a `*` anywhere else is refused. The `headroom.*` events are your organization's, about no sandbox: `headroom.burst_started` and `headroom.burst_ended` (a stretch past the free starts, with what it cost), `headroom.refused` (starts refused, at most one a minute for each reason), `headroom.running_count_reached`, `headroom.budget_threshold` (burst fees past 80% of the month's budget) and `headroom.budget_reached` (the budget refused a start). Money is in micros of a dollar, memory in MB.
 
 Check each post your server receives:
 

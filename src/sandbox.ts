@@ -62,7 +62,7 @@ export interface ExecOptions {
 export type ExecEvent = { type: "stdout" | "stderr"; data: string } | { type: "exit"; exitCode: number };
 
 /**
- * What a create, fork or start may pay for starting faster than the plan's free burst, and
+ * What a create, fork or start may pay for starting past the plan's free starts, and
  * whether to wait for a start to cost nothing when it is refused for its burst.
  */
 export interface BurstOptions {

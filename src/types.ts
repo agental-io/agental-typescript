@@ -134,7 +134,7 @@ export type Usage = Schemas["Usage"];
 export type UsageDays = Schemas["UsageDays"];
 /**
  * Where your account stands against its plan now: what it runs against its running count,
- * what its burst meter reads against the free burst, what it spent on burst fees this month
+ * what it started in the last 15 minutes against its free starts, what it spent on burst fees this month
  * against its budget, and what one sandbox of each size would cost to start now.
  */
 export type HeadroomNow = Omit<Schemas["Burst"], "quote"> & {
@@ -143,14 +143,14 @@ export type HeadroomNow = Omit<Schemas["Burst"], "quote"> & {
 };
 /**
  * How close your account runs to its plan's limits: where it stands now, and over a range,
- * what it ran against its running count, its burst meter against its free burst, each burst
- * (a stretch when the meter was over the free burst, so every start in it paid a fee), what
+ * what it ran against its running count, what it started in each 15 minutes against its free starts, each burst
+ * (a stretch when it was past its free starts, so every start in it paid a fee), what
  * did not start and why, and how fast what started ran.
  */
 export type Headroom = Omit<Schemas["Headroom"], "now"> & { now: HeadroomNow };
 /**
  * Your account's last full month priced on every plan (GET /v1/burst/replay): the same use at list
- * price, each plan's burst fees worked out again against its free burst, and its price and included
+ * price, each plan's burst fees worked out again against its free starts, and its price and included
  * credits. Your own plan is the month as charged. A plan that would have refused the month, or a
  * month whose starts were refused, has no amount. period is null where that month is not known whole.
  */
@@ -168,10 +168,10 @@ export interface HeadroomRange {
 }
 /** What starting so many sandboxes of one size now would cost in burst fees, and when it would cost nothing. */
 export type BurstQuote = Schemas["BurstQuote"];
-/** What a start costs when an account starts sandboxes faster than its plan's free burst, and the default monthly budget. */
+/** What a start costs when an account starts more than its plan's free starts in 15 minutes, and the default monthly budget. */
 export type BurstFee = Schemas["Prices"]["burstFee"];
 /**
- * A monthly plan: its price, the credits it includes, its running count, its free burst and its sizes.
+ * A monthly plan: its price, the credits it includes, its running count, its free starts and its sizes.
  * The API still sends sandboxesAtOnce and burst, the shape tiers had; they are not read here.
  */
 export type Plan = Omit<Schemas["Prices"]["tiers"][number], "sandboxesAtOnce" | "burst">;

@@ -3245,7 +3245,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Returns where the caller's account stands against its plan: how many sandboxes it runs and may run at once, its burst meter against its free burst, its burst fees this month against its budget, and what starting one sandbox of each size would cost now. With size (and count), it also quotes starting that many of that size. */
+        /** @description Returns where the caller's account stands against its plan: how many sandboxes it runs and may run at once, its burst meter against its free starts, its burst fees this month against its budget, and what starting one sandbox of each size would cost now. With size (and count), it also quotes starting that many of that size. */
         get: operations["getBurst"];
         put?: never;
         post?: never;
@@ -3262,7 +3262,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Replays the caller's account's last full month on every plan: its starts against each plan's running count, free burst and sizes, and the month priced on each, at the same list price, with that plan's burst fees and included credits. A plan that would not have allowed the month is not priced, and no plan is where creates or starts were refused in it for a limit, a size or the bill, since what they would have used is not known. */
+        /** @description Replays the caller's account's last full month on every plan: its starts against each plan's running count, free starts and sizes, and the month priced on each, at the same list price, with that plan's burst fees and included credits. A plan that would not have allowed the month is not priced, and no plan is where creates or starts were refused in it for a limit, a size or the bill, since what they would have used is not known. */
         get: operations["replayLastMonth"];
         put?: never;
         post?: never;
@@ -3315,7 +3315,7 @@ export interface paths {
         };
         /**
          * @deprecated
-         * @description Deprecated: use GET /v1/burst. Returns the account's limits in the old tier shape, derived from its burst state: the free burst fills the tier's amounts, and the burst meter what was started.
+         * @description Deprecated: use GET /v1/burst. Returns the account's limits in the old tier shape, derived from its burst state: the free starts fills the tier's amounts, and the burst meter what was started.
          */
         get: operations["getTier"];
         put?: never;
@@ -3333,7 +3333,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Returns how close the caller's account runs to its plan's limits: its state now and, over a time range (by default today in UTC), its running sandboxes against its running count, its burst meter against its free burst, each burst with who started what in it, the creates and starts that were refused and why, and how fast sandboxes started. A burst is a stretch when the meter was over the free burst, so every start in it paid a fee. */
+        /** @description Returns how close the caller's account runs to its plan's limits: its state now and, over a time range (by default today in UTC), its running sandboxes against its running count, its burst meter against its free starts, each burst with who started what in it, the creates and starts that were refused and why, and how fast sandboxes started. A burst is a stretch when the meter was over the free starts, so every start in it paid a fee. */
         get: operations["getHeadroom"];
         put?: never;
         post?: never;
@@ -3478,7 +3478,7 @@ export interface components {
                  */
                 feeMicros?: number;
                 /**
-                 * @description On a 429 burst refusal: seconds until the same start costs no burst fee, as the meter falls. Null where waiting would not do: on running_limit_reached, or for a start larger than the plan's whole free burst. On a 503 admission_unavailable: 1. Also sent as Retry-After.
+                 * @description On a 429 burst refusal: seconds until the same start costs no burst fee, as earlier starts leave the 15-minute window. Null where waiting would not do: on running_limit_reached, or for a start larger than the plan's whole free starts. On a 503 admission_unavailable: 1. Also sent as Retry-After.
                  * @example 240
                  */
                 retryAfterSeconds?: number | null;
@@ -6181,7 +6181,7 @@ export interface components {
                 /** @enum {string} */
                 label: "list price";
             }[];
-            /** @description The plans: what each costs a month, what it includes, which sizes it makes, how many sandboxes it runs at once, and how many it starts at once for nothing. The first, free, costs and includes nothing: it pays from top-ups and its one credit, see free. */
+            /** @description The plans: what each costs a month, what it includes, which sizes it makes, how many units it runs at once, and how many it starts for nothing in any 15 minutes. The first, free, costs and includes nothing: it pays from top-ups and its one credit, see free. */
             tiers: {
                 /** @example plan100 */
                 id: string;
@@ -6192,35 +6192,35 @@ export interface components {
                  */
                 includedMicros: number;
                 /**
-                 * @description Small sandboxes the plan runs at once. A medium counts 2, a large 4, a tiny half. A create, fork or start past it is refused with 429 running_limit_reached.
-                 * @example 100
+                 * @description Units the plan runs at once: a tiny sandbox is 1 unit, a small 2, a medium 4, a large 8. A create, fork or start past it is refused with 429 running_limit_reached.
+                 * @example 200
                  */
                 runningUnits: number;
                 /**
-                 * @description Small sandboxes the plan starts at once for nothing, counted as runningUnits is. Starting faster costs a burst fee: see burstFee, and GET /v1/burst for an account's own.
-                 * @example 100
+                 * @description Units the plan starts for nothing in any 15 minutes, counted as runningUnits is: three times runningUnits. Each unit started past them costs a burst fee: see burstFee, and GET /v1/burst for an account's own.
+                 * @example 600
                  */
                 freeBurstUnits: number;
                 /**
                  * @deprecated
-                 * @description The same as runningUnits: small sandboxes the plan runs at once. Sent for clients that read it, and it will be removed.
+                 * @description The same as runningUnits: units the plan runs at once. Sent for clients that read it, and it will be removed.
                  */
                 sandboxesAtOnce: number;
                 /**
                  * @deprecated
-                 * @description Kept for clients that read it: the free burst in megabytes. Nothing is refused for speed now; a start faster than the free burst costs a fee.
+                 * @description Kept for clients that read it: the free starts in megabytes. Nothing is refused for speed; a start past the free starts costs a fee.
                  */
                 burst: {
                     /** @description The plan's place among the plans, 0 for the free plan. */
                     tier: number;
                     /**
-                     * @description The plan's free burst, in megabytes: freeBurstUnits times 4096.
-                     * @example 409600
+                     * @description The plan's free starts, in megabytes: freeBurstUnits times 2048.
+                     * @example 1228800
                      */
                     perQuarterMb: number;
                     /**
                      * @description The same as perQuarterMb.
-                     * @example 409600
+                     * @example 1228800
                      */
                     perHourMb: number;
                 };
@@ -6234,23 +6234,23 @@ export interface components {
                  */
                 sizes: ("tiny" | "small" | "medium" | "large")[];
             }[];
-            /** @description What a start costs when an account starts sandboxes faster than its plan's free burst. Fees come out of the plan's credits and then the top-ups. */
+            /** @description What a start costs when an account starts more than its plan's free starts in windowMinutes. Fees come out of the plan's credits and then the top-ups. */
             burstFee: {
                 /**
-                 * @description How long an account's burst meter takes to fall by half. Each start adds its memory to it.
+                 * @description How far back a start counts against the free starts: the units started in the windowMinutes before a start, with its own, are what is held to them. A moving window, not quarter-hours of the clock.
                  * @example 15
                  */
-                halfLifeMinutes: number;
+                windowMinutes: number;
                 /**
-                 * @description What each GiB of a start that is past the free burst costs, in millionths of a US dollar: fee = min(feeMicrosPerGib × GiB over, feeCapHours × the size's list price an hour). A small past the free burst costs $0.027, a large $0.108.
-                 * @example 10000
+                 * @description A plan's free starts are this many times its running count.
+                 * @example 3
                  */
-                feeMicrosPerGib: number;
+                freeStartsPerRunning: number;
                 /**
-                 * @description The most one start costs in burst fees, in hours of its size's list price.
-                 * @example 1
+                 * @description What each unit of a start past the free starts costs, in millionths of a US dollar: one hour of a tiny's list price. A small wholly past them costs $0.027, a large $0.108: one hour of its own price.
+                 * @example 13500
                  */
-                feeCapHours: number;
+                feeMicrosPerUnit: number;
                 /**
                  * @description What an account spends on burst fees in a month at most unless it sets another budget: PUT /v1/headroom/budget.
                  * @example 50000000
@@ -6350,8 +6350,8 @@ export interface components {
                  */
                 allowanceMicros: number;
                 /**
-                 * @description Small sandboxes the free plan runs and starts at once, at most, until the account has paid for something, a top-up of any size. Then the plan's runningUnits. A tiny counts half.
-                 * @example 2
+                 * @description Units the free plan runs at once, at most, until the account has paid for something, a top-up of any size, and its free starts are three times that. Then the plan's runningUnits. A tiny sandbox is 1 unit, a small 2.
+                 * @example 4
                  */
                 unpaidUnits: number;
             };
@@ -6379,35 +6379,35 @@ export interface components {
                 dollarsPerMonth: number;
                 includedMicros: number;
                 /**
-                 * @description Small sandboxes the plan runs at once. A medium counts 2, a large 4, a tiny half. A create, fork or start past it is refused with 429 running_limit_reached.
-                 * @example 100
+                 * @description Units the plan runs at once: a tiny sandbox is 1 unit, a small 2, a medium 4, a large 8. A create, fork or start past it is refused with 429 running_limit_reached.
+                 * @example 200
                  */
                 runningUnits: number;
                 /**
-                 * @description Small sandboxes the plan starts at once for nothing, counted as runningUnits is. Starting faster costs a burst fee: see burstFee, and GET /v1/burst for an account's own.
-                 * @example 100
+                 * @description Units the plan starts for nothing in any 15 minutes, counted as runningUnits is: three times runningUnits. Each unit started past them costs a burst fee: see burstFee, and GET /v1/burst for an account's own.
+                 * @example 600
                  */
                 freeBurstUnits: number;
                 /**
                  * @deprecated
-                 * @description The same as runningUnits: small sandboxes the plan runs at once. Sent for clients that read it, and it will be removed.
+                 * @description The same as runningUnits: units the plan runs at once. Sent for clients that read it, and it will be removed.
                  */
                 sandboxesAtOnce: number;
                 /**
                  * @deprecated
-                 * @description Kept for clients that read it: the free burst in megabytes. Nothing is refused for speed now; a start faster than the free burst costs a fee.
+                 * @description Kept for clients that read it: the free starts in megabytes. Nothing is refused for speed; a start past the free starts costs a fee.
                  */
                 burst: {
                     /** @description The plan's place among the plans, 0 for the free plan. */
                     tier: number;
                     /**
-                     * @description The plan's free burst, in megabytes: freeBurstUnits times 4096.
-                     * @example 409600
+                     * @description The plan's free starts, in megabytes: freeBurstUnits times 2048.
+                     * @example 1228800
                      */
                     perQuarterMb: number;
                     /**
                      * @description The same as perQuarterMb.
-                     * @example 409600
+                     * @example 1228800
                      */
                     perHourMb: number;
                 };
@@ -6422,9 +6422,9 @@ export interface components {
             free: {
                 /** @description Whether the account has a card saved, which it must before it runs anything. */
                 cardSaved: boolean;
-                /** @description Whether it has paid for anything. Until it has, it runs and starts at most unpaidUnits small sandboxes at once. */
+                /** @description Whether it has paid for anything. Until it has, it runs at most unpaidUnits units at once. */
                 paid: boolean;
-                /** @example 2 */
+                /** @example 4 */
                 unpaidUnits: number;
                 /**
                  * @description What this month's use is free up to, at list price: the free plan's allowance, or 0 where the card the account saved had it on another account. The same as includedMicros.
@@ -6477,7 +6477,7 @@ export interface components {
             };
             /** @description The part of usedMicros that is snapshots past the free ones. */
             snapshotMicros: number;
-            /** @description The part of usedMicros that is burst fees: what starts faster than the plan's free burst cost. GET /v1/burst says where the account stands. */
+            /** @description The part of usedMicros that is burst fees: what starts past the plan's free starts cost. GET /v1/burst says where the account stands. */
             burstMicros: number;
             /** @description What an earlier month ran past its plan and its top-ups. This month's credits pay it first, then the top-ups. On the free plan, what the account owes now: what it has run past its allowance and its credits. */
             carriedMicros: number;
@@ -6485,7 +6485,7 @@ export interface components {
             topUpMicros: number;
             /**
              * @deprecated
-             * @description The same as runningUnits: small sandboxes the plan runs at once. Sent for clients that read it, and it will be removed.
+             * @description The same as runningUnits: units the plan runs at once. Sent for clients that read it, and it will be removed.
              */
             sandboxesAtOnce: number | null;
             cancelAtPeriodEnd: boolean;
@@ -6992,7 +6992,7 @@ export interface components {
             keepDays?: number;
         };
         Burst: {
-            /** @description Whether the account is held to its plan: a start past the running count is refused, and a fast one costs a fee. False: what it starts is only measured. */
+            /** @description Whether the account is held to its plan: a start past the running count is refused, and one past the free starts costs a fee. False: what it starts is only measured. */
             enforced: boolean;
             /** @description The plan it is on, free included, or null where plans are not enforced on it. */
             plan: string | null;
@@ -7006,28 +7006,29 @@ export interface components {
              * @example plan100
              */
             limitsPlan: string;
-            /** @description Small sandboxes it runs at once at most. A medium counts 2, a large 4, a tiny half. */
+            /** @description Units it runs at once at most: a tiny sandbox is 1 unit, a small 2, a medium 4, a large 8. */
             runningUnits: number;
-            /** @description Small sandboxes it starts at once for nothing, counted the same way. */
+            /** @description Units it starts for nothing in any windowMinutes, counted the same way: three times runningUnits. */
             freeBurstUnits: number;
             /** @description The memory of its sandboxes running, being made or being started. */
             runningMb: number;
-            /** @description runningUnits in megabytes: 4096 each. */
+            /** @description runningUnits in megabytes: 2048 each. */
             capMb: number;
             /** @description freeBurstUnits in megabytes. */
             freeMb: number;
-            /** @description What its burst meter reads: the memory of each start it made, halved for every halfLifeMinutes since. */
+            /** @description What its burst meter reads: the memory of the starts it made in the last windowMinutes. */
             meterMb: number;
             /** @description What it may start now for nothing: freeMb less meterMb, and no more than the room under capMb. */
             freeNowMb: number;
-            /** @description By how much the meter is over the free burst. While it is, every start costs a fee. */
+            /** @description By how much the meter is over the free starts. While it is, every start costs a fee. */
             overMb: number;
-            halfLifeMinutes: number;
             /** @description See burstFee in GET /v1/billing/plans. */
-            feeMicrosPerGib: number;
+            windowMinutes: number;
+            /** @description See burstFee in GET /v1/billing/plans. */
+            feeMicrosPerUnit: number;
             /** @description Whether it may start a sandbox at all now. A plan out of credit may not: GET /v1/billing says why. */
             mayStart: boolean;
-            /** @description Whether it is on the free plan and has paid for nothing yet: until it has, it runs and starts at most free.unpaidUnits small sandboxes at once (GET /v1/billing/plans). */
+            /** @description Whether it is on the free plan and has paid for nothing yet: until it has, it runs at most free.unpaidUnits units at once (GET /v1/billing/plans). */
             unpaid: boolean;
             /** @description What it has spent on burst fees this month, in millionths of a US dollar. */
             spentMicros: number;
@@ -7046,7 +7047,7 @@ export interface components {
             count: number;
             /** @description What starting that many of that size now would cost in burst fees, all told, in millionths of a US dollar. 0 where the account is not held to a plan. */
             feeMicros: number;
-            /** @description Seconds until they would cost nothing, as the meter falls: 0 when they cost nothing now, null when they never would, being more than the free burst. */
+            /** @description Seconds until they would cost nothing, as earlier starts leave the window: 0 when they cost nothing now, null when they never would, being more than the free starts. */
             freeInSeconds: number | null;
             /** @description Whether they would take the account past its running count, which refuses them. */
             overRunningCount: boolean;
@@ -7072,7 +7073,7 @@ export interface components {
              */
             from: "plan" | "money" | "hand";
             plan: string | null;
-            /** @description The free burst, in megabytes. */
+            /** @description The free starts, in megabytes. */
             perQuarterMb: number;
             /** @description The same. */
             perHourMb: number;
@@ -7086,7 +7087,7 @@ export interface components {
             leftHourMb: number;
             /** @description The same. */
             leftMb: number;
-            /** @description By how much the meter is over the free burst. */
+            /** @description By how much the meter is over the free starts. */
             overQuarterMb: number;
             /** @description The same. */
             overHourMb: number;
@@ -7107,7 +7108,7 @@ export interface components {
             series: {
                 /** @description The step's start. */
                 at: string;
-                /** @description What ran at the step's end, in MB: 4096 is one small. */
+                /** @description What ran at the step's end, in MB: 2048 is one unit, a tiny. */
                 runningMb: number;
                 /** @description What ran at its most in the step. */
                 peakRunningMb: number;
@@ -7118,10 +7119,10 @@ export interface components {
                 /** @description Creates and starts that did not start in the step, every try counted. */
                 refused: number;
             }[];
-            /** @description Each stretch when the burst meter was over the free burst, so that every start in it paid a fee, the newest first. One that paid nothing is left out. */
+            /** @description Each stretch when the burst meter was over the free starts, so that every start in it paid a fee, the newest first. One that paid nothing is left out. */
             bursts: {
                 startedAt: string;
-                /** @description Null where the meter was still over the free burst when the range ended. */
+                /** @description Null where the meter was still over the free starts when the range ended. */
                 endedAt: string | null;
                 peakMeterMb: number;
                 feesMicros: number;
@@ -7163,7 +7164,7 @@ export interface components {
                 p99Ms: number | null;
                 maxMs: number | null;
             };
-            /** @description How long, in the range, the account ran within one small sandbox of its running count. */
+            /** @description How long, in the range, the account ran within one unit of its running count. */
             atRunningCountMs: number;
             peakRunningMb: number;
             peakAt: string | null;

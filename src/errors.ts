@@ -47,7 +47,7 @@ export class ApiError extends AgentalError {
   /**
    * On a start refused with 429 or 409 for its burst: seconds until the same start would cost no
    * burst fee. Null where waiting would not help: on running_limit_reached, or for a start
-   * larger than the plan's whole free burst. Undefined on any other error.
+   * larger than the plan's whole free starts. Undefined on any other error.
    */
   readonly retryAfterSeconds?: number | null;
 
