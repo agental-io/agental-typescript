@@ -56,7 +56,7 @@ export type EgressInput = Schemas["EgressInput"];
 /** Whether the account may send sandboxes out residential, what it still needs, and what it has spent and may spend this month. */
 export type EgressAccount = Schemas["EgressAccount"];
 export type Size = SandboxInfo["size"];
-/** What makes a sandbox spot, and its chance of being stopped in the next minute: null on a normal sandbox. */
+/** What makes a sandbox spot, and its chance of being stopped in the next minute: null on a standard sandbox. */
 export type SandboxSpot = NonNullable<SandboxInfo["spot"]>;
 /** A spot sandbox's settings as a create or update() gives them: what a reclaim does to it, and the chance it is warned at. */
 export type SpotOptions = Schemas["SpotInput"];

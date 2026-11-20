@@ -3579,10 +3579,10 @@ export interface components {
              * @enum {string}
              */
             onTimeout: "delete" | "stop" | "stop_with_memory";
-            /** @description Set on a spot sandbox, null on a normal one. A spot sandbox runs at half the list price in room nobody else is paying for, and that room is taken back when a normal sandbox needs it, as onReclaim says. It never keeps its memory at a stop, and stays spot across a stop and start until it is made normal with PATCH /v1/sandboxes/{id}. */
+            /** @description Set on a spot sandbox, null on a standard one. A spot sandbox runs at half the list price in room nobody else is paying for, and that room is taken back when a standard sandbox needs it, as onReclaim says. It never keeps its memory at a stop, and stays spot across a stop and start until it is made standard with PATCH /v1/sandboxes/{id}. */
             spot: {
                 /**
-                 * @description What is done when its room is taken back: delete, stop (its disk kept, never its memory), or upgrade (it becomes a normal sandbox at the list price where that frees what was needed, and is stopped otherwise).
+                 * @description What is done when its room is taken back: delete, stop (its disk kept, never its memory), or upgrade (it becomes a standard sandbox at the list price where that frees what was needed, and is stopped otherwise).
                  * @enum {string}
                  */
                 onReclaim: "delete" | "stop" | "upgrade";
@@ -3798,14 +3798,14 @@ export interface components {
             egress?: components["schemas"]["EgressInput"];
         };
         /**
-         * @description Make it a spot sandbox: half the list price, in room nobody else is paying for, taken back when a normal sandbox needs it. It is placed only on a server with spare room now (409 spot_capacity_exceeded when none in its region has), and is not counted in the plan's running count. It never keeps its memory at a stop. Comes with the account's first top-up (before it, 409 spot_needs_top_up).
+         * @description Make it a spot sandbox: half the list price, in room nobody else is paying for, taken back when a standard sandbox needs it. It is placed only on a server with spare room now (409 spot_capacity_exceeded when none in its region has), and is not counted in the plan's running count. It never keeps its memory at a stop. Comes with the account's first top-up (before it, 409 spot_needs_top_up).
          * @example {
          *       "onReclaim": "stop"
          *     }
          */
         SpotInput: {
             /**
-             * @description What is done when its room is taken back. stop (the default): it is stopped, its disk kept, never its memory, and starts again as spot. delete: it is stopped and deleted. upgrade: it becomes a normal sandbox at the list price from that moment and keeps running, where another server in its region has room for what needed it; otherwise it is stopped as stop. Every reclaim sends sandbox.stopped with reason reclaimed, sandbox.deleted with reason reclaimed, or sandbox.upgraded, saying what was done and why.
+             * @description What is done when its room is taken back. stop (the default): it is stopped, its disk kept, never its memory, and starts again as spot. delete: it is stopped and deleted. upgrade: it becomes a standard sandbox at the list price from that moment and keeps running, where another server in its region has room for what needed it; otherwise it is stopped as stop. Every reclaim sends sandbox.stopped with reason reclaimed, sandbox.deleted with reason reclaimed, or sandbox.upgraded, saying what was done and why.
              * @example stop
              * @enum {string}
              */
@@ -6409,7 +6409,7 @@ export interface components {
                 /** @enum {string} */
                 planId: "free";
                 /**
-                 * @description What each calendar month's use (UTC) on the free plan is free up to, at list price, in millionths of a US dollar: running time, mail and the rest, together. 5,000,000 is 185 hours of a small sandbox, 370 of a tiny one, or 11,100 minutes of CI on small. It does not carry over. It needs a card saved, once a card.
+                 * @description What each month's use on the free plan is free up to, at list price, in millionths of a US dollar: running time, mail and the rest, together. 5,000,000 is 185 hours of a small sandbox, 370 of a tiny one, or 11,100 minutes of CI on small. Its month runs from the account's own day, as Stripe counts a plan's: the day it was made, or came back to the free plan. It does not carry over. It needs a card saved, once a card.
                  * @example 5000000
                  */
                 allowanceMicros: number;
@@ -8243,10 +8243,10 @@ export interface operations {
                      * @enum {string}
                      */
                     onTimeout?: "delete" | "stop" | "stop_with_memory";
-                    /** @description On a spot sandbox: its onReclaim or warnAt, changed; null makes it a normal sandbox, metered at the list price from that moment, which sends sandbox.upgraded. Made normal while it runs, it needs what a normal start needs: room under the plan's running count (429 running_limit_reached), and credit or a card (402). A normal sandbox is never made spot (409 not_spot). Omitted leaves it as it is. */
+                    /** @description On a spot sandbox: its onReclaim or warnAt, changed; null makes it a standard sandbox, metered at the list price from that moment, which sends sandbox.upgraded. Made standard while it runs, it needs what a standard start needs: room under the plan's running count (429 running_limit_reached), and credit or a card (402). A standard sandbox is never made spot (409 not_spot). Omitted leaves it as it is. */
                     spot?: {
                         /**
-                         * @description What is done when its room is taken back. stop (the default): it is stopped, its disk kept, never its memory, and starts again as spot. delete: it is stopped and deleted. upgrade: it becomes a normal sandbox at the list price from that moment and keeps running, where another server in its region has room for what needed it; otherwise it is stopped as stop. Every reclaim sends sandbox.stopped with reason reclaimed, sandbox.deleted with reason reclaimed, or sandbox.upgraded, saying what was done and why.
+                         * @description What is done when its room is taken back. stop (the default): it is stopped, its disk kept, never its memory, and starts again as spot. delete: it is stopped and deleted. upgrade: it becomes a standard sandbox at the list price from that moment and keeps running, where another server in its region has room for what needed it; otherwise it is stopped as stop. Every reclaim sends sandbox.stopped with reason reclaimed, sandbox.deleted with reason reclaimed, or sandbox.upgraded, saying what was done and why.
                          * @example stop
                          * @enum {string}
                          */
@@ -8317,7 +8317,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description name_taken: another of your sandboxes has that name. subdomain_taken: another sandbox has that subdomain. not_spot: spot was given for a normal sandbox, which is never made spot. spot_keeps_no_memory: onTimeout stop_with_memory on a spot sandbox. running_limit_reached: made normal while it runs, it would take the account past its plan's running count. Nothing was changed. */
+            /** @description name_taken: another of your sandboxes has that name. subdomain_taken: another sandbox has that subdomain. not_spot: spot was given for a standard sandbox, which is never made spot. spot_keeps_no_memory: onTimeout stop_with_memory on a spot sandbox. running_limit_reached: made standard while it runs, it would take the account past its plan's running count. Nothing was changed. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -8379,7 +8379,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description invalid_state: the sandbox is neither running nor stopped, as one still being created or in error. under_way: it is being resized, and is started when that has ended. capacity_exceeded: its server has no room to start it now, and no other can take it; try again later. spot_capacity_exceeded: a spot sandbox, and its server has no spare room for it now (or, archived, no server of its region has); try again later, or make it normal. */
+            /** @description invalid_state: the sandbox is neither running nor stopped, as one still being created or in error. under_way: it is being resized, and is started when that has ended. capacity_exceeded: its server has no room to start it now, and no other can take it; try again later. spot_capacity_exceeded: a spot sandbox, and its server has no spare room for it now (or, archived, no server of its region has); try again later, or turn off spot. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -13808,7 +13808,7 @@ export interface operations {
                      */
                     url: string;
                     /**
-                     * @description The events to send, at most 20 entries: sandbox.created, sandbox.started, sandbox.stopped, sandbox.archived, sandbox.error, sandbox.moved, sandbox.deleted, sandbox.auto_stop_set, sandbox.labels_changed, sandbox.low_cpu, sandbox.upgraded (a spot sandbox made normal), sandbox.reclaim_chance (a spot sandbox's chance of being stopped crossed its warnAt), prompt.created, email.received, email.delivered, email.bounced, member.invited, member.joined, member.removed, member.role_changed, key.revoked, template.created, template.updated, template.secrets_changed (named, never with a value), template.labels_changed, template.deleted, and Headroom's headroom.burst_started, headroom.burst_ended, headroom.refused, headroom.running_count_reached, headroom.budget_threshold and headroom.budget_reached, which concern the organization rather than a sandbox, and a job's job.created, job.updated, job.deleted, job.run_started, job.run_finished, job.run_failed, job.recovered and job.paused. A group name with .*, as headroom.*, job.* or sandbox.*, means every event in the group, including ones added later; * alone means every event, the default. A * anywhere else, or a name that is not one of these, is rejected. An event has the same id in every webhook it is sent to, and sandbox.* and headroom.* events are also sent as log records to the collector set with PUT /v1/telemetry.
+                     * @description The events to send, at most 20 entries: sandbox.created, sandbox.started, sandbox.stopped, sandbox.archived, sandbox.error, sandbox.moved, sandbox.deleted, sandbox.auto_stop_set, sandbox.labels_changed, sandbox.low_cpu, sandbox.upgraded (a spot sandbox made standard), sandbox.reclaim_chance (a spot sandbox's chance of being stopped crossed its warnAt), prompt.created, email.received, email.delivered, email.bounced, member.invited, member.joined, member.removed, member.role_changed, key.revoked, template.created, template.updated, template.secrets_changed (named, never with a value), template.labels_changed, template.deleted, and Headroom's headroom.burst_started, headroom.burst_ended, headroom.refused, headroom.running_count_reached, headroom.budget_threshold and headroom.budget_reached, which concern the organization rather than a sandbox, and a job's job.created, job.updated, job.deleted, job.run_started, job.run_finished, job.run_failed, job.recovered and job.paused. A group name with .*, as headroom.*, job.* or sandbox.*, means every event in the group, including ones added later; * alone means every event, the default. A * anywhere else, or a name that is not one of these, is rejected. An event has the same id in every webhook it is sent to, and sandbox.* and headroom.* events are also sent as log records to the collector set with PUT /v1/telemetry.
                      * @example [
                      *       "sandbox.created",
                      *       "sandbox.error",
@@ -14023,7 +14023,7 @@ export interface operations {
                      */
                     url?: string;
                     /**
-                     * @description The events to send, at most 20 entries: sandbox.created, sandbox.started, sandbox.stopped, sandbox.archived, sandbox.error, sandbox.moved, sandbox.deleted, sandbox.auto_stop_set, sandbox.labels_changed, sandbox.low_cpu, sandbox.upgraded (a spot sandbox made normal), sandbox.reclaim_chance (a spot sandbox's chance of being stopped crossed its warnAt), prompt.created, email.received, email.delivered, email.bounced, member.invited, member.joined, member.removed, member.role_changed, key.revoked, template.created, template.updated, template.secrets_changed (named, never with a value), template.labels_changed, template.deleted, and Headroom's headroom.burst_started, headroom.burst_ended, headroom.refused, headroom.running_count_reached, headroom.budget_threshold and headroom.budget_reached, which concern the organization rather than a sandbox, and a job's job.created, job.updated, job.deleted, job.run_started, job.run_finished, job.run_failed, job.recovered and job.paused. A group name with .*, as headroom.*, job.* or sandbox.*, means every event in the group, including ones added later; * alone means every event, the default. A * anywhere else, or a name that is not one of these, is rejected. An event has the same id in every webhook it is sent to, and sandbox.* and headroom.* events are also sent as log records to the collector set with PUT /v1/telemetry.
+                     * @description The events to send, at most 20 entries: sandbox.created, sandbox.started, sandbox.stopped, sandbox.archived, sandbox.error, sandbox.moved, sandbox.deleted, sandbox.auto_stop_set, sandbox.labels_changed, sandbox.low_cpu, sandbox.upgraded (a spot sandbox made standard), sandbox.reclaim_chance (a spot sandbox's chance of being stopped crossed its warnAt), prompt.created, email.received, email.delivered, email.bounced, member.invited, member.joined, member.removed, member.role_changed, key.revoked, template.created, template.updated, template.secrets_changed (named, never with a value), template.labels_changed, template.deleted, and Headroom's headroom.burst_started, headroom.burst_ended, headroom.refused, headroom.running_count_reached, headroom.budget_threshold and headroom.budget_reached, which concern the organization rather than a sandbox, and a job's job.created, job.updated, job.deleted, job.run_started, job.run_finished, job.run_failed, job.recovered and job.paused. A group name with .*, as headroom.*, job.* or sandbox.*, means every event in the group, including ones added later; * alone means every event, the default. A * anywhere else, or a name that is not one of these, is rejected. An event has the same id in every webhook it is sent to, and sandbox.* and headroom.* events are also sent as log records to the collector set with PUT /v1/telemetry.
                      * @example [
                      *       "sandbox.created",
                      *       "sandbox.error",

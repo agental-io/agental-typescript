@@ -130,9 +130,9 @@ export interface CreateOptions extends BurstOptions {
   network?: SandboxOwnNetwork;
   /**
    * Make it a spot sandbox: half the list price, in room on our servers nobody else is paying
-   * for, taken back when a normal sandbox needs it. onReclaim says what is then done to it:
+   * for, taken back when a standard sandbox needs it. onReclaim says what is then done to it:
    * "stop" (the default) stops it, its disk kept and never its memory; "delete" deletes it;
-   * "upgrade" makes it a normal sandbox at the list price and keeps it running, where that frees
+   * "upgrade" makes it a standard sandbox at the list price and keeps it running, where that frees
    * what was needed, and stops it otherwise. warnAt is the chance of being stopped, 0 to 1, at
    * which sandbox.reclaim_chance is sent (0.5 left out). { } takes both defaults. It is not
    * counted in the plan's running count, and it never keeps its memory at a stop. Throws
@@ -187,9 +187,9 @@ export interface SandboxChanges {
   /** Merged into its own metadata. null takes a key away. */
   metadata?: Record<string, string | null>;
   /**
-   * On a spot sandbox: its onReclaim or warnAt, changed. null makes it a normal sandbox at the
+   * On a spot sandbox: its onReclaim or warnAt, changed. null makes it a standard sandbox at the
    * list price from then on, which, while it runs, needs room under the plan's running count.
-   * A normal sandbox is never made spot (ApiError not_spot).
+   * A standard sandbox is never made spot (ApiError not_spot).
    */
   spot?: SpotOptions | null;
 }
@@ -864,7 +864,7 @@ export class Sandbox {
 
   /**
    * Its spot settings as last read, with reclaimChance, its chance of being stopped in the next
-   * minute while it runs: a hint, not a promise. Null for a normal sandbox.
+   * minute while it runs: a hint, not a promise. Null for a standard sandbox.
    */
   get spot(): SandboxSpot | null {
     return this.info.spot ?? null;
