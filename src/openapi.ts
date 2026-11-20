@@ -4617,7 +4617,7 @@ export interface components {
             storage: {
                 /** @description What it stores now, in bytes: its pack's size once archived, else what its server said its disk and kept memory took at its stop, else its whole disk (and memory). */
                 storedBytes: number;
-                /** @description When the free days of its stretch end: 14 days after its stop. From then it costs microsPerGbMonth for what it stores. */
+                /** @description When the free days of its stretch end: 14 days after its stop, or, where the account was told late that it would be deleted, 3 days after that notice. From then it costs microsPerGbMonth for what it stores, or, for an account that has never paid and has no credit, it is deleted. */
                 freeUntil: string | null;
                 /** @description What it costs an hour now, in millionths of a US dollar: 0 in its free days. */
                 microsPerHour: number;
@@ -7575,7 +7575,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description capacity_exceeded: no server in the region has room for it now; try again later. name_taken: one of your sandboxes has that name. account_limit_reached: your account holds as many sandboxes as it may at a time; delete one first. idempotency_conflict: the Idempotency-Key was used before with a different body. too_many_addresses: the template's rule and network.allow come to more than 100 addresses. spot_capacity_exceeded: a spot sandbox, and no server in the region has spare room for one now; try again later. spot_needs_top_up: spot sandboxes come with the account's first top-up. spot_keeps_no_memory: onTimeout stop_with_memory on a spot sandbox, which never keeps its memory. */
+            /** @description capacity_exceeded: no server in the region has room for it now; try again later. name_taken: one of your sandboxes has that name. account_limit_reached: your account holds as many sandboxes as it may at a time; delete one first. idempotency_conflict: the Idempotency-Key was used before with a different body. box_of_another_organization: the box named, or the one the snapshot is kept on, is a server another account joined. too_many_addresses: the template's rule and network.allow come to more than 100 addresses. spot_capacity_exceeded: a spot sandbox, and no server in the region has spare room for one now; try again later. spot_needs_top_up: spot sandboxes come with the account's first top-up. spot_keeps_no_memory: onTimeout stop_with_memory on a spot sandbox, which never keeps its memory. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -9261,7 +9261,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description capacity_exceeded: the source's server has no room for the copy now; try again later. name_taken: one of your sandboxes has that name. account_limit_reached: your account holds as many sandboxes as it may at a time. idempotency_conflict: the Idempotency-Key was used before with a different body. invalid_state: the source is neither running nor stopped, or memory was sent for a source stopped without its memory kept. sandbox_archived: the source is archived; start it first. sandbox_migrating: not returned now, since sandboxes are no longer moved between servers. too_many_addresses: the template's rule and the source's own addresses come to more than 100. */
+            /** @description capacity_exceeded: the source's server has no room for the copy now; try again later. box_of_another_organization: the source is on a server its account joined, and the copy would be made in another organization. name_taken: one of your sandboxes has that name. account_limit_reached: your account holds as many sandboxes as it may at a time. idempotency_conflict: the Idempotency-Key was used before with a different body. invalid_state: the source is neither running nor stopped, or memory was sent for a source stopped without its memory kept. sandbox_archived: the source is archived; start it first. sandbox_migrating: not returned now, since sandboxes are no longer moved between servers. too_many_addresses: the template's rule and the source's own addresses come to more than 100. */
             409: {
                 headers: {
                     [name: string]: unknown;
