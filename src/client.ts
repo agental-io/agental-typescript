@@ -1128,6 +1128,11 @@ export class Agental {
     return (await this.http.json<DataRetention>({ method: "PATCH", path: "/v1/data-retention", body: { keepDays }, replay: true })).body;
   }
 
+  /** The address your organization's billing emails are copied to, beside its owner, or null for none. An owner sets it in the console, Billing, and it gets nothing until its inbox confirms it. */
+  async getBillingEmailCopy(): Promise<string | null> {
+    return (await this.http.json<{ address: string | null }>({ method: "GET", path: "/v1/billing/email-copy", replay: true })).body.address;
+  }
+
   /** The webhooks your account's events are posted to, each with its tries of the last 30 days. Their secrets are not given. */
   async listWebhooks(): Promise<Webhook[]> {
     return (await this.http.json<{ webhooks: Webhook[] }>({ method: "GET", path: "/v1/webhooks", replay: true })).body.webhooks;

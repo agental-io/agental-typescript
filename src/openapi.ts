@@ -356,7 +356,7 @@ export interface paths {
         /** @description Changes when a running sandbox stops, for the current run only: to a time (at), or a number of seconds from now (inSeconds), later or sooner. Its next start runs for ttlSeconds again. The last change wins, and a PATCH that changes ttlSeconds resets it to the last start plus ttlSeconds. The new stop is at least 60 seconds and at most maxTtlSeconds of GET /v1/policy from now; a sandbox keeps running for as long as something keeps moving its stop. Every change sends the event sandbox.auto_stop_set, which says who made it. The sandbox's own token (AGENTAL_SANDBOX_TOKEN) may call this. */
         put: operations["setSandboxAutoStop"];
         post?: never;
-        /** @description Removes the sandbox's time limit, for the current run and every later start: it runs until something stops it. Its ttlSeconds is set to null, the deployment's default, and a stop moved for the current run is dropped. Works running or stopped. An API key needs sandbox.update; the sandbox's own token cannot call it, so an agent inside can move its stop but only its owner can remove the limit. */
+        /** @description Removes the sandbox's time limit, for the current run and every later start: it runs until something stops it, which for a spot sandbox is at most 24 hours a run. Its ttlSeconds is set to null, the deployment's default, and a stop moved for the current run is dropped. Works running or stopped. An API key needs sandbox.update; the sandbox's own token cannot call it, so an agent inside can move its stop but only its owner can remove the limit. */
         delete: operations["clearSandboxAutoStop"];
         options?: never;
         head?: never;
@@ -2092,6 +2092,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/me/emails": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Lists the emails the signed-in person may turn off, each with whether they get it. Emails about sign-in, security, money owed, deleting data and the account itself are always sent and are not listed. The choice holds in every organization the person gets mail for. */
+        get: operations["listEmailChoices"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/emails/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Turns one email on or off for the signed-in person. */
+        put: operations["setEmailChoice"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/console/misses": {
         parameters: {
             query?: never;
@@ -2727,6 +2761,58 @@ export interface paths {
         /** @description Turns auto-reload on or off: when the account's credits run out, its saved card is charged for a top-up of the chosen size. Send dollars as null to turn it off. */
         put: operations["setBillingAutoReload"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/billing/email-copy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Returns the address the caller's organization copies its Billing emails to, beside its owners, and whether it gets them yet. Null for none. */
+        get: operations["getBillingEmailCopy"];
+        /** @description Sets the address the caller's organization copies its Billing emails to, beside its owners, or removes it with null. A new address is sent a link, and gets nothing until someone with that inbox confirms it. Every owner is told of a change. Only an owner signed in sets it, in the console: an API key cannot. The same address again keeps it, which is how an owner takes over one set by someone who is no longer an owner, with no new link. */
+        put: operations["setBillingEmailCopy"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/billing/email-copy/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Sends the billing copy address a new confirmation link; the one before stops working. Only an owner signed in. */
+        post: operations["resendBillingEmailCopyConfirmation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/billing/email-copy/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Confirms a billing copy address by the token in the link sent to it. Says nothing of the account. */
+        post: operations["confirmBillingEmailCopy"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3582,10 +3668,10 @@ export interface components {
             /** @description Set on a spot sandbox, null on a standard one. A spot sandbox runs at half the list price in room nobody else is paying for, and that room is taken back when a standard sandbox needs it, as onReclaim says. It never keeps its memory at a stop, and stays spot across a stop and start until it is made standard with PATCH /v1/sandboxes/{id}. */
             spot: {
                 /**
-                 * @description What is done when its room is taken back: delete, stop (its disk kept, never its memory), or upgrade (it becomes a standard sandbox at the list price where that frees what was needed, and is stopped otherwise).
+                 * @description What is done when its room is taken back: delete, or stop (its disk kept, never its memory).
                  * @enum {string}
                  */
-                onReclaim: "delete" | "stop" | "upgrade";
+                onReclaim: "delete" | "stop";
                 /** @description The chance of being stopped, 0 to 1, at which sandbox.reclaim_chance is to be sent. */
                 warnAt: number;
                 /** @description The chance it is stopped in the next minute, 0 to 1, worked out each minute from how close its server is to its limits, how fast it has moved toward them over the last ten minutes, and where it stands in the order room is taken back in. A hint and not a promise: a burst of starts can stop it within seconds. sandbox.reclaim_chance is sent when it crosses warnAt, up or down. Null while it is not running, and until the first minute's pass. */
@@ -3805,11 +3891,11 @@ export interface components {
          */
         SpotInput: {
             /**
-             * @description What is done when its room is taken back. stop (the default): it is stopped, its disk kept, never its memory, and starts again as spot. delete: it is stopped and deleted. upgrade: it becomes a standard sandbox at the list price from that moment and keeps running, where another server in its region has room for what needed it; otherwise it is stopped as stop. Every reclaim sends sandbox.stopped with reason reclaimed, sandbox.deleted with reason reclaimed, or sandbox.upgraded, saying what was done and why.
+             * @description What is done when its room is taken back. stop (the default): it is stopped, its disk kept, never its memory, and starts again as spot. delete: it is stopped and deleted. Every reclaim sends sandbox.stopped or sandbox.deleted with reason reclaimed, saying what was done and why. Whatever this says, one run lasts at most 24 hours: then it is stopped with its disk, with reason spot_limit.
              * @example stop
              * @enum {string}
              */
-            onReclaim?: "delete" | "stop" | "upgrade";
+            onReclaim?: "delete" | "stop";
             /**
              * @description The chance of being stopped, 0 to 1, at which sandbox.reclaim_chance is to be sent. Left out, 0.5.
              * @example 0.5
@@ -4068,10 +4154,10 @@ export interface components {
             /** @description Seconds each start runs before it is stopped, unless the stop is moved. Null is the deployment's default. */
             ttlSeconds: number | null;
             /**
-             * @description What decided autoStopAt. ttl: its last start and ttlSeconds. account: a PUT of this with one of its account's API keys, or the console. sandbox: a PUT of this by the sandbox itself. Null with autoStopAt.
+             * @description What decided autoStopAt. ttl: its last start and ttlSeconds. account: a PUT of this with one of its account's API keys, or the console. sandbox: a PUT of this by the sandbox itself. spot_limit: it is a spot sandbox, and one run lasts at most 24 hours. Null with autoStopAt.
              * @enum {string|null}
              */
-            setBy: "ttl" | "account" | "sandbox" | null;
+            setBy: "ttl" | "spot_limit" | "account" | "sandbox" | null;
         };
         SetSandboxAutoStop: {
             /**
@@ -5755,10 +5841,50 @@ export interface components {
                 createdAt: string;
                 updatedAt: string;
             } | null;
+            /** @description The support tickets this person opened, with what was said on them. Files are listed by name, and downloaded from the ticket. */
+            supportTickets: {
+                id: string;
+                number: number;
+                subject: string;
+                status: string;
+                createdAt: string;
+                closedAt: string | null;
+                messages: {
+                    kind: string;
+                    authorName: string;
+                    body: string;
+                    createdAt: string;
+                    attachments: {
+                        id: string;
+                        name: string;
+                        size: number;
+                        createdAt: string;
+                    }[];
+                }[];
+            }[];
         };
         Heard: {
             /** @description What the person wrote to "How did you hear about agental?". Null until they answer. */
             heard: string | null;
+        };
+        EmailChoice: {
+            /**
+             * @description Which email.
+             * @enum {string}
+             */
+            kind: "allowance_80" | "storage_charged" | "burst_fees" | "burst_refused" | "spot_summary" | "member_joined" | "webhook_off";
+            /**
+             * @description What the console calls it.
+             * @example Someone joined the team
+             */
+            name: string;
+            /**
+             * @description When it is sent.
+             * @example Each time an invite is taken
+             */
+            when: string;
+            /** @description Whether the person gets it. Every kind is on until turned off. */
+            on: boolean;
         };
         TemplateList: {
             templates: components["schemas"]["Template"][];
@@ -6592,6 +6718,21 @@ export interface components {
                 /** @description The top-up charged, in whole US dollars. */
                 dollars: number;
             } | null;
+        };
+        BillingEmailCopy: {
+            /**
+             * @description The address set to get a copy of every Billing email beside the owners, or null for none.
+             * @example accounts@example.com
+             */
+            address: string | null;
+            /** @description Whether that inbox confirmed it by the link sent to it. Nothing is sent to it until it has. */
+            confirmed: boolean;
+            /** @description Until an address is confirmed, when its link stops working. POST /v1/billing/email-copy/resend sends a new one. */
+            confirmBy: string | null;
+            /** @description Whether whoever set it is no longer an owner. */
+            setterLeft: boolean;
+            /** @description True while copies are not sent: its inbox has not confirmed it, or whoever set it is no longer an owner. In that second case an owner keeps it by setting it again, or removes it. */
+            waiting: boolean;
         };
         BillingInvoices: {
             invoices: {
@@ -8246,11 +8387,11 @@ export interface operations {
                     /** @description On a spot sandbox: its onReclaim or warnAt, changed; null makes it a standard sandbox, metered at the list price from that moment, which sends sandbox.upgraded. Made standard while it runs, it needs what a standard start needs: room under the plan's running count (429 running_limit_reached), and credit or a card (402). A standard sandbox is never made spot (409 not_spot). Omitted leaves it as it is. */
                     spot?: {
                         /**
-                         * @description What is done when its room is taken back. stop (the default): it is stopped, its disk kept, never its memory, and starts again as spot. delete: it is stopped and deleted. upgrade: it becomes a standard sandbox at the list price from that moment and keeps running, where another server in its region has room for what needed it; otherwise it is stopped as stop. Every reclaim sends sandbox.stopped with reason reclaimed, sandbox.deleted with reason reclaimed, or sandbox.upgraded, saying what was done and why.
+                         * @description What is done when its room is taken back. stop (the default): it is stopped, its disk kept, never its memory, and starts again as spot. delete: it is stopped and deleted. Every reclaim sends sandbox.stopped or sandbox.deleted with reason reclaimed, saying what was done and why. Whatever this says, one run lasts at most 24 hours: then it is stopped with its disk, with reason spot_limit.
                          * @example stop
                          * @enum {string}
                          */
-                        onReclaim?: "delete" | "stop" | "upgrade";
+                        onReclaim?: "delete" | "stop";
                         /**
                          * @description The chance of being stopped, 0 to 1, at which sandbox.reclaim_chance is to be sent. Left out, 0.5.
                          * @example 0.5
@@ -8990,7 +9131,7 @@ export interface operations {
                     "application/json": components["schemas"]["SandboxAutoStop"];
                 };
             };
-            /** @description auto_stop_too_soon: it is less than 60 seconds from now. auto_stop_too_far: it is more than maxTtlSeconds from now. The stop is left as it was. */
+            /** @description auto_stop_too_soon: it is less than 60 seconds from now. auto_stop_too_far: it is more than maxTtlSeconds from now, or past the 24 hours one run of a spot sandbox may last. The stop is left as it was. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -16924,6 +17065,102 @@ export interface operations {
             };
         };
     };
+    listEmailChoices: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The emails the person may turn off. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        emails: components["schemas"]["EmailChoice"][];
+                    };
+                };
+            };
+            /** @description Missing or invalid API key or session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description session_required: an API key cannot do this; a person signed in can, in the console. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    setEmailChoice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Which email, as GET /v1/me/emails names it. */
+                kind: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    on: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description The email's setting now. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailChoice"];
+                };
+            };
+            /** @description Missing or invalid API key or session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description session_required: an API key cannot do this; a person signed in can, in the console. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description not_found: no email of that kind can be turned off. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     reportConsoleMiss: {
         parameters: {
             query?: never;
@@ -19966,6 +20203,228 @@ export interface operations {
             };
             /** @description billing_unavailable: the payment provider did not respond. Try again in a moment. */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getBillingEmailCopy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The billing copy address, or null. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BillingEmailCopy"];
+                };
+            };
+            /** @description invalid_request: the key belongs to no account or organization, so it has no billing. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description forbidden: in a team, only an owner or an admin sees its billing. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    setBillingEmailCopy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description An email address, or null to stop the copies. */
+                    address: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description The billing copy address now. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BillingEmailCopy"];
+                };
+            };
+            /** @description invalid_address: that is not an email address. Nothing was changed. invalid_request: the key belongs to no account or organization. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description forbidden: in a team, only an owner can change where its billing emails go. session_required: an API key cannot; an owner signed in can, in the console. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description copy_changed: it was changed while the email was on its way. What it was changed to stands. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description too_many_confirmations: the day's confirmation emails are used. Nothing was changed. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description confirmation_not_sent: the confirmation email could not be sent. Nothing was changed. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    resendBillingEmailCopyConfirmation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The billing copy address now. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BillingEmailCopy"];
+                };
+            };
+            /** @description invalid_request: the session acts in no organization. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description forbidden: only an owner. session_required: an API key cannot. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description nothing_to_confirm: no address waits for its inbox to confirm it. copy_changed: it was changed while the email was on its way. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description too_many_confirmations: the day's confirmation emails are used. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description confirmation_not_sent: the confirmation email could not be sent. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    confirmBillingEmailCopy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    token: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The address is confirmed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        confirmed: true;
+                    };
+                };
+            };
+            /** @description invalid_request: no token was given. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description confirmation_link_invalid: the link is wrong, expired or replaced by a newer one. */
+            410: {
                 headers: {
                     [name: string]: unknown;
                 };

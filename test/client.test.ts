@@ -2549,10 +2549,10 @@ test("what a sandbox's time limit does is sent when it is said, on a create and 
 });
 
 test("a spot sandbox is asked for on a create, its chance read, what a reclaim does changed, and made standard with spot null", async () => {
-  const spot = { onReclaim: "upgrade" as const, warnAt: 0.3, reclaimChance: 0.12 };
+  const spot = { onReclaim: "delete" as const, warnAt: 0.3, reclaimChance: 0.12 };
   const { agental, sent } = scripted(json(201, sandbox({ spot })), json(200, sandbox({ spot: { ...spot, onReclaim: "delete" } })), json(200, sandbox({ spot: null })));
-  const box = await agental.sandboxes.create({ name: "cheap", spot: { onReclaim: "upgrade", warnAt: 0.3 } });
-  assert.deepEqual(sent[0]?.body, { name: "cheap", spot: { onReclaim: "upgrade", warnAt: 0.3 } });
+  const box = await agental.sandboxes.create({ name: "cheap", spot: { onReclaim: "delete", warnAt: 0.3 } });
+  assert.deepEqual(sent[0]?.body, { name: "cheap", spot: { onReclaim: "delete", warnAt: 0.3 } });
   assert.deepEqual(box.spot, spot);
   await box.update({ spot: { onReclaim: "delete" } });
   assert.deepEqual([sent[1]?.method, sent[1]?.body], ["PATCH", { spot: { onReclaim: "delete" } }]);

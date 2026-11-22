@@ -131,9 +131,8 @@ export interface CreateOptions extends BurstOptions {
   /**
    * Make it a spot sandbox: half the list price, in room on our servers nobody else is paying
    * for, taken back when a standard sandbox needs it. onReclaim says what is then done to it:
-   * "stop" (the default) stops it, its disk kept and never its memory; "delete" deletes it;
-   * "upgrade" makes it a standard sandbox at the list price and keeps it running, where that frees
-   * what was needed, and stops it otherwise. warnAt is the chance of being stopped, 0 to 1, at
+   * "stop" (the default) stops it, its disk kept and never its memory; "delete" deletes it.
+   * One run lasts at most 24 hours, and is then stopped with its disk. warnAt is the chance of being stopped, 0 to 1, at
    * which sandbox.reclaim_chance is sent (0.5 left out). { } takes both defaults. It is not
    * counted in the plan's running count, and it never keeps its memory at a stop. Throws
    * ApiError spot_capacity_exceeded when no server in the region has spare room now, and
