@@ -3713,6 +3713,19 @@ export interface components {
              * @enum {string|null}
              */
             pendingSize: "tiny" | "small" | "medium" | "large" | null;
+            /** @description Set when its only copy was on a server that failed and cannot be brought back: its disk and memory are lost, it cannot be started again, and it stays until you delete it. Null for any other sandbox. */
+            lost: {
+                /** @description When its server was declared lost. */
+                at: string;
+                /** @description When its server last answered. Nothing of this sandbox is charged after it. */
+                lastHeardAt: string;
+                /** @description The snapshots that were on that server, lost with it. */
+                snapshots: {
+                    id: string;
+                    name: string;
+                    createdAt: string;
+                }[];
+            } | null;
             network: components["schemas"]["SandboxNetwork"];
             /** @description What it is doing, as last read: null when it is not running, not read yet, or where GET /v1/policy says metrics is false. */
             activity: {
@@ -10931,7 +10944,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description sandbox_archived: its sandbox is archived; start it first. sandbox_migrating: not returned now, since sandboxes are no longer moved between servers. */
+            /** @description under_way: the last snapshot of a deleted sandbox is being deleted with its machine: it can no longer be used, and the delete finishes by itself. sandbox_archived: its sandbox is archived; start it first. sandbox_migrating: not returned now, since sandboxes are no longer moved between servers. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -13949,7 +13962,7 @@ export interface operations {
                      */
                     url: string;
                     /**
-                     * @description The events to send, at most 20 entries: sandbox.created, sandbox.started, sandbox.stopped, sandbox.archived, sandbox.error, sandbox.moved, sandbox.deleted, sandbox.auto_stop_set, sandbox.labels_changed, sandbox.low_cpu, sandbox.upgraded (a spot sandbox made standard), sandbox.reclaim_chance (a spot sandbox's chance of being stopped crossed its warnAt), prompt.created, email.received, email.delivered, email.bounced, member.invited, member.joined, member.removed, member.role_changed, key.revoked, template.created, template.updated, template.secrets_changed (named, never with a value), template.labels_changed, template.deleted, and Headroom's headroom.burst_started, headroom.burst_ended, headroom.refused, headroom.running_count_reached, headroom.budget_threshold and headroom.budget_reached, which concern the organization rather than a sandbox, and a job's job.created, job.updated, job.deleted, job.run_started, job.run_finished, job.run_failed, job.recovered and job.paused. A group name with .*, as headroom.*, job.* or sandbox.*, means every event in the group, including ones added later; * alone means every event, the default. A * anywhere else, or a name that is not one of these, is rejected. An event has the same id in every webhook it is sent to, and sandbox.* and headroom.* events are also sent as log records to the collector set with PUT /v1/telemetry.
+                     * @description The events to send, at most 20 entries: sandbox.created, sandbox.started, sandbox.stopped, sandbox.archived, sandbox.error, sandbox.moved, sandbox.deleted, sandbox.auto_stop_set, sandbox.labels_changed, sandbox.low_cpu, sandbox.upgraded (a spot sandbox made standard), sandbox.reclaim_chance (a spot sandbox's chance of being stopped crossed its warnAt), sandbox.lost (its only copy was on a server that failed for good), prompt.created, email.received, email.delivered, email.bounced, member.invited, member.joined, member.removed, member.role_changed, key.revoked, template.created, template.updated, template.secrets_changed (named, never with a value), template.labels_changed, template.deleted, and Headroom's headroom.burst_started, headroom.burst_ended, headroom.refused, headroom.running_count_reached, headroom.budget_threshold and headroom.budget_reached, which concern the organization rather than a sandbox, and a job's job.created, job.updated, job.deleted, job.run_started, job.run_finished, job.run_failed, job.recovered and job.paused. A group name with .*, as headroom.*, job.* or sandbox.*, means every event in the group, including ones added later; * alone means every event, the default. A * anywhere else, or a name that is not one of these, is rejected. An event has the same id in every webhook it is sent to, and sandbox.* and headroom.* events are also sent as log records to the collector set with PUT /v1/telemetry.
                      * @example [
                      *       "sandbox.created",
                      *       "sandbox.error",
@@ -14164,7 +14177,7 @@ export interface operations {
                      */
                     url?: string;
                     /**
-                     * @description The events to send, at most 20 entries: sandbox.created, sandbox.started, sandbox.stopped, sandbox.archived, sandbox.error, sandbox.moved, sandbox.deleted, sandbox.auto_stop_set, sandbox.labels_changed, sandbox.low_cpu, sandbox.upgraded (a spot sandbox made standard), sandbox.reclaim_chance (a spot sandbox's chance of being stopped crossed its warnAt), prompt.created, email.received, email.delivered, email.bounced, member.invited, member.joined, member.removed, member.role_changed, key.revoked, template.created, template.updated, template.secrets_changed (named, never with a value), template.labels_changed, template.deleted, and Headroom's headroom.burst_started, headroom.burst_ended, headroom.refused, headroom.running_count_reached, headroom.budget_threshold and headroom.budget_reached, which concern the organization rather than a sandbox, and a job's job.created, job.updated, job.deleted, job.run_started, job.run_finished, job.run_failed, job.recovered and job.paused. A group name with .*, as headroom.*, job.* or sandbox.*, means every event in the group, including ones added later; * alone means every event, the default. A * anywhere else, or a name that is not one of these, is rejected. An event has the same id in every webhook it is sent to, and sandbox.* and headroom.* events are also sent as log records to the collector set with PUT /v1/telemetry.
+                     * @description The events to send, at most 20 entries: sandbox.created, sandbox.started, sandbox.stopped, sandbox.archived, sandbox.error, sandbox.moved, sandbox.deleted, sandbox.auto_stop_set, sandbox.labels_changed, sandbox.low_cpu, sandbox.upgraded (a spot sandbox made standard), sandbox.reclaim_chance (a spot sandbox's chance of being stopped crossed its warnAt), sandbox.lost (its only copy was on a server that failed for good), prompt.created, email.received, email.delivered, email.bounced, member.invited, member.joined, member.removed, member.role_changed, key.revoked, template.created, template.updated, template.secrets_changed (named, never with a value), template.labels_changed, template.deleted, and Headroom's headroom.burst_started, headroom.burst_ended, headroom.refused, headroom.running_count_reached, headroom.budget_threshold and headroom.budget_reached, which concern the organization rather than a sandbox, and a job's job.created, job.updated, job.deleted, job.run_started, job.run_finished, job.run_failed, job.recovered and job.paused. A group name with .*, as headroom.*, job.* or sandbox.*, means every event in the group, including ones added later; * alone means every event, the default. A * anywhere else, or a name that is not one of these, is rejected. An event has the same id in every webhook it is sent to, and sandbox.* and headroom.* events are also sent as log records to the collector set with PUT /v1/telemetry.
                      * @example [
                      *       "sandbox.created",
                      *       "sandbox.error",

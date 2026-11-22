@@ -73,6 +73,7 @@ function sandbox(changes: Partial<SandboxInfo> = {}): SandboxInfo {
     migratedAt: null,
     memoryKept: false,
     memoryLost: null,
+    lost: null,
     network: { outbound: "open", allow: [] },
     tags: [],
     metadata: {},
