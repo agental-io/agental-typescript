@@ -21,7 +21,7 @@ export class ApiError extends AgentalError {
      * any other error.
      */
     readonly regionsWithRoom?: string[],
-    refusal?: { feeMicros?: number; retryAfterSeconds?: number | null; refusedLastHour?: number; headroomUrl?: string },
+    refusal?: { feeMicros?: number; retryAfterSeconds?: number | null; refusedLastHour?: number; limitsUrl?: string },
   ) {
     super(message);
     if (refusal?.feeMicros !== undefined) {
@@ -33,8 +33,8 @@ export class ApiError extends AgentalError {
     if (refusal?.refusedLastHour !== undefined) {
       this.refusedLastHour = refusal.refusedLastHour;
     }
-    if (refusal?.headroomUrl !== undefined) {
-      this.headroomUrl = refusal.headroomUrl;
+    if (refusal?.limitsUrl !== undefined) {
+      this.limitsUrl = refusal.limitsUrl;
     }
   }
 
@@ -59,9 +59,9 @@ export class ApiError extends AgentalError {
 
   /**
    * On a create or start refused with 429 or 409: the console's page where the account sees every
-   * refusal, as headroom() reads them. Undefined on any other error.
+   * refusal, as limits() reads them. Undefined on any other error.
    */
-  readonly headroomUrl?: string;
+  readonly limitsUrl?: string;
 }
 
 /**

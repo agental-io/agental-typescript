@@ -7,10 +7,10 @@ import type {
   ApiKey,
   ApiKeyUsage,
   Billing,
-  Headroom,
-  HeadroomNow,
+  Limits,
+  LimitsNow,
   PlanReplay,
-  HeadroomRange,
+  LimitsRange,
   Catalog,
   HostRoute,
   Invite,
@@ -808,8 +808,8 @@ export class Agental {
   }
 
   /** The sizes on offer, the regions, and how many of your sandboxes are creating, running or stopped. */
-  async limits(): Promise<Catalog> {
-    return (await this.http.json<Catalog>({ method: "GET", path: "/v1/limits", replay: true })).body;
+  async sizes(): Promise<Catalog> {
+    return (await this.http.json<Catalog>({ method: "GET", path: "/v1/sizes", replay: true })).body;
   }
 
   /** What applies to every account here: how many sandboxes, how long one runs, whether ports get public addresses. */
@@ -914,10 +914,10 @@ export class Agental {
    * On the free plan, until the account has paid for something (`now.unpaid`), the running
    * count is `free.unpaidUnits` of prices(). Amounts are millionths of a US dollar.
    */
-  async headroom(range: HeadroomRange = {}): Promise<Headroom> {
+  async limits(range: LimitsRange = {}): Promise<Limits> {
     const iso = (at: Date | string | undefined): string | undefined => (at instanceof Date ? at.toISOString() : at);
     const query = { from: iso(range.from), to: iso(range.to), step: range.step };
-    return (await this.http.json<Headroom>({ method: "GET", path: "/v1/headroom", query, replay: true })).body;
+    return (await this.http.json<Limits>({ method: "GET", path: "/v1/limits", query, replay: true })).body;
   }
 
   /**
@@ -936,10 +936,10 @@ export class Agental {
   /**
    * Sets the most the account spends on burst fees in a month, in millionths of a US dollar:
    * 0 refuses every start that would cost one. null gives it the default again,
-   * defaultBudgetMicros. It answers with where the account stands now, as headroom().now.
+   * defaultBudgetMicros. It answers with where the account stands now, as limits().now.
    */
-  async setHeadroomBudget(budgetMicros: number | null): Promise<HeadroomNow> {
-    return (await this.http.json<HeadroomNow>({ method: "PUT", path: "/v1/headroom/budget", body: { budgetMicros }, replay: true })).body;
+  async setLimitsBudget(budgetMicros: number | null): Promise<LimitsNow> {
+    return (await this.http.json<LimitsNow>({ method: "PUT", path: "/v1/limits/budget", body: { budgetMicros }, replay: true })).body;
   }
 
   /**

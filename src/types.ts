@@ -141,7 +141,7 @@ export type UsageDays = Schemas["UsageDays"];
  * what it started in the last 15 minutes against its free starts, what it spent on burst fees this month
  * against its budget, and what one sandbox of each size would cost to start now.
  */
-export type HeadroomNow = Omit<Schemas["Burst"], "quote"> & {
+export type LimitsNow = Omit<Schemas["Burst"], "quote"> & {
   /** Always null here. */
   quote: BurstQuote | null;
 };
@@ -151,7 +151,7 @@ export type HeadroomNow = Omit<Schemas["Burst"], "quote"> & {
  * (a stretch when it was past its free starts, so every start in it paid a fee), what
  * did not start and why, and how fast what started ran.
  */
-export type Headroom = Omit<Schemas["Headroom"], "now"> & { now: HeadroomNow };
+export type Limits = Omit<Schemas["Limits"], "now"> & { now: LimitsNow };
 /**
  * Your account's last full month priced on every plan (GET /v1/burst/replay): the same use at list
  * price, each plan's burst fees worked out again against its free starts, and its price and included
@@ -159,16 +159,16 @@ export type Headroom = Omit<Schemas["Headroom"], "now"> & { now: HeadroomNow };
  * month whose starts were refused, has no amount. period is null where that month is not known whole.
  */
 export type PlanReplay = operations["replayLastMonth"]["responses"][200]["content"]["application/json"];
-/** How often headroom() reads its series: every 10 minutes, hour or day. */
-export type HeadroomStep = Schemas["Headroom"]["step"];
-/** The range headroom() covers. Left out, today (UTC) to now. */
-export interface HeadroomRange {
+/** How often limits() reads its series: every 10 minutes, hour or day. */
+export type LimitsStep = Schemas["Limits"]["step"];
+/** The range limits() covers. Left out, today (UTC) to now. */
+export interface LimitsRange {
   /** Where the range begins: a Date, or a time in ISO 8601. */
   from?: Date | string;
   /** Where it ends, never later than now. */
   to?: Date | string;
   /** Left out, 10m up to two days, hour up to 8, day past that. */
-  step?: HeadroomStep;
+  step?: LimitsStep;
 }
 /** What starting so many sandboxes of one size now would cost in burst fees, and when it would cost nothing. */
 export type BurstQuote = Schemas["BurstQuote"];

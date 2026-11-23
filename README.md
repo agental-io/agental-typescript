@@ -448,12 +448,12 @@ The free plan makes tiny and small sandboxes, the $100 plan medium ones too, and
 
 ## How many you run, and how fast you start them
 
-Each plan runs so many units at once, its running count, and starts three times that for nothing in any 15 minutes, its free starts. A unit is a tiny sandbox's memory: a tiny counts 1, a small 2, a medium 4 and a large 8. The free plan runs 40 and starts 120, though only 4 and 12 until the account has paid for something (`headroom().now.unpaid`, `prices().free.unpaidUnits`), the $100 plan 200 and 600, the $500 plan 1,200 and 3,600, the $2000 plan 4,000 and 12,000; `prices().tiers` gives each plan's `runningUnits` and `freeBurstUnits`, and `burstFee` how fees are worked out (`windowMinutes`, `freeStartsPerRunning`, `feeMicrosPerUnit`, `defaultBudgetMicros`). Before each start, the units the account started in the 15 minutes before it are counted (a moving window, so a start counts until it is 15 minutes old). Starting more than the free starts is never refused for speed: a start past them pays a burst fee of one hour of a tiny's list price, $0.0135, for each unit over, so one wholly past the line pays one hour of its own size's price (a small $0.027, a large $0.108) and one that straddles it pays only for the units past it.
+Each plan runs so many units at once, its running count, and starts three times that for nothing in any 15 minutes, its free starts. A unit is a tiny sandbox's memory: a tiny counts 1, a small 2, a medium 4 and a large 8. The free plan runs 40 and starts 120, though only 4 and 12 until the account has paid for something (`limits().now.unpaid`, `prices().free.unpaidUnits`), the $100 plan 200 and 600, the $500 plan 1,200 and 3,600, the $2000 plan 4,000 and 12,000; `prices().tiers` gives each plan's `runningUnits` and `freeBurstUnits`, and `burstFee` how fees are worked out (`windowMinutes`, `freeStartsPerRunning`, `feeMicrosPerUnit`, `defaultBudgetMicros`). Before each start, the units the account started in the 15 minutes before it are counted (a moving window, so a start counts until it is 15 minutes old). Starting more than the free starts is never refused for speed: a start past them pays a burst fee of one hour of a tiny's list price, $0.0135, for each unit over, so one wholly past the line pays one hour of its own size's price (a small $0.027, a large $0.108) and one that straddles it pays only for the units past it.
 
-`headroom()` says how close the account runs to these limits: `now`, where it stands, and over a range (today, UTC, unless `from` and `to` say otherwise, 90 days at most) what it ran against its running count, each burst (a stretch when the account was past its free starts, so every start in it paid a fee), what did not start and why, and how fast what started ran.
+`limits()` says how close the account runs to these limits: `now`, where it stands, and over a range (today, UTC, unless `from` and `to` say otherwise, 90 days at most) what it ran against its running count, each burst (a stretch when the account was past its free starts, so every start in it paid a fee), what did not start and why, and how fast what started ran.
 
 ```ts
-const { now, atRunningCountMs, bursts, refused } = await agental.headroom();
+const { now, atRunningCountMs, bursts, refused } = await agental.limits();
 console.log(now.runningMb / 2048, now.runningUnits); // units running, of 200
 console.log(now.freeNowMb / 2048); // units you may start now for nothing
 console.log(now.spentMicros, now.budgetMicros); // burst fees this month, and the most you spend on them
@@ -463,11 +463,11 @@ console.log(bursts[0]?.startedAt, bursts[0]?.endedAt); // the newest burst; ende
 console.log(refused.total, refused.byReason); // what did not start today: running_count, budget, fee_cap, room or other
 
 // The last week, read every hour.
-const week = await agental.headroom({ from: new Date(Date.now() - 7 * 86_400_000), step: "hour" });
+const week = await agental.limits({ from: new Date(Date.now() - 7 * 86_400_000), step: "hour" });
 console.log(week.series.map((point) => point.peakRunningMb / 2048));
 
 // Spend at most $10 a month on burst fees; 0 refuses every start that would cost one, null puts back the default ($50).
-await agental.setHeadroomBudget(10_000_000);
+await agental.setLimitsBudget(10_000_000);
 ```
 
 `replayLastMonth()` prices your last full month on every plan: the same use at list price, each plan's burst fees worked out again against its free starts, and its price and included credits. Your own plan is the month as charged. A plan that would have refused the month has no amount, and neither has any plan in a month whose creates or starts were refused.
@@ -489,7 +489,7 @@ console.log(sandbox.burstFeeMicros); // 0 within the free starts
 await sandbox.start({ maxBurstFeeMicros: 0, maxBurstWaitMs: 300_000 }); // free, waiting up to 5 minutes for it to be
 ```
 
-Where `now.enforced` is true, a start is refused with an `ApiError` of status 429 and one of these codes. `feeMicros` says what it would have cost and `retryAfterSeconds` when it would cost nothing, or null when waiting would not help; `refusedLastHour` how many creates and starts were refused with the same code in the last hour, this one with them, and `headroomUrl` the console's page that shows them all:
+Where `now.enforced` is true, a start is refused with an `ApiError` of status 429 and one of these codes. `feeMicros` says what it would have cost and `retryAfterSeconds` when it would cost nothing, or null when waiting would not help; `refusedLastHour` how many creates and starts were refused with the same code in the last hour, this one with them, and `limitsUrl` the console's page that shows them all:
 
 - `running_limit_reached`: the account already runs its plan's running count. Stop something first.
 - `burst_fee_too_high`: the start would cost more than `maxBurstFeeMicros`.
