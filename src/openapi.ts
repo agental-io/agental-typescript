@@ -9345,7 +9345,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description invalid_state: the sandbox is being created or being brought back from the archive, and cannot be recovered now. sandbox_archived: it is archived; start it instead. sandbox_migrating: not returned now, since sandboxes are no longer moved between servers. */
+            /** @description invalid_state: the sandbox is being created or being brought back from the archive, and cannot be recovered now, or its create failed before it was made; delete it and create another. sandbox_archived: it is archived; start it instead. sandbox_migrating: not returned now, since sandboxes are no longer moved between servers. */
             409: {
                 headers: {
                     [name: string]: unknown;
