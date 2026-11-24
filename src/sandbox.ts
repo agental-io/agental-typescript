@@ -16,6 +16,7 @@ import type {
   EmailMessageSummary,
   ExecResult,
   HostRoute,
+  SiteAnalytics,
   KeptTerminal,
   Operation,
   SandboxAutoStop,
@@ -1329,10 +1330,30 @@ export class Sandbox {
    * not_found before anything is taken away.
    */
   async removeSite(siteId: string): Promise<HostRoute> {
+    await this.requireSite(siteId);
+    return (await this.http.json<HostRoute>({ method: "POST", path: `/v1/host-routes/${encodeURIComponent(siteId)}/hide`, replay: true })).body;
+  }
+
+  /**
+   * A site's visits, page views and top pages, sources, countries, devices and browsers, over the last 7 days or 24
+   * hours. A visit is one address and browser on one site on one UTC day. Only one of this sandbox's sites: any other id is refused
+   * as not_found before anything is read.
+   */
+  async siteAnalytics(siteId: string, options: { range?: "24h" | "7d" } = {}): Promise<SiteAnalytics> {
+    await this.requireSite(siteId);
+    return (await this.http.json<SiteAnalytics>({ method: "GET", path: `/v1/host-routes/${encodeURIComponent(siteId)}/analytics`, query: { range: options.range }, replay: true })).body;
+  }
+
+  /** Turns a site's analytics on or off. Off deletes its figures at once. Only one of this sandbox's sites, as siteAnalytics. */
+  async setSiteAnalytics(siteId: string, enabled: boolean): Promise<SiteAnalytics> {
+    await this.requireSite(siteId);
+    return (await this.http.json<SiteAnalytics>({ method: "PUT", path: `/v1/host-routes/${encodeURIComponent(siteId)}/analytics`, body: { enabled }, replay: true })).body;
+  }
+
+  private async requireSite(siteId: string): Promise<void> {
     if (!(await this.sites()).some((site) => site.id === siteId)) {
       throw new ApiError(404, "not_found", `${siteId} is not a site of this sandbox.`);
     }
-    return (await this.http.json<HostRoute>({ method: "POST", path: `/v1/host-routes/${encodeURIComponent(siteId)}/hide`, replay: true })).body;
   }
 
   /** How long it has run and what that comes to at the list price, and the mail it has had. Without since, its whole life. */

@@ -638,6 +638,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/host-routes/{id}/analytics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description A site's visits, page views, top pages, sources, countries and devices. Figures are kept for 7 days, or less under the organization's data retention, and hold no visitor's address, query or cookie. */
+        get: operations["getSiteAnalytics"];
+        /** @description Turns one site's analytics on or off. Turning them off deletes its figures at once. */
+        put: operations["setSiteAnalytics"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/site-analytics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Whether the organization's sites are counted. */
+        get: operations["getOrganizationSiteAnalytics"];
+        /** @description Turns the organization's site analytics on or off. Off deletes every site's figures at once. On Enterprise or with a server of your own, on answers 409 notice_required until informed is true: send it only after showing that these figures, page names included, are kept on agental's side, and that error logs can hold a request's details for up to 30 days. */
+        put: operations["setOrganizationSiteAnalytics"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/host-routes/{id}/proxy": {
         parameters: {
             query?: never;
@@ -3249,6 +3285,93 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/servers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description The organization's own servers, on the Enterprise plan. */
+        get: operations["listServers"];
+        put?: never;
+        /** @description Adds a server of the organization's own, and answers with the one-time token and install line it joins with. It takes no sandbox yet. */
+        post: operations["addServer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/servers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description One of the organization's own servers. */
+        get: operations["getServer"];
+        put?: never;
+        post?: never;
+        /** @description Removes a server that holds nothing. Then run `agental-agent uninstall` on it: your disks are left as they are. */
+        delete: operations["removeServer"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/servers/{id}/join-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description A new join token for a server that has not joined. The one it had stops working at once. */
+        post: operations["newServerJoinToken"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/servers/{id}/drain": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Takes the server out of placement. Nothing on it is stopped or moved. */
+        post: operations["drainServer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/servers/{id}/declare-gone": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Says a server is gone for good, once its agent has been away for 24 hours and it takes no new sandbox (drain it first). This cannot be undone. Its sandboxes are said lost and are made again nowhere; its agent's key stops working; what is on its disks stays there. Send its label to confirm. */
+        post: operations["declareServerGone"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/telemetry": {
         parameters: {
             query?: never;
@@ -4281,6 +4404,59 @@ export interface components {
             proxy: "available" | "not_configured";
             /** @description Public address of the port: HTTP and WebSocket only, no token needed, and hard to guess. It answers while the sandbox is running. Null when the route is not public or public addresses are off. */
             url: string | null;
+        };
+        SiteAnalytics: {
+            siteId: string;
+            /** @description This site's own switch. */
+            enabled: boolean;
+            /** @description The organization's switch, which each site's applies within. */
+            organizationEnabled: boolean;
+            /** @enum {string} */
+            range: "24h" | "7d";
+            /** @description Visits: one IP address and browser on this site on one UTC day, so the count is close, not exact. Someone who returns on another day is another visit, and browsers that say they are bots are left out. */
+            visits: number;
+            pageViews: number;
+            /** @description Over 24h, of today UTC, as listsFrom says. */
+            requests: number;
+            /** @description Answers of 500 or more. Over 24h, of today UTC. */
+            errors: number;
+            /** @description 24h: against the 24 hours before. 7d: the last 3 days against the 3 before. Null with nothing to compare. */
+            visitsChangePercent: number | null;
+            /** @description The first UTC day the lists and the request counts cover. */
+            listsFrom: string;
+            series: {
+                at: string;
+                visits: number;
+                views: number;
+            }[];
+            /** @description Top pages by views: paths with no query, and id-, token- and email-like parts collapsed. */
+            pages: {
+                name: string;
+                count: number;
+            }[];
+            /** @description Top sources by visits, as domains, or Direct. */
+            sources: {
+                name: string;
+                count: number;
+            }[];
+            countries: {
+                name: string;
+                count: number;
+            }[];
+            devices: {
+                name: string;
+                count: number;
+            }[];
+            browsers: {
+                name: string;
+                count: number;
+            }[];
+        };
+        OrganizationSiteAnalytics: {
+            enabled: boolean;
+            /** @description True on Enterprise or with a server of your own: turning analytics on needs informed: true, after showing what is kept. */
+            noticeRequired: boolean;
+            keptDays: number;
         };
         Snapshot: {
             id: string;
@@ -5646,6 +5822,8 @@ export interface components {
                 size: string;
                 /** @description Whether a job holds it now. */
                 busy: boolean;
+                /** @description Kept as a failed job left it until this time, for you to step into, and given to no job. Null for a sandbox in its pool. */
+                heldUntil: string | null;
             }[];
             /** @description Its jobs that were refused a runner so far, the oldest first. Each is tried again every minute. */
             waiting: {
@@ -7068,6 +7246,65 @@ export interface components {
             };
             /** @description Bytes of mail the account stores now. */
             keptBytes: number;
+        };
+        Server: {
+            id: string;
+            label: string;
+            /** @enum {string} */
+            state: "open" | "held" | "draining" | "evacuating";
+            agent: {
+                /**
+                 * @description waiting: it has not joined. online: connected in the last minute. offline: neither.
+                 * @enum {string}
+                 */
+                state: "waiting" | "online" | "offline";
+                version: string | null;
+                lastSeenAt: string | null;
+                joinTokenExpiresAt: string | null;
+            };
+            publicAddress: string | null;
+            holds: {
+                creating: number;
+                running: number;
+                stopped: number;
+                failed: number;
+                withSnapshots: number;
+            };
+            addedAt: string;
+        };
+        ServerToJoin: {
+            server: components["schemas"]["Server"];
+            join: {
+                /** @description The one-time token its agent joins with, shown this once. */
+                token: string;
+                expiresAt: string;
+                /** @description The line to run as root on the server, with the disk for sandboxes in place of /dev/DISK. */
+                installCommand: string;
+            };
+        };
+        NewServer: {
+            /**
+             * @description Your own name for the server, unique in this organization.
+             * @example rack-2 server-01
+             */
+            label: string;
+            /** @description For a person signed in with two-factor sign-in on: a code from the app, or a backup code. */
+            code?: string;
+        };
+        ServerCode: {
+            /** @description For a person signed in with two-factor sign-in on: a code from the app, or a backup code. */
+            code?: string;
+        };
+        DeclareServerGone: {
+            /** @description The server's label, to confirm which one. */
+            label: string;
+            /**
+             * @description Why it is gone, as it should be read back later.
+             * @example The machine's motherboard failed.
+             */
+            reason: string;
+            /** @description For a person signed in with two-factor sign-in on: a code from the app, or a backup code. */
+            code?: string;
         };
         TelemetryAnswer: {
             telemetry: components["schemas"]["Telemetry"] | null;
@@ -10518,6 +10755,179 @@ export interface operations {
             };
         };
     };
+    getSiteAnalytics: {
+        parameters: {
+            query?: {
+                range?: "24h" | "7d";
+            };
+            header?: never;
+            path: {
+                /** @description The host route's ID, as POST /v1/sandboxes/{id}/host returned it. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The site's figures. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteAnalytics"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    setSiteAnalytics: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The host route's ID, as POST /v1/sandboxes/{id}/host returned it. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    enabled: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description The site's figures. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteAnalytics"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getOrganizationSiteAnalytics: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The organization's setting. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationSiteAnalytics"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    setOrganizationSiteAnalytics: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    enabled: boolean;
+                    informed?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description The organization's setting. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationSiteAnalytics"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     proxyHostRoute: {
         parameters: {
             query?: never;
@@ -13923,11 +14333,11 @@ export interface operations {
                      */
                     url: string;
                     /**
-                     * @description The events to send, at most 20 entries: sandbox.created, sandbox.started, sandbox.stopped, sandbox.archived, sandbox.error, sandbox.moved, sandbox.deleted, sandbox.auto_stop_set, sandbox.labels_changed, sandbox.low_cpu, sandbox.upgraded (a spot sandbox made standard), sandbox.reclaim_chance (a spot sandbox's chance of being stopped crossed its warnAt), sandbox.lost (its only copy was on a server that failed for good), prompt.created, email.received, email.delivered, email.bounced, member.invited, member.joined, member.removed, member.role_changed, key.revoked, template.created, template.updated, template.secrets_changed (named, never with a value), template.labels_changed, template.deleted, and Headroom's headroom.burst_started, headroom.burst_ended, headroom.refused, headroom.running_count_reached, headroom.budget_threshold and headroom.budget_reached, which concern the organization rather than a sandbox, and a job's job.created, job.updated, job.deleted, job.run_started, job.run_finished, job.run_failed, job.recovered and job.paused. A group name with .*, as headroom.*, job.* or sandbox.*, means every event in the group, including ones added later; * alone means every event, the default. A * anywhere else, or a name that is not one of these, is rejected. An event has the same id in every webhook it is sent to, and sandbox.* and headroom.* events are also sent as log records to the collector set with PUT /v1/telemetry.
+                     * @description The events to send, at most 20 entries: sandbox.created, sandbox.started, sandbox.stopped, sandbox.archived, sandbox.error, sandbox.moved, sandbox.deleted, sandbox.auto_stop_set, sandbox.labels_changed, sandbox.low_cpu, sandbox.upgraded (a spot sandbox made standard), sandbox.reclaim_chance (a spot sandbox's chance of being stopped crossed its warnAt), sandbox.lost (its only copy was on a server that failed for good), prompt.created, email.received, email.delivered, email.bounced, member.invited, member.joined, member.removed, member.role_changed, key.revoked, template.created, template.updated, template.secrets_changed (named, never with a value), template.labels_changed, template.deleted, and Headroom's limits.burst_started, limits.burst_ended, limits.refused, limits.running_count_reached, limits.budget_threshold and limits.budget_reached, which concern the organization rather than a sandbox, and a job's job.created, job.updated, job.deleted, job.run_started, job.run_finished, job.run_failed, job.recovered and job.paused. A group name with .*, as limits.*, job.* or sandbox.*, means every event in the group, including ones added later; * alone means every event, the default. A * anywhere else, or a name that is not one of these, is rejected. An event has the same id in every webhook it is sent to, and sandbox.* and limits.* events are also sent as log records to the collector set with PUT /v1/telemetry.
                      * @example [
                      *       "sandbox.created",
                      *       "sandbox.error",
-                     *       "headroom.*"
+                     *       "limits.*"
                      *     ]
                      */
                     events?: string[];
@@ -14138,11 +14548,11 @@ export interface operations {
                      */
                     url?: string;
                     /**
-                     * @description The events to send, at most 20 entries: sandbox.created, sandbox.started, sandbox.stopped, sandbox.archived, sandbox.error, sandbox.moved, sandbox.deleted, sandbox.auto_stop_set, sandbox.labels_changed, sandbox.low_cpu, sandbox.upgraded (a spot sandbox made standard), sandbox.reclaim_chance (a spot sandbox's chance of being stopped crossed its warnAt), sandbox.lost (its only copy was on a server that failed for good), prompt.created, email.received, email.delivered, email.bounced, member.invited, member.joined, member.removed, member.role_changed, key.revoked, template.created, template.updated, template.secrets_changed (named, never with a value), template.labels_changed, template.deleted, and Headroom's headroom.burst_started, headroom.burst_ended, headroom.refused, headroom.running_count_reached, headroom.budget_threshold and headroom.budget_reached, which concern the organization rather than a sandbox, and a job's job.created, job.updated, job.deleted, job.run_started, job.run_finished, job.run_failed, job.recovered and job.paused. A group name with .*, as headroom.*, job.* or sandbox.*, means every event in the group, including ones added later; * alone means every event, the default. A * anywhere else, or a name that is not one of these, is rejected. An event has the same id in every webhook it is sent to, and sandbox.* and headroom.* events are also sent as log records to the collector set with PUT /v1/telemetry.
+                     * @description The events to send, at most 20 entries: sandbox.created, sandbox.started, sandbox.stopped, sandbox.archived, sandbox.error, sandbox.moved, sandbox.deleted, sandbox.auto_stop_set, sandbox.labels_changed, sandbox.low_cpu, sandbox.upgraded (a spot sandbox made standard), sandbox.reclaim_chance (a spot sandbox's chance of being stopped crossed its warnAt), sandbox.lost (its only copy was on a server that failed for good), prompt.created, email.received, email.delivered, email.bounced, member.invited, member.joined, member.removed, member.role_changed, key.revoked, template.created, template.updated, template.secrets_changed (named, never with a value), template.labels_changed, template.deleted, and Headroom's limits.burst_started, limits.burst_ended, limits.refused, limits.running_count_reached, limits.budget_threshold and limits.budget_reached, which concern the organization rather than a sandbox, and a job's job.created, job.updated, job.deleted, job.run_started, job.run_finished, job.run_failed, job.recovered and job.paused. A group name with .*, as limits.*, job.* or sandbox.*, means every event in the group, including ones added later; * alone means every event, the default. A * anywhere else, or a name that is not one of these, is rejected. An event has the same id in every webhook it is sent to, and sandbox.* and limits.* events are also sent as log records to the collector set with PUT /v1/telemetry.
                      * @example [
                      *       "sandbox.created",
                      *       "sandbox.error",
-                     *       "headroom.*"
+                     *       "limits.*"
                      *     ]
                      */
                     events?: string[];
@@ -22052,6 +22462,461 @@ export interface operations {
             };
             /** @description Missing or invalid API key. */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listServers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Its servers. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        servers: components["schemas"]["Server"][];
+                    };
+                };
+            };
+            /** @description invalid_request. code_required, invalid_code or code_used: two-factor sign-in is on, and this needs a code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description role_required: only an owner or an admin of the organization does this. enterprise_required: the organization has no Enterprise contract in its pilot or active. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    addServer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewServer"];
+            };
+        };
+        responses: {
+            /** @description The server, and how it joins, shown this once. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServerToJoin"];
+                };
+            };
+            /** @description invalid_request. code_required, invalid_code or code_used: two-factor sign-in is on, and this needs a code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description role_required: only an owner or an admin of the organization does this. enterprise_required: the organization has no Enterprise contract in its pilot or active. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description server_label_taken: the organization has a server of that name. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Servers do not join through an agent in this deployment. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getServer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The server. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Server"];
+                };
+            };
+            /** @description invalid_request. code_required, invalid_code or code_used: two-factor sign-in is on, and this needs a code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description role_required: only an owner or an admin of the organization does this. enterprise_required: the organization has no Enterprise contract in its pilot or active. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description server_not_found: the organization has no such server. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    removeServer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ServerCode"];
+            };
+        };
+        responses: {
+            /** @description Removed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        removed: true;
+                        uninstallCommand: string;
+                    };
+                };
+            };
+            /** @description invalid_request. code_required, invalid_code or code_used: two-factor sign-in is on, and this needs a code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description role_required: only an owner or an admin of the organization does this. enterprise_required: the organization has no Enterprise contract in its pilot or active. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description server_not_found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description box_not_empty: it still holds a sandbox, or a machine kept for a snapshot. box_unreachable: it joined and does not answer, so what it holds cannot be checked. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    newServerJoinToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ServerCode"];
+            };
+        };
+        responses: {
+            /** @description The server, and how it joins, shown this once. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServerToJoin"];
+                };
+            };
+            /** @description invalid_request. code_required, invalid_code or code_used: two-factor sign-in is on, and this needs a code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description role_required: only an owner or an admin of the organization does this. enterprise_required: the organization has no Enterprise contract in its pilot or active. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description server_not_found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description box_already_joined: its agent has joined. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    drainServer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The server. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Server"];
+                };
+            };
+            /** @description invalid_request. code_required, invalid_code or code_used: two-factor sign-in is on, and this needs a code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description role_required: only an owner or an admin of the organization does this. enterprise_required: the organization has no Enterprise contract in its pilot or active. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description server_not_found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    declareServerGone: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeclareServerGone"];
+            };
+        };
+        responses: {
+            /** @description It is gone. sandboxesWaiting are still being seen to, within a few minutes. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        gone: true;
+                        sandboxesWaiting: number;
+                    };
+                };
+            };
+            /** @description invalid_request. code_required, invalid_code or code_used: two-factor sign-in is on, and this needs a code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description role_required: only an owner or an admin of the organization does this. enterprise_required: the organization has no Enterprise contract in its pilot or active. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description server_not_found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description box_not_lost: its agent is connected, it was heard from in the last 24 hours, it is still open, or a join token of its still works. box_declared_lost: it is being seen to already. */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

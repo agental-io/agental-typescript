@@ -53,6 +53,8 @@ export type {
   FolderEntry,
   HiddenVariable,
   HostRoute,
+  OrganizationSiteAnalytics,
+  SiteAnalytics,
   Invite,
   Me,
   Member,

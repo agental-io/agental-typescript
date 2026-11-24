@@ -13,6 +13,7 @@ import type {
   LimitsRange,
   Catalog,
   HostRoute,
+  OrganizationSiteAnalytics,
   Invite,
   Me,
   Member,
@@ -807,6 +808,22 @@ export class Agental {
     return (await this.http.json<HostRoute>({ method: "POST", path: `/v1/host-routes/${encodeURIComponent(routeId)}/hide`, replay: true })).body;
   }
 
+  /** Whether the organization's sites are counted, whether turning that on needs informed, and how many days figures are kept. */
+  async organizationSiteAnalytics(): Promise<OrganizationSiteAnalytics> {
+    return (await this.http.json<OrganizationSiteAnalytics>({ method: "GET", path: "/v1/site-analytics", replay: true })).body;
+  }
+
+  /**
+   * Turns the organization's site analytics on or off. Off deletes every site's figures at once. On Enterprise or with a
+   * server of your own, on is refused with 409 notice_required until informed is true. Pass it only once a person has been
+   * shown that these figures, page names included, are kept on agental's side, and that error logs can hold a request's
+   * details for up to 30 days. It is never sent for you.
+   */
+  async setOrganizationSiteAnalytics(enabled: boolean, options: { informed?: boolean } = {}): Promise<OrganizationSiteAnalytics> {
+    const body = { enabled, ...(options.informed === undefined ? {} : { informed: options.informed }) };
+    return (await this.http.json<OrganizationSiteAnalytics>({ method: "PUT", path: "/v1/site-analytics", body, replay: true })).body;
+  }
+
   /** The sizes on offer, the regions, and how many of your sandboxes are creating, running or stopped. */
   async sizes(): Promise<Catalog> {
     return (await this.http.json<Catalog>({ method: "GET", path: "/v1/sizes", replay: true })).body;
@@ -1140,8 +1157,8 @@ export class Agental {
 
   /**
    * Adds a webhook. url is posted each event it takes, and has to be on the public internet.
-   * events names the kinds it takes, such as sandbox.stopped or headroom.burst_ended, a group
-   * of them by its name and .*, such as "headroom.*", which takes the group's kinds added later
+   * events names the kinds it takes, such as sandbox.stopped or limits.burst_ended, a group
+   * of them by its name and .*, such as "limits.*", which takes the group's kinds added later
    * too, or "*" for every one and any added later, which is what it takes when events is left
    * out. A * anywhere else is refused. The answer holds
    * signingSecret, the one time it is given: each post's X-Agental-Signature is checked

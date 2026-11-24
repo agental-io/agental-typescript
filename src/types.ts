@@ -101,6 +101,8 @@ export type JobUsage = Schemas["JobUsage"];
 export type Snapshot = Schemas["Snapshot"];
 /** A port of a sandbox, and the address it is reached at. */
 export type HostRoute = Schemas["HostRoute"];
+export type SiteAnalytics = Schemas["SiteAnalytics"];
+export type OrganizationSiteAnalytics = Schemas["OrganizationSiteAnalytics"];
 /** Whether a sandbox has a desktop turned on, the size of its screen, and where it is watched. */
 export type DesktopState = Schemas["DesktopState"];
 /** A picture of a sandbox's screen in base64, with its media type, its size and the part of the screen it shows. */

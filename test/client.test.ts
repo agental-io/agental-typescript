@@ -541,6 +541,42 @@ test("a sandbox's sites are its public routes not taken away, added from a port 
   assert.equal(sent.length, 7);
 });
 
+test("a site's analytics are read and switched only for a site of this sandbox, and informed is sent only when given", async () => {
+  const route = (id: string, port: number, changes: Record<string, unknown> = {}) => ({ id, sandboxId: "sbx_0123456789abcdef", port, title: `port-${port}`, public: true, hidden: false, url: `https://${id}.agental.site`, ...changes });
+  const routes = { routes: [route("rte_1", 3000), route("rte_2", 4000, { public: false, url: null })] };
+  const report = { siteId: "rte_1", enabled: true, organizationEnabled: true, range: "24h", visits: 5 };
+  const setting = { enabled: true, noticeRequired: true, keptDays: 7 };
+  const { agental, sent } = scripted(
+    json(200, sandbox()),
+    json(200, routes),
+    json(200, report),
+    json(200, routes),
+    json(200, { ...report, enabled: false }),
+    json(200, routes),
+    json(200, routes),
+    json(200, setting),
+    json(200, setting),
+    json(200, setting),
+  );
+  const box = await agental.sandboxes.get("sbx_0123456789abcdef");
+  assert.equal((await box.siteAnalytics("rte_1", { range: "24h" })).visits, 5);
+  assert.deepEqual([sent[2]?.method, sent[2]?.path], ["GET", "/v1/host-routes/rte_1/analytics?range=24h"]);
+  assert.equal((await box.setSiteAnalytics("rte_1", false)).enabled, false);
+  assert.deepEqual([sent[4]?.method, sent[4]?.path, sent[4]?.body], ["PUT", "/v1/host-routes/rte_1/analytics", { enabled: false }]);
+
+  const count = sent.length + 2;
+  await assert.rejects(box.siteAnalytics("rte_2"), (error: unknown) => error instanceof ApiError && error.code === "not_found");
+  await assert.rejects(box.setSiteAnalytics("rte_2", true), (error: unknown) => error instanceof ApiError && error.code === "not_found");
+  assert.equal(sent.length, count);
+
+  assert.equal((await agental.organizationSiteAnalytics()).keptDays, 7);
+  assert.deepEqual([sent[7]?.method, sent[7]?.path], ["GET", "/v1/site-analytics"]);
+  await agental.setOrganizationSiteAnalytics(true);
+  assert.deepEqual(sent[8]?.body, { enabled: true });
+  await agental.setOrganizationSiteAnalytics(true, { informed: true });
+  assert.deepEqual(sent[9]?.body, { enabled: true, informed: true });
+});
+
 function stopOf(changes: Partial<SandboxAutoStop> = {}): SandboxAutoStop {
   return { sandboxId: "sbx_0123456789abcdef", status: "running", autoStopAt: "2026-10-13T02:00:00.000Z", secondsLeft: 7200, ttlSeconds: 7200, setBy: "ttl", ...changes };
 }
