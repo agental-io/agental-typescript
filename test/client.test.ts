@@ -2608,3 +2608,36 @@ test("an upload or download link is asked for by path, with its time when given"
   await box.files.downloadLink("a.tgz", { expiresInSeconds: 120 });
   assert.deepEqual([sent[2]?.path, sent[2]?.body], ["/v1/sandboxes/sbx_0123456789abcdef/files/download-link", { path: "a.tgz", expiresInSeconds: 120 }]);
 });
+
+test("Node 26.4.0 to 26.5.0, whose fetch sends concurrent requests one at a time, is refused with the version to use", async () => {
+  const { refuseNodeThatStallsRequests } = await import("../src/http.js");
+  for (const node of ["26.4.0", "26.4.3", "26.5.0", "26.5.0-rc.1"]) {
+    assert.throws(
+      () => refuseNodeThatStallsRequests({ node }),
+      (error: unknown) => error instanceof AgentalError && error.message.includes(`Node ${node}`) && error.message.includes("26.5.1"),
+      node,
+    );
+  }
+});
+
+test("every other Node, a runtime with a fetch of its own, and one with no versions are let through", async () => {
+  const { refuseNodeThatStallsRequests } = await import("../src/http.js");
+  for (const node of ["20.16.0", "24.11.0", "26.3.9", "26.5.1", "26.6.0", "27.4.0"]) {
+    assert.doesNotThrow(() => refuseNodeThatStallsRequests({ node }), node);
+  }
+  assert.doesNotThrow(() => refuseNodeThatStallsRequests({ node: "26.4.0", bun: "1.3.0" }));
+  assert.doesNotThrow(() => refuseNodeThatStallsRequests({ node: "26.4.0", deno: "2.5.0" }));
+  assert.doesNotThrow(() => refuseNodeThatStallsRequests(undefined));
+});
+
+test("a client is refused as it is made on such a Node, and made when it is given a fetch of its own", () => {
+  const versions = Object.getOwnPropertyDescriptor(process, "versions");
+  assert.ok(versions);
+  Object.defineProperty(process, "versions", { ...versions, value: { node: "26.4.0" } });
+  try {
+    assert.throws(() => new Agental({ apiKey: "ag_test" }), (error: unknown) => error instanceof AgentalError && error.message.includes("26.5.1"));
+    assert.doesNotThrow(() => new Agental({ apiKey: "ag_test", fetch: async () => new Response("{}") }));
+  } finally {
+    Object.defineProperty(process, "versions", versions);
+  }
+});

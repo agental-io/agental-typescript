@@ -6,7 +6,7 @@ TypeScript SDK for [agental.io](https://agental.io): a Linux virtual machine of 
 npm install agental-sdk
 ```
 
-Node 20.16 or later. No dependencies. The package is ESM only: `import`, not `require`. It uses only `fetch` and Web Crypto, so Bun, Deno and Cloudflare Workers should run it too, but it is only tested on Node.
+Node 20.16 or later, except 26.4.0 to 26.5.0, which the SDK refuses: their `fetch` sends concurrent requests one at a time, so calls would hang (use 26.5.1 or later, or pass a `fetch` of your own). No dependencies. The package is ESM only: `import`, not `require`. It uses only `fetch` and Web Crypto, so Bun, Deno and Cloudflare Workers should run it too, but it is only tested on Node.
 
 ## The agental command
 

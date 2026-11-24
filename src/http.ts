@@ -51,6 +51,8 @@ const MIGRATING_TRIES = 18;
 
 interface NodeProcess {
   env?: Record<string, string | undefined>;
+  /** The runtime's versions: node everywhere Node's process is copied, and bun or deno where it is one of those. */
+  versions?: Record<string, string | undefined>;
   /** Node's own modules, where the runtime has them: Node 20.16 and later. */
   getBuiltinModule?: (name: string) => unknown;
 }
@@ -92,6 +94,27 @@ function signedIn(): { apiUrl: string; apiKey: string } | undefined {
     return typeof saved["apiUrl"] === "string" && typeof saved["apiKey"] === "string" ? { apiUrl: saved["apiUrl"], apiKey: saved["apiKey"] } : undefined;
   } catch {
     return undefined;
+  }
+}
+
+/**
+ * Refuses Node 26.4.0 to 26.5.0, whose fetch sends concurrent POSTs one at a time (undici
+ * #5390, fixed in Node 26.5.1). A command's output and a sandbox's events are each one long
+ * POST or stream, so on those versions every other call would wait behind it with no error: a
+ * program that hangs. Bun and Deno say a Node version too and have their own fetch, so they
+ * are let through.
+ */
+export function refuseNodeThatStallsRequests(versions: Record<string, string | undefined> | undefined): void {
+  const node = versions?.["node"];
+  if (node === undefined || versions?.["bun"] !== undefined || versions?.["deno"] !== undefined) {
+    return;
+  }
+  // parseInt, so that a pre-release of 26.5.0 ("26.5.0-rc.1") counts as 26.5.0.
+  const [major, minor, patch] = node.split(".").map((part) => Number.parseInt(part, 10));
+  if (major === 26 && (minor === 4 || (minor === 5 && patch === 0))) {
+    throw new AgentalError(
+      `agental-sdk cannot run on Node ${node}: its fetch sends concurrent requests one at a time, so a call made while a command's output is being read would hang. Use Node 26.5.1 or later, or Node 24. To stay on this version, pass new Agental({ fetch }) with a fetch of your own.`,
+    );
   }
 }
 
@@ -141,6 +164,9 @@ export class Http {
     }
     this.apiKey = apiKey;
     this.baseUrl = (baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
+    if (!options.fetch) {
+      refuseNodeThatStallsRequests(runtime()?.versions);
+    }
     this.fetch = options.fetch ?? ((input, init) => globalThis.fetch(input, init));
     this.maxRetries = options.maxRetries ?? 3;
     this.retryDelayMs = options.retryDelayMs ?? 1000;
