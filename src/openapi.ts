@@ -3339,6 +3339,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/servers/{id}/readings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description How used one of the organization's own servers was, over time: its memory, CPU and disk, read every minute and kept 15 days. These are what placement and offload go by. A point whose minutesRead is 0 is a time the server did not answer in. */
+        get: operations["getServerReadings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/servers/{id}/join-token": {
         parameters: {
             query?: never;
@@ -7322,6 +7339,20 @@ export interface components {
             enabled: boolean;
             /** @description Left out, it stays as it was: 80 to begin with. */
             overPercent?: number;
+        };
+        ServerReadings: {
+            since: string;
+            until: string;
+            everyMinutes: number;
+            readings: {
+                /** @description The start of the minutes this point covers. */
+                from: string;
+                /** @description How many of them the server answered in. 0 is a server that was away. */
+                minutesRead: number;
+                memoryUsedPercent: number | null;
+                cpuBusyPercent: number | null;
+                diskUsedPercent: number | null;
+            }[];
         };
         ServerCode: {
             /** @description For a person signed in with two-factor sign-in on: a code from the app, or a backup code. */
@@ -22843,6 +22874,71 @@ export interface operations {
             };
             /** @description box_not_empty: it still holds a sandbox, or a machine kept for a snapshot. box_unreachable: it joined and does not answer, so what it holds cannot be checked. */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getServerReadings: {
+        parameters: {
+            query?: {
+                /** @description From when. Readings are kept 15 days, so nothing older comes back. Left out: 24 hours before until. */
+                since?: string;
+                /** @description Up to when. Left out: now. */
+                until?: string;
+                /** @description How many minutes a point covers: 1, 5, 15 or 60. Left out: 1 for a day or less, 5 for up to 5 days, 15 past that. */
+                everyMinutes?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Its readings, oldest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServerReadings"];
+                };
+            };
+            /** @description invalid_request. code_required, invalid_code or code_used: two-factor sign-in is on, and this needs a code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description role_required: only an owner or an admin of the organization does this. enterprise_required: the organization has no Enterprise contract in its pilot or active. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description server_not_found. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
