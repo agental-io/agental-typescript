@@ -3303,6 +3303,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/offload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Whether new sandboxes go to agental's servers when the organization's own are busy, and how busy that is. */
+        get: operations["getOffload"];
+        /** @description Turns offload on or off. On, a new sandbox that names no region is made on agental's servers, in the default hosted region, when none of the organization's own servers has room under overPercent; it is then a hosted sandbox, billed as one. A create that names `own` is never offloaded. Off, such a create is refused with capacity_exceeded when the servers are full. */
+        put: operations["setOffload"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/servers/{id}": {
         parameters: {
             query?: never;
@@ -4373,9 +4391,9 @@ export interface components {
             id: string;
             sandboxId: string;
             pid: number | null;
-            /** @description running, succeeded (exit code 0), failed, or timed_out (exit code 124). */
+            /** @description running, succeeded (exit code 0), failed, or timed_out (its timeoutMs ran out). */
             status: string;
-            /** @description Its exit code. Null while it runs, and for one whose end is not known, as when the API restarted while it ran. */
+            /** @description The exit code the program exited with. Null while it runs, and whenever it did not exit by itself: a signal, a timeout, a stop of its sandbox, or an end that is not known. */
             exitCode: number | null;
             /** @description The last 65,536 characters it wrote to stdout. */
             stdout: string;
@@ -7290,6 +7308,20 @@ export interface components {
             label: string;
             /** @description For a person signed in with two-factor sign-in on: a code from the app, or a backup code. */
             code?: string;
+        };
+        Offload: {
+            /** @description Whether a new sandbox that names no region is made on agental's servers when none of your own has room under overPercent. */
+            enabled: boolean;
+            /**
+             * @description How used a server of yours may be, in memory, CPU or disk, and still take a new sandbox while offload is on.
+             * @example 80
+             */
+            overPercent: number;
+        };
+        SetOffload: {
+            enabled: boolean;
+            /** @description Left out, it stays as it was: 80 to begin with. */
+            overPercent?: number;
         };
         ServerCode: {
             /** @description For a person signed in with two-factor sign-in on: a code from the app, or a backup code. */
@@ -22580,6 +22612,104 @@ export interface operations {
             };
             /** @description Servers do not join through an agent in this deployment. */
             501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getOffload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The setting. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Offload"];
+                };
+            };
+            /** @description invalid_request. code_required, invalid_code or code_used: two-factor sign-in is on, and this needs a code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description role_required: only an owner or an admin of the organization does this. enterprise_required: the organization has no Enterprise contract in its pilot or active. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    setOffload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetOffload"];
+            };
+        };
+        responses: {
+            /** @description The setting as it is now. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Offload"];
+                };
+            };
+            /** @description invalid_request. code_required, invalid_code or code_used: two-factor sign-in is on, and this needs a code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description role_required: only an owner or an admin of the organization does this. enterprise_required: the organization has no Enterprise contract in its pilot or active. */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
