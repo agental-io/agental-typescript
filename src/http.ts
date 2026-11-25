@@ -32,6 +32,8 @@ export interface Call {
   path: string;
   query?: Record<string, string | readonly string[] | undefined>;
   body?: unknown;
+  /** Raw bytes sent as application/octet-stream, in place of a JSON body. */
+  bytes?: Uint8Array;
   headers?: Record<string, string>;
   /**
    * Whether sending it twice does what sending it once does. Only such a request is sent
@@ -142,8 +144,8 @@ export class Http {
   private readonly apiKey: string;
   private readonly baseUrl: string;
   private readonly fetch: typeof fetch;
-  private readonly maxRetries: number;
-  private readonly retryDelayMs: number;
+  readonly maxRetries: number;
+  readonly retryDelayMs: number;
   private readonly webSocket: WebSocketConstructor | undefined;
 
   constructor(options: AgentalOptions = {}) {
@@ -219,9 +221,11 @@ export class Http {
         Accept: "application/json",
         ...userAgent(),
         ...(call.body === undefined ? {} : { "Content-Type": "application/json" }),
+        ...(call.bytes === undefined ? {} : { "Content-Type": "application/octet-stream" }),
         ...call.headers,
       },
       ...(call.body === undefined ? {} : { body: JSON.stringify(call.body) }),
+      ...(call.bytes === undefined ? {} : { body: call.bytes as NonNullable<RequestInit["body"]> }),
       ...(call.signal ? { signal: call.signal } : {}),
     };
     for (let attempt = 0; ; attempt += 1) {
@@ -252,8 +256,12 @@ export class Http {
     return { status: response.status, body: (await response.json()) as T, headers: response.headers };
   }
 
-  /** The server-sent events a request is answered with, each as it arrives. */
-  async *events(call: Call): AsyncGenerator<StreamEvent, void, void> {
+  /**
+   * The server-sent events a request is answered with, each as it arrives. onRead is told of
+   * every read, comments and heartbeats included: what a caller times silence by. A stream cut
+   * part way is a ConnectionError.
+   */
+  async *events(call: Call, onRead?: () => void): AsyncGenerator<StreamEvent, void, void> {
     const response = await this.send({ ...call, headers: { ...call.headers, Accept: "text/event-stream" } });
     if (!response.body) {
       return;
@@ -263,10 +271,20 @@ export class Http {
     let buffered = "";
     try {
       for (;;) {
-        const { value, done } = await reader.read();
+        let read: Awaited<ReturnType<typeof reader.read>>;
+        try {
+          read = await reader.read();
+        } catch (error) {
+          if (call.signal?.aborted) {
+            throw error;
+          }
+          throw new ConnectionError(`The stream was cut: ${error instanceof Error ? error.message : String(error)}`);
+        }
+        const { value, done } = read;
         if (done) {
           return;
         }
+        onRead?.();
         buffered = (buffered + decoder.decode(value, { stream: true })).replaceAll("\r\n", "\n");
         // A blank line ends an event.
         for (let end = buffered.indexOf("\n\n"); end >= 0; end = buffered.indexOf("\n\n")) {
@@ -337,7 +355,8 @@ async function errorOf(response: Response): Promise<AgentalError> {
   const body = parsed(await response.text().catch(() => ""));
   const error = body && typeof body === "object" ? (body as { error?: unknown }).error : null;
   if (error && typeof error === "object") {
-    const { code, message, regionsWithRoom, feeMicros, retryAfterSeconds, refusedLastHour, limitsUrl } = error as {
+    const { code, message, regionsWithRoom, feeMicros, retryAfterSeconds, refusedLastHour, limitsUrl, offset } = error as {
+      offset?: unknown;
       code?: unknown;
       message?: unknown;
       regionsWithRoom?: unknown;
@@ -353,6 +372,7 @@ async function errorOf(response: Response): Promise<AgentalError> {
         ...(typeof retryAfterSeconds === "number" || retryAfterSeconds === null ? { retryAfterSeconds } : {}),
         ...(typeof refusedLastHour === "number" ? { refusedLastHour } : {}),
         ...(typeof limitsUrl === "string" ? { limitsUrl } : {}),
+        ...(typeof offset === "number" ? { offset } : {}),
       };
       return new ApiError(response.status, code, message, regions, refusal);
     }

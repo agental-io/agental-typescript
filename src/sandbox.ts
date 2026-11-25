@@ -1,4 +1,4 @@
-import { AgentalError, ApiError, ConnectionError, TimeoutError } from "./errors.js";
+import { AgentalError, ApiError, ConnectionError, ProxyError, TimeoutError } from "./errors.js";
 import { sleep, tagSegment, type Http } from "./http.js";
 import { Secrets, type Template } from "./template.js";
 import { KEPT_TERMINAL_ID, Terminal, terminalKeep, terminalPkce, terminalSize, type TerminalOptions, type TerminalTicket } from "./terminal.js";
@@ -675,27 +675,79 @@ export interface ScreenshotOptions {
   cursor?: boolean;
 }
 
-/** Commands left running in the background: started, and looked at later. */
+/** How a command is started beyond what exec takes. */
+export interface CommandStartOptions {
+  /** How long it may run, in milliseconds, up to 600000; null for no limit of its own: it runs until it exits or its sandbox stops. Left out it is 60000. */
+  timeoutMs?: number | null;
+  /** The absolute folder it runs in. Left out, /root. */
+  cwd?: string;
+  /** Variables for it alone, on top of the sandbox's own. agental never keeps their values. Names starting AGENTAL_ and variables kept out of the sandbox are refused. */
+  env?: Record<string, string>;
+  /** Its stdin is written with commands.stdin() or writeStdin(). Left out, it is /dev/null. */
+  stdin?: boolean;
+  signal?: AbortSignal;
+}
+
+/** What reading a command's output gives, in order. Bytes are as the command wrote them. */
+export type CommandOutputEvent =
+  | { type: "stdout" | "stderr"; offset: number; data: Uint8Array }
+  /** Bytes from..to of a stream that the sandbox overwrote before they were read: each stream keeps its last 1 MiB. */
+  | { type: "gap"; stream: "stdout" | "stderr"; from: number; to: number }
+  | { type: "end"; command: Command };
+
+/** Signals a command can be sent. */
+export type CommandSignal = "TERM" | "KILL" | "INT" | "HUP" | "QUIT" | "USR1" | "USR2" | "STOP" | "CONT";
+
+/** The most one write of stdin carries: the API's own limit. */
+const STDIN_PIECE_BYTES = 1024 * 1024;
+/** Reads of output cut in a row, with nothing between them, before output() gives up. */
+const OUTPUT_TRIES = 5;
+/** A read of output that hears nothing for this long, not even the heartbeat sent every 15 seconds, is taken as cut. */
+const OUTPUT_SILENCE_MS = 60_000;
+
+/** A failure of a read of output that passes: read again from where it got to. */
+function passing(error: unknown): boolean {
+  if (error instanceof ConnectionError) {
+    return true;
+  }
+  if (error instanceof ProxyError) {
+    return error.status >= 500;
+  }
+  return error instanceof ApiError && (error.code === "restarting" || error.code === "sandbox_moved" || error.code === "host_error" || error.code === "internal_error");
+}
+
+/**
+ * A sandbox's commands that run on their own: started, then read, followed, written to and
+ * signalled from anywhere, while they run until they exit or their sandbox stops.
+ */
 export class Commands {
   constructor(
     private readonly http: Http,
     private readonly path: string,
   ) {}
 
-  /** Starts a command and answers at once. It may run for up to ten minutes. */
-  async start(command: CommandLine, options: ExecOptions = {}): Promise<Command> {
-    const { body } = await this.http.json<{ id: string }>({
-      method: "POST",
-      path: this.path,
-      body: { command: argv(command), ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }) },
-      ...(options.signal ? { signal: options.signal } : {}),
-    });
-    return await this.get(body.id);
+  /** Starts a command and answers at once, with the command as it is then. */
+  async start(command: CommandLine, options: CommandStartOptions = {}): Promise<Command> {
+    const body = {
+      command: argv(command),
+      ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
+      ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
+      ...(options.env === undefined ? {} : { env: options.env }),
+      ...(options.stdin ? { stdin: true } : {}),
+    };
+    const { body: started } = await this.http.json<{ id: string }>({ method: "POST", path: this.path, body, ...(options.signal ? { signal: options.signal } : {}) });
+    return await this.get(started.id);
   }
 
-  /** A command's status, running, succeeded, failed or timed_out, with its exit code and its output so far. */
+  /** The sandbox's commands, the latest first, without their output: limit 1 to 100, 50 by default. */
+  async list(options: { limit?: number } = {}): Promise<Array<Omit<Command, "stdout" | "stderr">>> {
+    const query = { limit: options.limit === undefined ? undefined : String(options.limit) };
+    return (await this.http.json<{ commands: Array<Omit<Command, "stdout" | "stderr">> }>({ method: "GET", path: this.path, query, replay: true })).body.commands;
+  }
+
+  /** A command as it is now: its status, how it ended, its stdin, and the last 65,536 characters of each stream. */
   async get(commandId: string): Promise<Command> {
-    return (await this.http.json<Command>({ method: "GET", path: `${this.path}/${encodeURIComponent(commandId)}`, replay: true })).body;
+    return (await this.http.json<Command>({ method: "GET", path: this.one(commandId), replay: true })).body;
   }
 
   /** Reads a command until it has ended. */
@@ -719,9 +771,196 @@ export class Commands {
    * runs. Use it for one that takes more than a minute: a request held open that long may
    * be cut by a proxy on the way.
    */
-  async run(command: CommandLine, options: ExecOptions = {}): Promise<Command> {
+  async run(command: CommandLine, options: CommandStartOptions = {}): Promise<Command> {
     const started = await this.start(command, options);
-    return started.status === "running" ? await this.wait(started.id) : started;
+    // One with no limit of its own is waited for as long as it runs.
+    return started.status === "running" ? await this.wait(started.id, options.timeoutMs === null ? { timeoutMs: Number.POSITIVE_INFINITY } : {}) : started;
+  }
+
+  /**
+   * A command's output from these byte offsets, as it comes, and with follow (the default)
+   * until it ends. A stream that is cut, or that the API ends after 5 minutes, is read on from
+   * where it got to by itself: nothing is missed or repeated, and bytes the sandbox overwrote
+   * before they were read come as a gap. It gives up after 5 reads in a row cut with nothing
+   * read. Reading never affects the command.
+   */
+  async *output(commandId: string, options: { stdout?: number; stderr?: number; follow?: boolean; signal?: AbortSignal } = {}): AsyncGenerator<CommandOutputEvent, void, void> {
+    const at = { stdout: options.stdout ?? 0, stderr: options.stderr ?? 0 };
+    const follow = options.follow ?? true;
+    let failed = 0;
+    let waits = 0;
+    for (;;) {
+      let moved = false;
+      let continued = false;
+      // Each read has its own end: the caller's, or silence for OUTPUT_SILENCE_MS.
+      const read = new AbortController();
+      const gone = (): void => read.abort(options.signal?.reason);
+      options.signal?.addEventListener("abort", gone, { once: true });
+      let silence = setTimeout(() => read.abort(new ConnectionError("silent")), OUTPUT_SILENCE_MS);
+      const heard = (): void => {
+        clearTimeout(silence);
+        silence = setTimeout(() => read.abort(new ConnectionError("silent")), OUTPUT_SILENCE_MS);
+      };
+      try {
+        const query = { stdout: String(at.stdout), stderr: String(at.stderr), ...(follow ? { follow: "1" } : {}) };
+        for await (const { event, data } of this.http.events({ method: "GET", path: `${this.one(commandId)}/output`, query, signal: read.signal }, heard)) {
+          const fields = (data && typeof data === "object" ? data : {}) as Record<string, unknown>;
+          if (event === "output") {
+            const stream = fields["stream"] === "stderr" ? "stderr" : "stdout";
+            const bytes = fromBase64(String(fields["data"] ?? ""));
+            const offset = Number(fields["offset"]);
+            at[stream] = offset + bytes.length;
+            moved = true;
+            yield { type: stream, offset, data: bytes };
+          } else if (event === "gap") {
+            const stream = fields["stream"] === "stderr" ? "stderr" : "stdout";
+            at[stream] = Number(fields["to"]);
+            moved = true;
+            yield { type: "gap", stream, from: Number(fields["from"]), to: Number(fields["to"]) };
+          } else if (event === "continue") {
+            const next = { stdout: Number(fields["stdout"]), stderr: Number(fields["stderr"]) };
+            moved ||= next.stdout !== at.stdout || next.stderr !== at.stderr;
+            at.stdout = next.stdout;
+            at.stderr = next.stderr;
+            continued = true;
+          } else if (event === "end") {
+            yield { type: "end", command: data as Command };
+            return;
+          } else if (event === "gone") {
+            throw new ApiError(410, "output_gone", `The output of command ${commandId} is gone with its sandbox's machine: get() has the last of it.`);
+          } else if (event === "error") {
+            throw new ConnectionError(`Reading the output of command ${commandId} failed: ${typeof data === "string" ? data : JSON.stringify(data)}`);
+          }
+        }
+      } catch (error) {
+        if (options.signal?.aborted || !passing(error)) {
+          throw error;
+        }
+      } finally {
+        clearTimeout(silence);
+        options.signal?.removeEventListener("abort", gone);
+      }
+      if (continued && !follow) {
+        return;
+      }
+      if (continued && !moved) {
+        // A command that has exited and whose end is not recorded yet, which the API does within
+        // 30 seconds: waited for, a little longer each time, and never given up on.
+        waits += 1;
+        await sleep(Math.min(4_000, 250 * 2 ** (waits - 1)), options.signal);
+        continue;
+      }
+      waits = 0;
+      failed = moved ? 0 : failed + 1;
+      if (failed >= OUTPUT_TRIES) {
+        throw new ConnectionError(`The output of command ${commandId} could not be read on: ${OUTPUT_TRIES} reads in a row read nothing. It may still be running.`);
+      }
+      if (failed > 0) {
+        await sleep(this.http.retryDelayMs * 2 ** (failed - 1), options.signal);
+      }
+    }
+  }
+
+  /**
+   * Writes bytes to a command's stdin from offset, the bytes of it accepted before them, and
+   * answers the offset after what it took. A command that is not reading takes part, and the
+   * rest is to be sent later. A write sent again is safe: what was taken is skipped.
+   */
+  async writeStdin(commandId: string, data: Uint8Array, offset: number): Promise<number> {
+    const { body } = await this.http.json<{ offset: number }>({ method: "POST", path: `${this.one(commandId)}/stdin`, query: { offset: String(offset) }, bytes: data });
+    return body.offset;
+  }
+
+  /** Closes a command's stdin after what was written: it reads EOF. */
+  async closeStdin(commandId: string): Promise<number> {
+    return (await this.http.json<{ offset: number }>({ method: "POST", path: `${this.one(commandId)}/stdin/close`, replay: true })).body.offset;
+  }
+
+  /**
+   * A command's stdin as a stream: each write is sent in order, in pieces of at most 1 MiB,
+   * what the command did not take yet sent again, and close() sends EOF. It starts at offset,
+   * or, left out, where the command's stdin stands now: from 0, bytes written before would be
+   * taken as already sent, and new ones dropped.
+   */
+  stdin(commandId: string, options: { offset?: number } = {}): WritableStream<Uint8Array> {
+    let offset: number | undefined = options.offset;
+    const send = async (bytes: Uint8Array): Promise<void> => {
+      if (offset === undefined) {
+        const stdin = (await this.get(commandId)).stdin;
+        if (!stdin) {
+          throw new AgentalError(`Command ${commandId} was started without stdin: start one with stdin: true to write to it.`);
+        }
+        offset = stdin.offset;
+      }
+      // The stream's offset of bytes[0]: a refusal is told in the stream's offsets.
+      const first = offset;
+      let sent = 0;
+      let unreachable = 0;
+      while (sent < bytes.length) {
+        const piece = bytes.subarray(sent, sent + STDIN_PIECE_BYTES);
+        let next: number;
+        try {
+          next = await this.writeStdin(commandId, piece, offset);
+        } catch (error) {
+          if (error instanceof ApiError && error.code === "stdin_offset" && error.offset !== undefined && error.offset >= first && error.offset < offset) {
+            // The command has fewer bytes than this stream counted: sent again from its next byte, which these bytes still hold.
+            offset = error.offset;
+            sent = error.offset - first;
+            continue;
+          }
+          if (error instanceof ApiError && error.code === "stdin_unreachable" && unreachable < this.http.maxRetries) {
+            unreachable += 1;
+            await sleep(this.http.retryDelayMs * 2 ** (unreachable - 1));
+            continue;
+          }
+          throw error;
+        }
+        unreachable = 0;
+        const took = next - offset;
+        offset = next;
+        sent += took;
+        if (took === 0) {
+          // Not reading now: asked again after a moment.
+          await sleep(this.http.pollIntervalMs);
+        }
+      }
+    };
+    return new WritableStream<Uint8Array>({
+      write: send,
+      close: async () => void (await this.closeStdin(commandId)),
+    });
+  }
+
+  /** Sends a signal to every process of the command, those it left running included. Answers how many it reached. */
+  async signal(commandId: string, signal: CommandSignal): Promise<number> {
+    return (await this.http.json<{ signaled: number }>({ method: "POST", path: `${this.one(commandId)}/signal`, body: { signal } })).body.signaled;
+  }
+
+  /** Ends a command: TERM, then KILL if it has not ended within graceMs (5000 by default). Answers the command as it ended. */
+  async kill(commandId: string, options: { graceMs?: number } = {}): Promise<Command> {
+    await this.signal(commandId, "TERM");
+    const deadline = Date.now() + (options.graceMs ?? 5_000);
+    for (;;) {
+      const command = await this.get(commandId);
+      if (command.status !== "running") {
+        return command;
+      }
+      if (Date.now() >= deadline) {
+        break;
+      }
+      await sleep(Math.min(this.http.pollIntervalMs, Math.max(1, deadline - Date.now())));
+    }
+    await this.signal(commandId, "KILL");
+    return await this.wait(commandId, { timeoutMs: 30_000 });
+  }
+
+  /** Forgets an ended command and its output. */
+  async delete(commandId: string): Promise<void> {
+    await this.http.send({ method: "DELETE", path: this.one(commandId), replay: true });
+  }
+
+  private one(commandId: string): string {
+    return `${this.path}/${encodeURIComponent(commandId)}`;
   }
 }
 

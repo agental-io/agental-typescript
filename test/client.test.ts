@@ -513,6 +513,20 @@ test("a fork, a snapshot and a port ask for what the API needs of them", async (
   assert.equal((sent[5]?.body as { snapshotId: string }).snapshotId, "snap_1");
 });
 
+test("a snapshot says its state: ready, deleting, or held by a roll-back", async () => {
+  const snapshot = (id: string, state: string) => ({ id, sandboxId: "sbx_0123456789abcdef", name: id, createdAt: "", browsable: false, state, size: "small", sandboxDeleted: false, sandboxName: "box", sandboxStatus: "running" });
+  const { agental, sent } = scripted(
+    json(200, { snapshots: [snapshot("snap_1", "ready"), snapshot("snap_2", "deleting"), snapshot("snap_3", "rolling_back")] }),
+    json(200, snapshot("snap_3", "rolling_back")),
+  );
+  const listed = await agental.snapshots.list();
+  assert.deepEqual(listed.map((each) => each.state), ["ready", "deleting", "rolling_back"]);
+  // What a caller does with it: only a ready one is offered to start from or roll back to.
+  assert.deepEqual(listed.filter((each) => each.state === "ready").map((each) => each.id), ["snap_1"]);
+  assert.equal((await agental.snapshots.get("snap_3")).state, "rolling_back");
+  assert.equal(sent[1]?.path, "/v1/snapshots/snap_3");
+});
+
 test("a sandbox's sites are its public routes not taken away, added from a port and removed by their id", async () => {
   const route = (id: string, port: number, changes: Record<string, unknown> = {}) => ({ id, sandboxId: "sbx_0123456789abcdef", port, title: `port-${port}`, public: true, hidden: false, url: `https://${id}.agental.site`, ...changes });
   const { agental, sent } = scripted(
@@ -2640,4 +2654,132 @@ test("a client is refused as it is made on such a Node, and made when it is give
   } finally {
     Object.defineProperty(process, "versions", versions);
   }
+});
+
+function commandOf(changes: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    id: "cmd_0123456789abcdef",
+    sandboxId: "sbx_0123456789abcdef",
+    pid: 7,
+    status: "running",
+    exitCode: null,
+    endReason: null,
+    signal: null,
+    paused: false,
+    launched: true,
+    cwd: null,
+    timeoutMs: null,
+    stdoutBytes: 0,
+    stderrBytes: 0,
+    outputFrom: { stdout: 0, stderr: 0 },
+    stdin: null,
+    stdout: "",
+    stderr: "",
+    startedAt: "2026-11-24T00:00:00.000Z",
+    finishedAt: null,
+    ...changes,
+  };
+}
+
+test("a command is started with a folder, its own variables, stdin and no time limit, as asked", async () => {
+  const { agental, sent } = scripted(json(200, sandbox()), json(201, { id: "cmd_0123456789abcdef", pid: 7, status: "running" }), json(200, commandOf({ cwd: "/opt/agental/app" })));
+  const box = await agental.sandboxes.get("sbx_0123456789abcdef");
+  const started = await box.commands.start(["make"], { cwd: "/opt/agental/app", env: { CI: "1" }, stdin: true, timeoutMs: null });
+  assert.equal(started.cwd, "/opt/agental/app");
+  assert.deepEqual(sent[1]?.body, { command: ["make"], timeoutMs: null, cwd: "/opt/agental/app", env: { CI: "1" }, stdin: true });
+});
+
+test("a command's output is followed by offset, bytes as written, a gap said, and read on by itself after a cut or a continue until its end", async () => {
+  const bytes = (text: string): string => Buffer.from(text).toString("base64");
+  const { agental, sent } = scripted(
+    json(200, sandbox()),
+    stream(`event: gap\ndata: {"stream":"stdout","from":0,"to":4}\n\nevent: output\ndata: {"stream":"stdout","offset":4,"data":"${bytes("four")}"}\n\n`),
+    stream(`: heartbeat\n\nevent: output\ndata: {"stream":"stderr","offset":0,"data":"${bytes("e")}"}\n\nevent: continue\ndata: {"stdout":8,"stderr":1}\n\n`),
+    stream(`event: end\ndata: ${JSON.stringify(commandOf({ status: "succeeded", exitCode: 0, endReason: "exited" }))}\n\n`),
+  );
+  const box = await agental.sandboxes.get("sbx_0123456789abcdef");
+  const seen: string[] = [];
+  for await (const event of box.commands.output("cmd_0123456789abcdef")) {
+    seen.push(event.type === "gap" ? `gap ${event.stream} ${event.from}-${event.to}` : event.type === "end" ? `end ${event.command.exitCode}` : `${event.type}@${event.offset} ${Buffer.from(event.data).toString()}`);
+  }
+  assert.deepEqual(seen, ["gap stdout 0-4", "stdout@4 four", "stderr@0 e", "end 0"]);
+  // Each read goes on from where the one before got to: the cut one from what it read, the continued one from what it said.
+  assert.deepEqual(
+    sent.slice(1).map((request) => request.path),
+    [
+      "/v1/sandboxes/sbx_0123456789abcdef/commands/cmd_0123456789abcdef/output?stdout=0&stderr=0&follow=1",
+      "/v1/sandboxes/sbx_0123456789abcdef/commands/cmd_0123456789abcdef/output?stdout=8&stderr=0&follow=1",
+      "/v1/sandboxes/sbx_0123456789abcdef/commands/cmd_0123456789abcdef/output?stdout=8&stderr=1&follow=1",
+    ],
+  );
+});
+
+test("stdin is written by offset: what the command did not take is sent again, a write past its next byte is sent again from there, and close sends EOF", async () => {
+  const { agental, sent } = scripted(
+    json(200, sandbox()),
+    json(200, { offset: 3 }),
+    json(200, { offset: 5 }),
+    json(409, { error: { code: "stdin_offset", message: "the next byte is at 4", offset: 4 } }),
+    json(200, { offset: 7 }),
+    json(200, { offset: 7 }),
+  );
+  const box = await agental.sandboxes.get("sbx_0123456789abcdef");
+  const writer = box.commands.stdin("cmd_0123456789abcdef", { offset: 0 }).getWriter();
+  await writer.write(new TextEncoder().encode("abc"));
+  await writer.write(new TextEncoder().encode("defg"));
+  await writer.close();
+  const writes = sent.slice(1).map((request) => request.path.replace("/v1/sandboxes/sbx_0123456789abcdef/commands/cmd_0123456789abcdef", ""));
+  assert.deepEqual(writes, ["/stdin?offset=0", "/stdin?offset=3", "/stdin?offset=5", "/stdin?offset=4", "/stdin/close"]);
+  assert.equal(sent[1]?.headers.get("content-type"), "application/octet-stream");
+});
+
+test("a read of output cut part way, or that the API turns away while it restarts, is read again from where it got to", async () => {
+  const bytes = (text: string): string => Buffer.from(text).toString("base64");
+  let pulls = 0;
+  const cut = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      pulls += 1;
+      if (pulls === 1) {
+        controller.enqueue(new TextEncoder().encode(`event: output\ndata: {"stream":"stdout","offset":0,"data":"${bytes("ab")}"}\n\n`));
+      } else {
+        controller.error(new TypeError("terminated"));
+      }
+    },
+  });
+  const { agental, sent } = scripted(
+    json(200, sandbox()),
+    new Response(cut, { status: 200, headers: { "content-type": "text/event-stream" } }),
+    json(503, { error: { code: "restarting", message: "the API is restarting" } }),
+    stream(`event: end\ndata: ${JSON.stringify(commandOf({ status: "succeeded", exitCode: 0 }))}\n\n`),
+  );
+  const box = await agental.sandboxes.get("sbx_0123456789abcdef");
+  const seen: string[] = [];
+  for await (const event of box.commands.output("cmd_0123456789abcdef")) {
+    seen.push(event.type);
+  }
+  assert.deepEqual(seen, ["stdout", "end"]);
+  assert.match(sent.at(-1)?.path ?? "", /stdout=2&stderr=0/);
+});
+
+test("kill sends TERM, and KILL only when the command has not ended within its grace", async () => {
+  const { agental, sent } = scripted(
+    json(200, sandbox()),
+    json(200, { signaled: 2 }),
+    json(200, commandOf()),
+    json(200, { signaled: 2 }),
+    json(200, commandOf({ status: "failed", endReason: "signaled", signal: 9 })),
+  );
+  const box = await agental.sandboxes.get("sbx_0123456789abcdef");
+  const ended = await box.commands.kill("cmd_0123456789abcdef", { graceMs: 0 });
+  assert.equal(ended.endReason, "signaled");
+  const signals = sent.filter((request) => request.path.endsWith("/signal")).map((request) => (request.body as { signal: string }).signal);
+  assert.deepEqual(signals, ["TERM", "KILL"]);
+});
+
+test("a stdin stream with no offset starts where the command's stdin stands, so nothing written is taken as sent before", async () => {
+  const { agental, sent } = scripted(json(200, sandbox()), json(200, commandOf({ stdin: { open: true, offset: 40 } })), json(200, { offset: 43 }));
+  const box = await agental.sandboxes.get("sbx_0123456789abcdef");
+  const writer = box.commands.stdin("cmd_0123456789abcdef").getWriter();
+  await writer.write(new TextEncoder().encode("abc"));
+  assert.match(sent[2]?.path ?? "", /\/stdin\?offset=40$/);
 });

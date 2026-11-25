@@ -21,9 +21,12 @@ export class ApiError extends AgentalError {
      * any other error.
      */
     readonly regionsWithRoom?: string[],
-    refusal?: { feeMicros?: number; retryAfterSeconds?: number | null; refusedLastHour?: number; limitsUrl?: string },
+    refusal?: { feeMicros?: number; retryAfterSeconds?: number | null; refusedLastHour?: number; limitsUrl?: string; offset?: number },
   ) {
     super(message);
+    if (refusal?.offset !== undefined) {
+      this.offset = refusal.offset;
+    }
     if (refusal?.feeMicros !== undefined) {
       this.feeMicros = refusal.feeMicros;
     }
@@ -43,6 +46,9 @@ export class ApiError extends AgentalError {
    * would have cost, in millionths of a US dollar. Undefined on any other error.
    */
   readonly feeMicros?: number;
+
+  /** On a write of a command's stdin refused with stdin_offset: the offset to send from. Undefined on any other error. */
+  readonly offset?: number;
 
   /**
    * On a start refused with 429 or 409 for its burst: seconds until the same start would cost no

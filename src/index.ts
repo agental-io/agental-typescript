@@ -7,7 +7,7 @@ export { Secrets, Template, Templates } from "./template.js";
 export { KEPT_TERMINAL_ID, Terminal, TERMINAL_CLOSE, TERMINAL_PROTOCOL } from "./terminal.js";
 export type { TerminalExit, TerminalOptions, WebSocketConstructor, WebSocketLike } from "./terminal.js";
 export type { TemplateChanges } from "./template.js";
-export type { BurstOptions, CommandLine, CreateOptions, DesktopButton, ExecEvent, ExecOptions, ResizeOptions, SandboxChanges, ScreenshotOptions, SendEmailOptions, StartOptions, StopOptions, WaitOptions } from "./sandbox.js";
+export type { BurstOptions, CommandLine, CommandOutputEvent, CommandSignal, CommandStartOptions, CreateOptions, DesktopButton, ExecEvent, ExecOptions, ResizeOptions, SandboxChanges, ScreenshotOptions, SendEmailOptions, StartOptions, StopOptions, WaitOptions } from "./sandbox.js";
 export type {
   AccountEmail,
   ApiKey,

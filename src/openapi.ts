@@ -542,9 +542,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** @description Lists a sandbox's commands, running and ended, the latest first, as last saved: a running one's state is up to 30 seconds old here. GET one for it now. */
+        get: operations["listCommands"];
         put?: never;
-        /** @description Starts a command in a running sandbox and returns at once, with 201 and the command's id, without waiting for it to exit. Read its status, exit code and output with GET /v1/sandboxes/{id}/commands/{commandId}. timeoutMs can be up to 600000 here. */
+        /** @description Starts a command in a running sandbox and returns at once, with 201 and the command's id, without waiting for it to exit. It runs until it exits, its timeoutMs runs out, or its sandbox stops, whether or not anyone is watching: an API restart, a dropped connection or a closed client does not end it. Read it with GET …/commands/{commandId}, follow its output with GET …/output, write its stdin with POST …/stdin, and signal it with POST …/signal. */
         post: operations["startCommand"];
         delete?: never;
         options?: never;
@@ -559,10 +560,79 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Returns a command started with POST /v1/sandboxes/{id}/commands: its status, its exit code once it has exited, and the last 65,536 characters of its stdout and stderr. Poll it until status is no longer running. */
+        /** @description Returns a command: its status and how it ended, its exit code once it has exited by itself, its stdin, how much it has written, and the last 65,536 characters of its stdout and stderr. A running one is asked about as this is read. */
         get: operations["getCommand"];
         put?: never;
         post?: never;
+        /** @description Forgets an ended command and its output. */
+        delete: operations["deleteCommand"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sandboxes/{id}/commands/{commandId}/output": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Reads a command's output from byte offsets as server-sent events, and with follow=1 until it ends. Each output event is one piece of a stream, at most 48 KiB, as base64, with its offset; its id is stdoutOffset:stderrOffset past it, so that a stream cut short is resumed from the last id, with Last-Event-ID or the query. A gap event says bytes the sandbox overwrote before they were read: each stream keeps its last 1 MiB. A comment is sent every 15 seconds. After 5 minutes a continue event gives the offsets to go on from and the stream ends; an end event gives the command as it ended. A stream that closes with neither was cut: go on from the last id. Reading output never affects the command. */
+        get: operations["commandOutput"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sandboxes/{id}/commands/{commandId}/stdin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Writes bytes to a command's stdin, from offset: the bytes of it accepted before them. Bytes already accepted are skipped, so a write sent again is safe. Up to 1 MiB a write. A command that is not reading takes part of it within 20 seconds, and the answer says how much: send the rest later. */
+        post: operations["writeCommandStdin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sandboxes/{id}/commands/{commandId}/stdin/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Closes a command's stdin, after what was written: it reads EOF. Sent again, it answers the same, while its sandbox still holds the command. */
+        post: operations["closeCommandStdin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sandboxes/{id}/commands/{commandId}/signal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Sends a signal to every process of a command, those it started in the background and their children included, and to what it left running after it ended while its sandbox still holds it. To stop one gracefully, send TERM, wait, then KILL. */
+        post: operations["signalCommand"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4404,6 +4474,66 @@ export interface components {
             /** @description running. */
             status: string;
         };
+        CommandStart: {
+            /**
+             * @description The program and its arguments, as an argv array of up to 64 strings. No shell runs it: for pipes, redirects or globs, send ["sh", "-c", "..."]. It runs as root, with the variables of the sandbox's template and its own in its environment, plus AGENTAL_SANDBOX_ID, the sandbox's ID, AGENTAL_API_URL, this API's address, and AGENTAL_SANDBOX_TOKEN, a token for the current run that can read and move the sandbox's stop and nothing else.
+             * @example [
+             *       "echo",
+             *       "hello"
+             *     ]
+             */
+            command: string[];
+            /** @description Milliseconds the command may run before it is ended, 100 to 600000. Defaults to 60000. null gives it no limit of its own: it runs until it exits or its sandbox stops, and a sandbox has no time limit unless one is set. A running command does not keep its sandbox running or change what it costs. */
+            timeoutMs?: number | null;
+            /** @description The absolute folder it runs in. One that is not a folder is refused with 400 before anything runs. Defaults to /root. */
+            cwd?: string;
+            /** @description Variables for this command alone, on top of the sandbox's own. agental never writes their values to its records or logs, though the running process holds them, as a memory kept or forked does. Names starting AGENTAL_ and names of variables kept out of the sandbox are refused. The command, its cwd and every variable it gets are at most 63 KiB together. */
+            env?: {
+                [key: string]: string;
+            };
+            /** @description true lets its stdin be written with POST …/commands/{commandId}/stdin and closed with …/stdin/close. Defaults to false: stdin is /dev/null. */
+            stdin?: boolean;
+        };
+        CommandList: {
+            commands: {
+                id: string;
+                sandboxId: string;
+                pid: number | null;
+                /** @description running, succeeded (exit code 0), failed, or timed_out (its timeoutMs ran out). */
+                status: string;
+                /** @description The exit code the program exited with. Null while it runs, and whenever it did not exit by itself: a signal, a timeout, a stop of its sandbox, or an end that is not known. */
+                exitCode: number | null;
+                /**
+                 * @description How it ended: exited by itself; signaled; timed_out; failed_to_start, never ran; sandbox_stopped, its sandbox stopped, was deleted or hit its time limit; sandbox_restarted, its machine restarted or its kept memory was lost; sandbox_moved, its machine went to another server without it; lost, what ran it died and anything left of it was killed. Null while it runs, and for one from before reasons.
+                 * @enum {string|null}
+                 */
+                endReason: "exited" | "signaled" | "timed_out" | "failed_to_start" | "sandbox_stopped" | "sandbox_restarted" | "sandbox_moved" | "lost" | null;
+                /** @description The signal that ended it, for endReason signaled. */
+                signal: number | null;
+                /** @description Its sandbox is stopped with its memory kept: it goes on from where it was when the sandbox starts. */
+                paused: boolean;
+                /** @description False while it is not known whether it started, after a start whose answer was lost: it becomes true, or the command ends failed_to_start, once its sandbox says. */
+                launched: boolean;
+                cwd: string | null;
+                /** @description Its time limit; null for none. */
+                timeoutMs: number | null;
+                /** @description Bytes it has written to stdout in all, whether still kept or not. */
+                stdoutBytes: number;
+                stderrBytes: number;
+                /** @description The oldest byte of each stream that can still be read with …/output, while its sandbox runs: each keeps its last 1 MiB. */
+                outputFrom: {
+                    stdout: number;
+                    stderr: number;
+                };
+                /** @description For one started with stdin: whether it is open, and the bytes of it accepted so far. */
+                stdin: {
+                    open: boolean;
+                    offset: number;
+                } | null;
+                startedAt: string;
+                finishedAt: string | null;
+            }[];
+        };
         Command: {
             id: string;
             sandboxId: string;
@@ -4412,12 +4542,50 @@ export interface components {
             status: string;
             /** @description The exit code the program exited with. Null while it runs, and whenever it did not exit by itself: a signal, a timeout, a stop of its sandbox, or an end that is not known. */
             exitCode: number | null;
-            /** @description The last 65,536 characters it wrote to stdout. */
+            /**
+             * @description How it ended: exited by itself; signaled; timed_out; failed_to_start, never ran; sandbox_stopped, its sandbox stopped, was deleted or hit its time limit; sandbox_restarted, its machine restarted or its kept memory was lost; sandbox_moved, its machine went to another server without it; lost, what ran it died and anything left of it was killed. Null while it runs, and for one from before reasons.
+             * @enum {string|null}
+             */
+            endReason: "exited" | "signaled" | "timed_out" | "failed_to_start" | "sandbox_stopped" | "sandbox_restarted" | "sandbox_moved" | "lost" | null;
+            /** @description The signal that ended it, for endReason signaled. */
+            signal: number | null;
+            /** @description Its sandbox is stopped with its memory kept: it goes on from where it was when the sandbox starts. */
+            paused: boolean;
+            /** @description False while it is not known whether it started, after a start whose answer was lost: it becomes true, or the command ends failed_to_start, once its sandbox says. */
+            launched: boolean;
+            cwd: string | null;
+            /** @description Its time limit; null for none. */
+            timeoutMs: number | null;
+            /** @description Bytes it has written to stdout in all, whether still kept or not. */
+            stdoutBytes: number;
+            stderrBytes: number;
+            /** @description The oldest byte of each stream that can still be read with …/output, while its sandbox runs: each keeps its last 1 MiB. */
+            outputFrom: {
+                stdout: number;
+                stderr: number;
+            };
+            /** @description For one started with stdin: whether it is open, and the bytes of it accepted so far. */
+            stdin: {
+                open: boolean;
+                offset: number;
+            } | null;
+            /** @description The last 65,536 characters it wrote to stdout, as last saved: while it runs, up to 30 seconds old. */
             stdout: string;
-            /** @description The last 65,536 characters it wrote to stderr. */
+            /** @description The last 65,536 characters it wrote to stderr, as last saved. */
             stderr: string;
             startedAt: string;
             finishedAt: string | null;
+        };
+        CommandStdin: {
+            /** @description The bytes of stdin accepted so far: where the next write goes. */
+            offset: number;
+        };
+        CommandSignaled: {
+            signaled: number;
+        };
+        CommandSignal: {
+            /** @enum {string} */
+            signal: "TERM" | "KILL" | "INT" | "HUP" | "QUIT" | "USR1" | "USR2" | "STOP" | "CONT";
         };
         HostRoute: {
             id: string;
@@ -4500,6 +4668,11 @@ export interface components {
             createdAt: string;
             /** @description Whether the files in it can be listed and downloaded. False for a snapshot of the whole machine: roll back to it to reach them. */
             browsable: boolean;
+            /**
+             * @description ready: it can be used. deleting: its delete was asked and is finishing by itself; it is no longer charged, and can no longer be used. rolling_back: a roll-back of its sandbox to an earlier snapshot is discarding it; usually within a minute it is ready again if the roll-back was not made, and gone if it was. Rolling back to one that is not ready, or making a sandbox from it, returns 409 under_way.
+             * @enum {string}
+             */
+            state: "ready" | "deleting" | "rolling_back";
             /** @description The size of the sandbox it was taken of. A sandbox made from it gets this size unless another, with no less disk, is asked for. */
             size: string | null;
             /** @description Whether the sandbox it was taken of has been deleted. The snapshot is kept either way, and a new sandbox can still be made from it. */
@@ -10458,6 +10631,50 @@ export interface operations {
             };
         };
     };
+    listCommands: {
+        parameters: {
+            query?: {
+                /** @description How many, 1 to 100. Defaults to 50. */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The sandbox's ID. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The sandbox's commands, without their output: GET one for it. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandList"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     startCommand: {
         parameters: {
             query?: never;
@@ -10470,7 +10687,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ExecRequest"];
+                "application/json": components["schemas"]["CommandStart"];
             };
         };
         responses: {
@@ -10481,6 +10698,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StartedCommand"];
+                };
+            };
+            /** @description invalid_request: its cwd is not a folder, a variable is not one it may set, or the command and its variables are over 63 KiB together. Nothing ran. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Missing or invalid API key. */
@@ -10510,7 +10736,16 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description sandbox_moved: rare; the sandbox's machine was no longer on the server the call went to, for example because it was archived and started again meanwhile, and the call may not have finished. Send it again. */
+            /** @description not_supported: the sandbox's agent is from before cwd, env, stdin or no time limit. Stop and start the sandbox, and it has them. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description sandbox_moved: rare; the sandbox's machine was no longer on the server the call went to. A failure that leaves it unknown whether the command started says so, with commandId among its details: GET that command rather than start it again. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -10535,7 +10770,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The command's status and output so far. */
+            /** @description The command as it is now. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -10555,6 +10790,290 @@ export interface operations {
             };
             /** @description Not found. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deleteCommand: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The sandbox's ID. */
+                id: string;
+                /** @description The command's ID, from POST /v1/sandboxes/{id}/commands. */
+                commandId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Forgotten. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description still_running: it has not ended; signal it first. has_processes: it has ended, and processes it left still run; signal it, which reaches them too. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    commandOutput: {
+        parameters: {
+            query?: {
+                /** @description The first byte of stdout wanted, a whole number. Defaults to 0. A Last-Event-ID header wins over this and stderr. */
+                stdout?: string;
+                stderr?: string;
+                /** @description 1 follows it until it ends. Without it, what is there is sent, then continue or end. */
+                follow?: "0" | "1" | "true" | "false";
+            };
+            header?: never;
+            path: {
+                /** @description The sandbox's ID. */
+                id: string;
+                /** @description The command's ID, from POST /v1/sandboxes/{id}/commands. */
+                commandId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Server-sent events. output: {"stream":"stdout","offset":n,"data":"<base64>"}. gap: {"stream":"stderr","from":n,"to":m}. continue: {"stdout":n,"stderr":m}. end: the command, as GET …/commands/{commandId} answers it. gone: its machine no longer holds its output. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description not_supported: it was started before output could be read by offset. sandbox_not_running: its sandbox is stopped with its memory kept. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description output_gone: its sandbox's machine, and its output with it, is gone. GET the command for the last of its output. */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    writeCommandStdin: {
+        parameters: {
+            query: {
+                /** @description Where these bytes go, a whole number: the offset the last answer gave, 0 at first. */
+                offset: string;
+            };
+            header?: never;
+            path: {
+                /** @description The sandbox's ID. */
+                id: string;
+                /** @description The command's ID, from POST /v1/sandboxes/{id}/commands. */
+                commandId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/octet-stream": string;
+            };
+        };
+        responses: {
+            /** @description Where its stdin stands now. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandStdin"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description stdin_offset: offset is past the next byte; error.offset is where to send from. stdin_closed, command_ended, no_stdin: it takes no more. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description stdin_unreachable: its stdin did not answer. Send the same offset again. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    closeCommandStdin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The sandbox's ID. */
+                id: string;
+                /** @description The command's ID, from POST /v1/sandboxes/{id}/commands. */
+                commandId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Its stdin, closed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandStdin"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    signalCommand: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The sandbox's ID. */
+                id: string;
+                /** @description The command's ID, from POST /v1/sandboxes/{id}/commands. */
+                commandId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommandSignal"];
+            };
+        };
+        responses: {
+            /** @description How many processes it reached. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandSignaled"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description not_supported: the sandbox's machine cannot signal a command's tree, or its agent is from before signals. */
+            501: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -11259,7 +11778,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description restore_blocked: a sandbox forked from this one after the snapshot still exists, or is being made. invalid_state: the sandbox is neither running nor stopped. sandbox_archived: it is archived; start it first. sandbox_migrating: not returned now, since sandboxes are no longer moved between servers. Nothing was discarded. */
+            /** @description restore_blocked: a sandbox forked from this one after the snapshot still exists, or is being made. under_way: the snapshot's state is not ready. invalid_state: the sandbox is neither running nor stopped. sandbox_archived: it is archived; start it first. sandbox_migrating: not returned now, since sandboxes are no longer moved between servers. Nothing was discarded. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -11416,7 +11935,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description under_way: the last snapshot of a deleted sandbox is being deleted with its machine: it can no longer be used, and the delete finishes by itself. sandbox_archived: its sandbox is archived; start it first. sandbox_migrating: not returned now, since sandboxes are no longer moved between servers. */
+            /** @description under_way: its state is deleting, and its server has not removed it yet: it can no longer be used, and the delete finishes by itself. sandbox_archived: its sandbox is archived; start it first. sandbox_migrating: not returned now, since sandboxes are no longer moved between servers. */
             409: {
                 headers: {
                     [name: string]: unknown;

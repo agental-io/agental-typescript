@@ -179,6 +179,8 @@ await sandbox.restore(snapshot.id); // roll the disk back
 const fresh = await agental.sandboxes.create({ snapshotId: snapshot.id });
 ```
 
+A snapshot's `state` is `ready` when it can be used. `deleting` is one whose delete was asked and is finishing by itself, and `rolling_back` is one a roll-back of its sandbox to an earlier snapshot is discarding: it is `ready` again, usually within a minute, if the roll-back was not made. Rolling back to one that is not `ready`, or making a sandbox from it, throws an `ApiError` with the status 409 and the code `under_way`.
+
 ## Spot sandboxes
 
 Half the list price, for work that is cheap to repeat: evals, batch jobs, test runs. A spot sandbox runs in room nobody else is paying for, and that room is taken back when a standard sandbox needs it.
