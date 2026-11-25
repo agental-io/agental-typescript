@@ -218,7 +218,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Starts a stopped sandbox and returns it running, with 200. It boots from its disk, so processes from before the stop are gone, unless it was stopped with keepMemory. A running sandbox is returned as it is. An archived sandbox returns 202 while its disk is brought back: read it until its status is running. */
+        /** @description Starts a stopped sandbox and returns it running, with 200. It boots from its disk, so processes from before the stop are gone, unless it was stopped with keepMemory. A running sandbox is returned as it is. An archived sandbox returns 202 while its disk is brought back: read it until its status is running. So does one whose server is too full to start it: its disk moves through storage to a server in its region with room, and it starts there, for one start's burst fee. Where none has room, or it cannot move (it has snapshots, or was stopped with keepMemory), the start is refused with 409 and says why, and its disk stays as it is. */
         post: operations["startSandbox"];
         delete?: never;
         options?: never;
@@ -3373,6 +3373,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/core-days": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description The cores of the organization's own servers, day by day for a month, as they are billed: each day's joined cores by server, what the contract commits to, and the cores past it. A day with no server joined is left out. */
+        get: operations["getCoreDays"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/offload": {
         parameters: {
             query?: never;
@@ -4493,11 +4510,18 @@ export interface components {
             };
             /** @description true lets its stdin be written with POST …/commands/{commandId}/stdin and closed with …/stdin/close. Defaults to false: stdin is /dev/null. */
             stdin?: boolean;
+            /**
+             * @description What the command is for, as lists and the console show it, such as "dev server" or "tests": 1 to 100 characters, no control characters. agental keeps no command line, so without a name a command is shown by its ID. Name it for what it does, never by copying its command line, which can hold a secret: everyone who can see the sandbox sees the name.
+             * @example dev server
+             */
+            name?: string;
         };
         CommandList: {
             commands: {
                 id: string;
                 sandboxId: string;
+                /** @description The name it was started with, or null. A job's run has its job's name. */
+                name: string | null;
                 pid: number | null;
                 /** @description running, succeeded (exit code 0), failed, or timed_out (its timeoutMs ran out). */
                 status: string;
@@ -4537,6 +4561,8 @@ export interface components {
         Command: {
             id: string;
             sandboxId: string;
+            /** @description The name it was started with, or null. A job's run has its job's name. */
+            name: string | null;
             pid: number | null;
             /** @description running, succeeded (exit code 0), failed, or timed_out (its timeoutMs ran out). */
             status: string;
@@ -7471,6 +7497,8 @@ export interface components {
                 joinTokenExpiresAt: string | null;
             };
             publicAddress: string | null;
+            /** @description Its physical cores (cores per socket times sockets, whether SMT is on or off), which it is billed by. Null until it has joined. */
+            cores: number | null;
             holds: {
                 creating: number;
                 running: number;
@@ -7498,6 +7526,33 @@ export interface components {
             label: string;
             /** @description For a person signed in with two-factor sign-in on: a code from the app, or a backup code. */
             code?: string;
+        };
+        CoreDays: {
+            month: string;
+            days: {
+                /** @description The day, UTC. A server counts for every day it was joined at any moment of, online or not. */
+                day: string;
+                /**
+                 * @description Where the contract stood that day. Only an active day has a commitment and cores billed past it.
+                 * @enum {string}
+                 */
+                phase: "none" | "pilot" | "active" | "ended";
+                /** @description The cores of the servers joined that day. */
+                cores: number;
+                /** @description The cores the contract commits to that day, billed every month whatever is joined. */
+                committedCores: number;
+                /** @description The cores past the commitment, billed by the day. */
+                extraCores: number;
+                servers: {
+                    id: string;
+                    label: string;
+                    cores: number;
+                }[];
+            }[];
+            /** @description Every day's cores added up. */
+            coreDays: number;
+            /** @description Every day's cores past the commitment added up. */
+            extraCoreDays: number;
         };
         Offload: {
             /** @description Whether a new sandbox that names no region is made on agental's servers when none of your own has room under overPercent. */
@@ -8967,7 +9022,14 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @description Start it from its disk and let the memory it was stopped with go, for good: its files are kept, and the programs that ran in it and anything in its memory are lost. For a sandbox whose memory waits for a server that can take it back (409 capacity_exceeded), so its owner is never left waiting on us. memoryLost then says it was let go at its owner's start. Nothing changes for a sandbox that keeps no memory. The memory is let go even if the start is then refused (as for credit or room), and the sandbox stays stopped from its disk. A key needs sandbox.stop as well to send it. */
+                    withoutMemory?: boolean;
+                };
+            };
+        };
         responses: {
             /** @description The sandbox, running. Processes from before the stop are not restored, unless it was stopped with keepMemory. */
             200: {
@@ -8978,7 +9040,7 @@ export interface operations {
                     "application/json": components["schemas"]["Sandbox"];
                 };
             };
-            /** @description The sandbox is archived, so the start was accepted and its machine is being brought back, which takes longer the larger its disk. It is answered with the status restoring. Read it every 10 seconds until its status is running. If its status is stopped again, the start failed, and error says why. Sending the start again meanwhile answers 202 again. */
+            /** @description The sandbox is archived, or its server was too full to start it and its disk is moving to another, so the start was accepted and its machine is being brought back, which takes longer the larger its disk. It is answered with the status restoring. Read it every 10 seconds until its status is running. If its status is stopped again, the start failed, and error says why. Sending the start again meanwhile answers 202 again. */
             202: {
                 headers: {
                     [name: string]: unknown;
@@ -8996,6 +9058,15 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            /** @description key_action_forbidden: withoutMemory was sent, and the API key lacks sandbox.stop. Nothing was changed. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Not found. */
             404: {
                 headers: {
@@ -9005,7 +9076,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description invalid_state: the sandbox is neither running nor stopped, as one still being created or in error. under_way: it is being resized, and is started when that has ended. capacity_exceeded: its server has no room to start it now, and no other can take it; try again later. spot_capacity_exceeded: a spot sandbox, and its server has no spare room for it now (or, archived, no server of its region has); try again later, or turn off spot. */
+            /** @description invalid_state: the sandbox is neither running nor stopped, as one still being created or in error. under_way: it is being resized, and is started when that has ended. capacity_exceeded: its server has no room to start it now, and no other can take it, or it is archived with its memory and no server that can take that memory back has room or is in its region; try again later, or, for its memory, send withoutMemory. spot_capacity_exceeded: a spot sandbox, and its server has no spare room for it now (or, archived, no server of its region has); try again later, or turn off spot. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -10700,7 +10771,7 @@ export interface operations {
                     "application/json": components["schemas"]["StartedCommand"];
                 };
             };
-            /** @description invalid_request: its cwd is not a folder, a variable is not one it may set, or the command and its variables are over 63 KiB together. Nothing ran. */
+            /** @description invalid_request: its cwd is not a folder, a variable is not one it may set, its name is empty, too long or holds a control character, or the command and its variables are over 63 KiB together. Nothing ran. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -23162,6 +23233,56 @@ export interface operations {
             };
             /** @description Servers do not join through an agent in this deployment. */
             501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getCoreDays: {
+        parameters: {
+            query?: {
+                /** @description The month, UTC, as 2026-11. Left out: this month. */
+                month?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The month's days, oldest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoreDays"];
+                };
+            };
+            /** @description invalid_request. code_required, invalid_code or code_used: two-factor sign-in is on, and this needs a code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid API key. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description role_required: only an owner or an admin of the organization does this. enterprise_required: the organization has no Enterprise contract in its pilot or active. */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

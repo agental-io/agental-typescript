@@ -276,6 +276,17 @@ test("a stop sends no body, and keepMemory when it is asked for, and the sandbox
   assert.equal(box.info.memoryKept, true);
 });
 
+test("a start sends no body, and withoutMemory when it is asked for, and the sandbox says its memory was let go", async () => {
+  const { agental, sent } = scripted(
+    json(200, sandbox({ status: "stopped", memoryKept: true })),
+    json(200, sandbox({ memoryKept: false, memoryLost: "Its memory was let go when it was started without it." })),
+  );
+  const box = await agental.sandboxes.get("sbx_0123456789abcdef");
+  await box.start({ withoutMemory: true });
+  assert.deepEqual([sent[1]?.method, sent[1]?.path, sent[1]?.body], ["POST", "/v1/sandboxes/sbx_0123456789abcdef/start", { withoutMemory: true }]);
+  assert.match(String(box.info.memoryLost), /let go/);
+});
+
 test("a resize sends the size, and restart only when it is asked for, and the sandbox says the size that waits", async () => {
   const { agental, sent } = scripted(
     json(200, sandbox()),

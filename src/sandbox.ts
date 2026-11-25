@@ -232,8 +232,16 @@ export interface StopOptions {
   timeoutMs?: number;
 }
 
-/** How to start a sandbox: whether to wait until it runs, and what its burst may cost. */
-export interface StartOptions extends WaitOptions, BurstOptions {}
+/** How to start a sandbox: whether to wait until it runs, what its burst may cost, and whether to keep its memory. */
+export interface StartOptions extends WaitOptions, BurstOptions {
+  /**
+   * Start it from its disk and let the memory it was stopped with go, for good: its files are
+   * kept, and the programs that ran in it and anything in its memory are lost. For a sandbox
+   * whose memory waits for a server that can take it back (capacity_exceeded). info.memoryLost
+   * says so afterwards. Nothing changes for a sandbox that keeps no memory.
+   */
+  withoutMemory?: boolean;
+}
 
 /**
  * A message for a sandbox to send. It goes to the address of the sandbox's own account: to
@@ -685,6 +693,8 @@ export interface CommandStartOptions {
   env?: Record<string, string>;
   /** Its stdin is written with commands.stdin() or writeStdin(). Left out, it is /dev/null. */
   stdin?: boolean;
+  /** What it is for, as lists and the console show it, such as "dev server": agental keeps no command line, so without one it shows as its id. Never its command line, which can hold a secret: everyone who can see the sandbox sees it. */
+  name?: string;
   signal?: AbortSignal;
 }
 
@@ -734,6 +744,7 @@ export class Commands {
       ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
       ...(options.env === undefined ? {} : { env: options.env }),
       ...(options.stdin ? { stdin: true } : {}),
+      ...(options.name === undefined ? {} : { name: options.name }),
     };
     const { body: started } = await this.http.json<{ id: string }>({ method: "POST", path: this.path, body, ...(options.signal ? { signal: options.signal } : {}) });
     return await this.get(started.id);
@@ -1402,7 +1413,7 @@ export class Sandbox {
     const headers = burstHeaders(options);
     await burstWaited(options, async () => {
       try {
-        const answer = await this.http.json<SandboxInfo>({ method: "POST", path: `${this.path}/start`, headers, replay: true });
+        const answer = await this.http.json<SandboxInfo>({ method: "POST", path: `${this.path}/start`, headers, ...(options.withoutMemory ? { body: { withoutMemory: true } } : {}), replay: true });
         this.info = answer.body;
         this.burstFeeMicros = burstFeeOf(answer.headers);
       } catch (error) {
