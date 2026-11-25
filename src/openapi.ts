@@ -3776,6 +3776,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/billing/enterprise": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description The organization's Enterprise contract as its Billing shows it: the terms, the cores joined, what this month comes to so far, and the subscription that pays for it. */
+        get: operations["getEnterpriseBilling"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/billing/enterprise/checkout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Starts the subscription that pays for the organization's Enterprise contract, and returns the payment page to send the browser to. It takes a card, a billing address and a VAT number. Started in the pilot, the card is first charged on the contract's first day; started within three days of it or after, the month's minimum is charged at once. Asked for twice in a day, it gives the one page. */
+        post: operations["startEnterpriseSubscription"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -7980,6 +8014,53 @@ export interface components {
              * @enum {string|null}
              */
             session: "sticky" | "rotating" | null;
+        };
+        EnterpriseBilling: {
+            /** @description The terms that hold today. Null where the organization has no Enterprise contract in its pilot or its term, and no subscription left running from one. */
+            contract: {
+                /** @description The price of a physical core joined for a month. */
+                dollarsPerCoreMonth: number;
+                /** @description The price of a core joined for a day, to four decimals: the month's price × 12 ÷ 365. */
+                coreDayDollars: number;
+                /** @description The least a month's invoice comes to, charged in advance. The cores joined count against it. */
+                minimumDollars: number;
+                startsOn: string;
+                endsOn: string;
+                /**
+                 * @description pilot: before startsOn, and nothing is charged. active: in its term. ended: past endsOn, shown while its subscription still runs.
+                 * @enum {string}
+                 */
+                phase: "pilot" | "active" | "ended";
+                /** @description Whether a subscription started now is charged its first month at once: true in the term, and in the pilot's last three days, when Stripe can no longer wait for startsOn. */
+                chargedAtOnce: boolean;
+            } | null;
+            cores: {
+                /** @description Physical cores on the servers it has joined now, as they are billed. */
+                joined: number;
+            };
+            /** @description This calendar month so far. An invoice counts by the subscription's own month, so its figures differ by the days at each end. */
+            month: {
+                /**
+                 * @description The calendar month the figures are of, in UTC.
+                 * @example 2026-11
+                 */
+                name: string;
+                /** @description Core-days in the contract's term so far this month: none in the pilot. */
+                coreDays: number;
+                /** @description What they come to, each day at the price that held on it. */
+                coresDollars: number;
+                /** @description The part of it past the minimum. */
+                pastMinimumDollars: number;
+            };
+            /** @description The subscription that pays for the contract, as Stripe last said it. Null until its owner starts one, and once one is cancelled. */
+            subscription: {
+                status: string;
+                periodEnd: string | null;
+                cancelAtPeriodEnd: boolean;
+            } | null;
+        };
+        EnterpriseCheckout: {
+            url: string;
         };
     };
     responses: never;
@@ -25087,6 +25168,100 @@ export interface operations {
             };
             /** @description residential_egress_unavailable: residential was asked for where GET /v1/policy says residentialEgress is false. Nothing was changed. */
             501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getEnterpriseBilling: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Its Enterprise billing. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnterpriseBilling"];
+                };
+            };
+            /** @description invalid_request: the key belongs to no account or organization, so it has no billing. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description forbidden: in a team, only an owner or admin can read its billing. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    startEnterpriseSubscription: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The payment page. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnterpriseCheckout"];
+                };
+            };
+            /** @description invalid_request: the key belongs to no account or organization, so it has no billing. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description forbidden: in a team, only an owner starts its Enterprise subscription. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description no_contract: the organization has no Enterprise contract in its pilot or its term. already_subscribed: its subscription is started already. on_plan: it is on a plan bought by the month, to cancel first. sponsored: it is sponsored. billing_not_configured: nothing is sold on this deployment. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description billing_unavailable: the payment provider did not respond. Try again in a moment. */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
