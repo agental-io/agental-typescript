@@ -3802,7 +3802,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Starts the subscription that pays for the organization's Enterprise contract, and returns the payment page to send the browser to. It takes a card, a billing address and a VAT number. Started in the pilot, the card is first charged on the contract's first day; started within three days of it or after, the month's minimum is charged at once. Asked for twice in a day, it gives the one page. */
+        /** @description Starts the subscription that pays for the organization's Enterprise contract, and returns the payment page to send the browser to. It takes a card, a billing address and a VAT number. Started in the pilot, the card is first charged on the contract's first day, and nothing before; started on that day or after, the first month's minimum is charged at the next midnight (UTC), so that its months are whole days. Asked for twice in a day, it gives the one page. */
         post: operations["startEnterpriseSubscription"];
         delete?: never;
         options?: never;
@@ -8031,8 +8031,10 @@ export interface components {
                  * @enum {string}
                  */
                 phase: "pilot" | "active" | "ended";
-                /** @description Whether a subscription started now is charged its first month at once: true in the term, and in the pilot's last three days, when Stripe can no longer wait for startsOn. */
-                chargedAtOnce: boolean;
+                /** @description Whether startsOn is under an hour off: a subscription cannot be started in that hour, and is started at startsOn. */
+                startsWithinTheHour: boolean;
+                /** @description When a subscription started now is first charged: startsOn in the pilot, and in the term the next midnight (UTC) an hour off or more, so that its months are whole days. Null in the hour before startsOn. */
+                firstChargeAt: string | null;
             } | null;
             cores: {
                 /** @description Physical cores on the servers it has joined now, as they are billed. */
@@ -8057,6 +8059,8 @@ export interface components {
                 status: string;
                 periodEnd: string | null;
                 cancelAtPeriodEnd: boolean;
+                /** @description When its first charged month begins or began: nothing is charged before it. */
+                firstMonthFrom: string | null;
             } | null;
         };
         EnterpriseCheckout: {
@@ -25251,7 +25255,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description no_contract: the organization has no Enterprise contract in its pilot or its term. already_subscribed: its subscription is started already. on_plan: it is on a plan bought by the month, to cancel first. sponsored: it is sponsored. billing_not_configured: nothing is sold on this deployment. */
+            /** @description no_contract: the organization has no Enterprise contract in its pilot or its term. already_subscribed: its subscription is started already. term_ends: the term ends before a subscription started now would first be charged. starts_within_the_hour: the contract starts in under an hour, and the subscription is started then. on_plan: it is on a plan bought by the month, to cancel first. sponsored: it is sponsored. billing_not_configured: nothing is sold on this deployment. */
             409: {
                 headers: {
                     [name: string]: unknown;
