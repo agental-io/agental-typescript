@@ -252,7 +252,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Stops a running sandbox and returns it stopped, with 200. Its disk is kept and every process ends, unless keepMemory is sent, which keeps its memory too. A stopped sandbox is free for 14 days after its stop, then $0.05 a GB a month of what it stores, until it is started or deleted. keepMemory on a spot sandbox is refused with 409 spot_keeps_no_memory, on every account. Until the account's first top-up, keepMemory is refused with 409 memory_needs_top_up, and a stop that would take what its stopped sandboxes store past 20 GB with 409 stopped_storage_limit; the sandbox goes on running. A stopped sandbox is returned as it is. The response header Stop-Id names the stop, for GET /v1/stops/{id}. */
+        /** @description Stops a running sandbox and returns it stopped, with 200. Its disk is kept and every process ends, unless keepMemory is sent, which keeps its memory too. A stopped sandbox is free for 14 days after its stop, then $0.05 a GB a month of what it stores, until it is started or deleted. keepMemory on a spot sandbox is refused with 409 spot_keeps_no_memory, on every account. So is keepMemory on a sandbox running on an old version of the server software that is being retired (its metadata agental.memory-retires says the last day), with 409 memory_retiring: restart it instead. Until the account's first top-up, keepMemory is refused with 409 memory_needs_top_up, and a stop that would take what its stopped sandboxes store past 20 GB with 409 stopped_storage_limit; the sandbox goes on running. A stopped sandbox is returned as it is. The response header Stop-Id names the stop, for GET /v1/stops/{id}. */
         post: operations["stopSandbox"];
         delete?: never;
         options?: never;
@@ -4747,6 +4747,11 @@ export interface components {
              * @enum {string}
              */
             sandboxStatus: "creating" | "running" | "stopped" | "error" | "deleted" | "restoring" | "migrating";
+            /**
+             * @description For a snapshot with memory that only an old version of the server software can put back, which is being retired: when that happens. After it, a sandbox made from it starts from its disk, with every file, and without the programs that ran. Null for any other snapshot.
+             * @example 2026-12-28T00:00:00.000Z
+             */
+            memoryRetiresAt: string | null;
         };
         DesktopState: {
             /** @description Whether a desktop is turned on for the sandbox. It stays so through a stop and a start, and a move to another server: the desktop is started again by itself, with nothing open on it. */
@@ -9329,7 +9334,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description invalid_state: the sandbox is neither running nor stopped, or keepMemory was sent and its memory cannot be kept, and it is left running; the message says why. resize_pending: keepMemory was sent, and a larger size waits for its next start, which cannot take the memory back. */
+            /** @description invalid_state: the sandbox is neither running nor stopped, or keepMemory was sent and its memory cannot be kept, and it is left running; the message says why. resize_pending: keepMemory was sent, and a larger size waits for its next start, which cannot take the memory back. memory_retiring: keepMemory was sent, and the sandbox runs on a version of the server software being retired: restart it instead. */
             409: {
                 headers: {
                     [name: string]: unknown;
