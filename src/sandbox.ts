@@ -237,8 +237,7 @@ export interface StartOptions extends WaitOptions, BurstOptions {
   /**
    * Start it from its disk and let the memory it was stopped with go, for good: its files are
    * kept, and the programs that ran in it and anything in its memory are lost. For a sandbox
-   * whose memory waits for a server that can take it back (capacity_exceeded). info.memoryLost
-   * says so afterwards. Nothing changes for a sandbox that keeps no memory.
+   * whose start failed with memory_cannot_resume. info.memoryLost says so afterwards. Nothing changes for a sandbox that keeps no memory.
    */
   withoutMemory?: boolean;
 }

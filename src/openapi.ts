@@ -7783,10 +7783,10 @@ export interface components {
             /** @description The plan it is on, free included, or null where plans are not enforced on it. */
             plan: string | null;
             /**
-             * @description Whose limits it has: its plan's, a plan's we gave it, or, on no plan, the smallest plan's.
+             * @description Whose limits it has: its plan's, a plan's we gave it, its Enterprise contract's, or, on no plan, the smallest plan's.
              * @enum {string}
              */
-            limitsFrom: "plan" | "hand" | "none";
+            limitsFrom: "plan" | "hand" | "contract" | "none";
             /**
              * @description The plan whose limits it has.
              * @example plan100
@@ -8061,6 +8061,22 @@ export interface components {
                 cancelAtPeriodEnd: boolean;
                 /** @description When its first charged month begins or began: nothing is charged before it. */
                 firstMonthFrom: string | null;
+            } | null;
+            /** @description Set while the contract is in its term and is not paid for. What runs on its servers keeps running, and nothing of theirs is stopped or erased; paying puts it all back. */
+            unpaid: {
+                /** @description The first day it was not paid for, in UTC: the day an invoice failed or the subscription was cancelled, or the contract's first day where none was started. */
+                since: string;
+                /** @description Which day of it today is: 1 on since. */
+                day: number;
+                /**
+                 * @description counting: nothing is held back yet. no_new: no new sandbox is made on its servers. ended: the contract has ended for it, and nothing is made or started on its servers.
+                 * @enum {string}
+                 */
+                stage: "counting" | "no_new" | "ended";
+                /** @description The day from which no new sandbox is made on its servers: day 30. */
+                noNewSandboxesOn: string;
+                /** @description The day the contract ends for it: day 60. */
+                contractEndsOn: string;
             } | null;
         };
         EnterpriseCheckout: {
@@ -8353,7 +8369,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description billing_required: the account is on the free plan with no card saved. out_of_credit: its credits, the plan's or the free plan's monthly allowance and the top-ups, are used. size_not_on_plan: the plan does not make sandboxes of this size, and the message names the plan that does. Nothing was created. */
+            /** @description billing_required: the account is on the free plan with no card saved. out_of_credit: its credits, the plan's or the free plan's monthly allowance and the top-ups, are used. size_not_on_plan: the plan does not make sandboxes of this size, and the message names the plan that does. Nothing was created. contract_unpaid: it would be made on the organization's own servers, whose Enterprise contract has not been paid for in 30 days or more; what runs there keeps running. */
             402: {
                 headers: {
                     [name: string]: unknown;
@@ -9110,7 +9126,7 @@ export interface operations {
         requestBody?: {
             content: {
                 "application/json": {
-                    /** @description Start it from its disk and let the memory it was stopped with go, for good: its files are kept, and the programs that ran in it and anything in its memory are lost. For a sandbox whose memory waits for a server that can take it back (409 capacity_exceeded), so its owner is never left waiting on us. memoryLost then says it was let go at its owner's start. Nothing changes for a sandbox that keeps no memory. The memory is let go even if the start is then refused (as for credit or room), and the sandbox stays stopped from its disk. A key needs sandbox.stop as well to send it. */
+                    /** @description Start it from its disk and let the memory it was stopped with go, for good: its files are kept, and the programs that ran in it and anything in its memory are lost. For a sandbox whose memory no server can bring back (409 memory_cannot_resume). memoryLost then says it was let go at its owner's start. Nothing changes for a sandbox that keeps no memory. The memory is let go even if the start is then refused (as for credit or room), and the sandbox stays stopped from its disk. A key needs sandbox.stop as well to send it. */
                     withoutMemory?: boolean;
                 };
             };
@@ -9161,7 +9177,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description invalid_state: the sandbox is neither running nor stopped, as one still being created or in error. under_way: it is being resized, and is started when that has ended. capacity_exceeded: its server has no room to start it now, and no other can take it, or it is archived with its memory and no server that can take that memory back has room or is in its region; try again later, or, for its memory, send withoutMemory. spot_capacity_exceeded: a spot sandbox, and its server has no spare room for it now (or, archived, no server of its region has); try again later, or turn off spot. */
+            /** @description invalid_state: the sandbox is neither running nor stopped, as one still being created or in error. under_way: it is being resized, and is started when that has ended. capacity_exceeded: its server has no room to start it now, and no other can take it, or it is archived with its memory and every server that can bring that memory back is full; try again later. memory_cannot_resume: it was stopped with its memory and no server can bring that memory back now; its files and memory are kept, and a start with withoutMemory boots it from its files. spot_capacity_exceeded: a spot sandbox, and its server has no spare room for it now (or, archived, no server of its region has); try again later, or turn off spot. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -9911,7 +9927,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description invalid_state: the sandbox is neither running nor stopped, as one still being created or in error. under_way: it is being resized, and is started when that has ended. capacity_exceeded: its server has no room to start it now, and no other can take it; try again later. */
+            /** @description invalid_state: the sandbox is neither running nor stopped, as one still being created or in error. under_way: it is being resized, and is started when that has ended. capacity_exceeded: its server has no room to start it now, and no other can take it; try again later. memory_cannot_resume: it was stopped with its memory and no server can load that memory now; its files and memory are kept, and a start with withoutMemory boots it from its files. */
             409: {
                 headers: {
                     [name: string]: unknown;
