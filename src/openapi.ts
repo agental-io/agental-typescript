@@ -4119,7 +4119,7 @@ export interface components {
              */
             templateId?: string;
             /**
-             * @description What its time limit does when it runs out. delete (the default): the sandbox is deleted, with its disk. stop: it is stopped and its disk kept, as a stop asked for keeps it. stop_with_memory: it is stopped with its memory kept too, as a stop with keepMemory, and its next start carries on where it was; for an account that has made its first top-up (before it, 409 memory_needs_top_up), where the deployment keeps memory (otherwise 501). A stop asked for always keeps the disk, whatever this says.
+             * @description What its time limit does when it runs out. delete (the default): the sandbox is deleted, with its disk, and one whose create failed is deleted once its time limit has passed since it was created. stop: it is stopped and its disk kept, as a stop asked for keeps it. stop_with_memory: it is stopped with its memory kept too, as a stop with keepMemory, and its next start carries on where it was; for an account that has made its first top-up (before it, 409 memory_needs_top_up), where the deployment keeps memory (otherwise 501). A stop asked for always keeps the disk, whatever this says.
              * @example stop
              * @enum {string}
              */
