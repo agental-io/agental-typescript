@@ -4037,12 +4037,12 @@ export interface components {
         };
         SandboxNetwork: {
             /**
-             * @description What the sandbox may reach outside itself: its template's rule with its own addresses on top. open is the internet, which is what a sandbox has when nothing is asked. blocked lets nothing out: names still resolve, and no connection leaves. allowlist lets out only what goes to an address in allow. It is enforced outside the sandbox, on the server it runs on, so nothing running in the sandbox can change it, root included. What reaches the sandbox is not affected: commands, files and its public addresses work as before. Whatever this says, no sandbox reaches another sandbox or a private network, or delivers mail on port 25.
+             * @description What the sandbox may reach outside itself: its template's rule with its own addresses on top. open is the internet, which is what a sandbox has when nothing is asked. blocked lets nothing out: names still resolve, and no connection leaves. allowlist lets out only what goes to an address in allow, and HTTPS on port 443 to a name in it. It is enforced outside the sandbox, on the server it runs on, so nothing running in the sandbox can change it, root included. What reaches the sandbox is not affected: commands, files and its public addresses work as before. Whatever this says, no sandbox reaches another sandbox or a private network, or delivers mail on port 25.
              * @enum {string}
              */
             outbound: "open" | "blocked" | "allowlist";
             /**
-             * @description The IPv4 addresses and ranges an allowlist lets out to, over any protocol and port: its template's and its own. Empty for open and blocked.
+             * @description What an allowlist lets out to, its template's and its own: IPv4 addresses and ranges, over any protocol and port, and names, as github.com or *.pythonhosted.org, over HTTPS on port 443 alone. Empty for open and blocked.
              * @example [
              *       "203.0.113.7",
              *       "198.51.100.0/24"
@@ -4180,7 +4180,7 @@ export interface components {
         /** @description Addresses the sandbox may reach on top of its template's outbound rule. It is held to the two from its first boot, so it never runs open first. Left out, it has none of its own. The rule itself is its template's: PUT /v1/templates/{id}/network. PUT /v1/sandboxes/{id}/network changes its own addresses later, while it runs. A fork has its source's. Sending outbound here is refused with rule_on_template. Only where GET /v1/policy says networkPolicy. */
         SandboxOwnNetworkInput: {
             /**
-             * @description The addresses the sandbox may reach on top of its template's outbound rule, in place of the ones it had. An empty list takes them all away. IPv4 addresses and ranges, as 203.0.113.7 or 198.51.100.0/24, 100 at most. Names are not taken, and nor is a range inside a private network. A range is kept by its first address, so 198.51.100.7/24 comes back as 198.51.100.0/24. With its template's addresses they come to 100 at most.
+             * @description The addresses the sandbox may reach on top of its template's outbound rule, in place of the ones it had. An empty list takes them all away. IPv4 addresses and ranges, as 203.0.113.7 or 198.51.100.0/24, and names, as github.com or *.pythonhosted.org, 100 in all at most. An address or range lets out every protocol and port; a name lets out HTTPS on port 443 alone, to the addresses the sandbox's server finds for it, and no SSH, plain HTTP or other port. A range inside a private network is not taken, nor a name on the Public Suffix List, as *.com. A name cannot be held with residential egress. A range is kept by its first address, so 198.51.100.7/24 comes back as 198.51.100.0/24. With its template's addresses they come to 100 at most.
              * @example [
              *       "192.0.2.99"
              *     ]
@@ -6405,12 +6405,12 @@ export interface components {
         };
         TemplateNetwork: {
             /**
-             * @description What a sandbox on the template may reach outside itself, before its own addresses. open is the internet, which is what a sandbox has when nothing is asked. blocked lets nothing out: names still resolve, and no connection leaves. allowlist lets out only what goes to an address in allow. It is enforced outside the sandbox, on the server it runs on, so nothing running in the sandbox can change it, root included. What reaches the sandbox is not affected: commands, files and its public addresses work as before. Whatever this says, no sandbox reaches another sandbox or a private network, or delivers mail on port 25.
+             * @description What a sandbox on the template may reach outside itself, before its own addresses. open is the internet, which is what a sandbox has when nothing is asked. blocked lets nothing out: names still resolve, and no connection leaves. allowlist lets out only what goes to an address in allow, and HTTPS on port 443 to a name in it. It is enforced outside the sandbox, on the server it runs on, so nothing running in the sandbox can change it, root included. What reaches the sandbox is not affected: commands, files and its public addresses work as before. Whatever this says, no sandbox reaches another sandbox or a private network, or delivers mail on port 25.
              * @enum {string}
              */
             outbound: "open" | "blocked" | "allowlist";
             /**
-             * @description The IPv4 addresses and ranges an allowlist lets out to, over any protocol and port. Empty for open and blocked.
+             * @description What an allowlist lets out to: IPv4 addresses and ranges, over any protocol and port, and names, as github.com or *.pythonhosted.org, over HTTPS on port 443 alone. Empty for open and blocked.
              * @example [
              *       "203.0.113.7",
              *       "198.51.100.0/24"
@@ -6518,12 +6518,12 @@ export interface components {
         };
         TemplateNetworkInput: {
             /**
-             * @description open is the internet, which is what a sandbox has when nothing is asked. blocked lets nothing out: names still resolve, and no connection leaves. allowlist lets out only what goes to an address in allow. It is enforced outside the sandbox, on the server it runs on, so nothing running in the sandbox can change it, root included. What reaches the sandbox is not affected: commands, files and its public addresses work as before. Whatever this says, no sandbox reaches another sandbox or a private network, or delivers mail on port 25.
+             * @description open is the internet, which is what a sandbox has when nothing is asked. blocked lets nothing out: names still resolve, and no connection leaves. allowlist lets out only what goes to an address in allow, and HTTPS on port 443 to a name in it. It is enforced outside the sandbox, on the server it runs on, so nothing running in the sandbox can change it, root included. What reaches the sandbox is not affected: commands, files and its public addresses work as before. Whatever this says, no sandbox reaches another sandbox or a private network, or delivers mail on port 25.
              * @enum {string}
              */
             outbound: "open" | "blocked" | "allowlist";
             /**
-             * @description For allowlist only, and then at least one: IPv4 addresses and ranges, as 203.0.113.7 or 198.51.100.0/24, 100 at most. Names are not taken, and nor is a range inside a private network. A range is kept by its first address, so 198.51.100.7/24 comes back as 198.51.100.0/24.
+             * @description For allowlist only, and then at least one: IPv4 addresses and ranges, as 203.0.113.7 or 198.51.100.0/24, and names, as github.com or *.pythonhosted.org, 100 in all at most. An address or range lets out every protocol and port; a name lets out HTTPS on port 443 alone, to the addresses the sandbox's server finds for it, and no SSH, plain HTTP or other port. A range inside a private network is not taken, nor a name on the Public Suffix List, as *.com. A name cannot be held with residential egress. A range is kept by its first address, so 198.51.100.7/24 comes back as 198.51.100.0/24.
              * @example [
              *       "203.0.113.7",
              *       "198.51.100.0/24"
