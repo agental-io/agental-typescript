@@ -235,7 +235,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Moves a stopped sandbox's disk off its server to storage now, and returns the sandbox with 202 while the move runs. Its next start brings the disk back, which takes longer than a plain start. A sandbox with snapshots, or one stopped with keepMemory, is not archived. */
+        /** @description Moves a stopped sandbox's disk off its server to storage now, and returns the sandbox with 202 while the move runs. Its next start brings the disk back, which takes longer than a plain start. A sandbox with snapshots kept on its server, or one stopped with keepMemory, is not archived. */
         post: operations["archiveSandbox"];
         delete?: never;
         options?: never;
@@ -9259,7 +9259,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description invalid_state: the sandbox is not stopped, is being started, was stopped with keepMemory, or is on a server its account joined, where sandboxes are not archived. sandbox_migrating: not returned now, since sandboxes are no longer moved between servers. sandbox_has_snapshots: a sandbox that has snapshots is not archived. */
+            /** @description invalid_state: the sandbox is not stopped, is being started, was stopped with keepMemory, or is on a server its account joined, where sandboxes are not archived. sandbox_migrating: not returned now, since sandboxes are no longer moved between servers. sandbox_has_snapshots: the sandbox has snapshots kept on its server beside its disk, which keep it there. One whose snapshots are all kept elsewhere, as after agental moved it off a server, is archived as one with none. */
             409: {
                 headers: {
                     [name: string]: unknown;
