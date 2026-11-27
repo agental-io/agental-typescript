@@ -805,7 +805,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Rolls a sandbox's disk back to one of its own snapshots, keeping its ID. Every process in it ends, as on a stop and a start, and snapshots taken after that one are deleted. It cannot be undone. */
+        /** @description Rolls a sandbox's disk back to one of its own snapshots, keeping its ID. Every process in it ends, as on a stop and a start, and snapshots taken after that one are deleted. It cannot be undone. A roll-back to an older snapshot can take some minutes, and may give the sandbox a new machine, on its own server or another: its address and SSH port may then change. No start is charged for it. */
         post: operations["restoreSandbox"];
         delete?: never;
         options?: never;
@@ -11908,7 +11908,10 @@ export interface operations {
     restoreSandbox: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Optional. Sent again with the same key within a day, after a lost answer or a timeout, the roll-back is answered as it was the first time and nothing is rolled back twice. The same key for another snapshot is 409 idempotency_conflict. */
+                "idempotency-key"?: string;
+            };
             path: {
                 /** @description The sandbox's ID. */
                 id: string;
@@ -11937,6 +11940,15 @@ export interface operations {
                     };
                 };
             };
+            /** @description invalid_request: the body is not valid, or an Idempotency-Key was sent that is not 8 to 200 visible ASCII characters. Nothing was rolled back. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Missing or invalid API key. */
             401: {
                 headers: {
@@ -11955,7 +11967,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description restore_blocked: a sandbox forked from this one after the snapshot still exists, or is being made. under_way: the snapshot's state is not ready. invalid_state: the sandbox is neither running nor stopped. sandbox_archived: it is archived; start it first. sandbox_migrating: not returned now, since sandboxes are no longer moved between servers. Nothing was discarded. */
+            /** @description restore_blocked: a sandbox forked from this one after the snapshot still exists, or is being made; or it keeps an earlier snapshot that this roll-back cannot keep. under_way: the snapshot's state is not ready, a later snapshot is being used to make a new sandbox, the sandbox is already being rolled back, or it was changed while it was being rolled back. capacity_exceeded: no server has room to roll it back now; try again later. idempotency_conflict: the Idempotency-Key was used before for another snapshot. invalid_state: the sandbox is neither running nor stopped. sandbox_archived: it is archived; start it first. sandbox_migrating: not returned now, since sandboxes are no longer moved between servers. Nothing was discarded. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -11964,7 +11976,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description host_error: the server could not roll it back. The sandbox has the disk it had. */
+            /** @description host_error: the server could not roll it back, and the sandbox has the disk it had. Or, where the message says it was rolled back, the roll-back was made and the sandbox could not be started again: start it. */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -11982,7 +11994,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description uncertain_operation: the server did not answer in time. Read the sandbox, and start it if it is not running. */
+            /** @description uncertain_operation: the server did not answer in time, or did not confirm the sandbox's machine stopped, and nothing was discarded; or the roll-back was made and the sandbox was not started again. Read the sandbox, and start it if it is not running. */
             503: {
                 headers: {
                     [name: string]: unknown;
