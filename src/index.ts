@@ -103,6 +103,7 @@ export type {
   Size,
   SpotOptions,
   Snapshot,
+  SnapshotKept,
   SshKey,
   KeptTerminal,
   SshState,

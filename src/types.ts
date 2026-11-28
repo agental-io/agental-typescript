@@ -99,6 +99,8 @@ export type RefusedJobCall = operations["listRefusedJobCalls"]["responses"][200]
 /** Running time and list cost by job over a window: GET /v1/usage/jobs. */
 export type JobUsage = Schemas["JobUsage"];
 export type Snapshot = Schemas["Snapshot"];
+/** Where a snapshot is kept: server_and_storage, storage, server or your_server. copiedAt says since when its copy is whole. */
+export type SnapshotKept = Snapshot["kept"];
 /** A port of a sandbox, and the address it is reached at. */
 export type HostRoute = Schemas["HostRoute"];
 export type SiteAnalytics = Schemas["SiteAnalytics"];

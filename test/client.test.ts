@@ -29,6 +29,7 @@ import {
   type SandboxInfo,
   type SandboxMetrics,
   type SandboxNetworkDetail,
+  type SnapshotKept,
   type DataRetention,
   type Telemetry,
   type TelemetryTest,
@@ -536,6 +537,17 @@ test("a snapshot says its state: ready, deleting, or held by a roll-back", async
   assert.deepEqual(listed.filter((each) => each.state === "ready").map((each) => each.id), ["snap_1"]);
   assert.equal((await agental.snapshots.get("snap_3")).state, "rolling_back");
   assert.equal(sent[1]?.path, "/v1/snapshots/snap_3");
+});
+
+test("a snapshot says where it is kept, and since when its copy is whole", async () => {
+  const snapshot = (id: string, kept: SnapshotKept, copiedAt: string | null) => ({ id, sandboxId: "sbx_0123456789abcdef", name: id, createdAt: "", browsable: false, state: "ready", kept, copiedAt, size: "small", sandboxDeleted: false, sandboxName: "box", sandboxStatus: "running" });
+  const { agental } = scripted(
+    json(200, { snapshots: [snapshot("snap_1", "server_and_storage", "2026-11-27T10:15:00.000Z"), snapshot("snap_2", "server", null), snapshot("snap_3", "storage", "2026-11-26T09:00:00.000Z"), snapshot("snap_4", "server", null), snapshot("snap_5", "your_server", null)] }),
+  );
+  const listed = await agental.snapshots.list();
+  assert.deepEqual(listed.map((each) => [each.kept, each.copiedAt]), [["server_and_storage", "2026-11-27T10:15:00.000Z"], ["server", null], ["storage", "2026-11-26T09:00:00.000Z"], ["server", null], ["your_server", null]]);
+  // What a caller does with it: a snapshot in storage only takes minutes to start from, so that is said before it is used.
+  assert.deepEqual(listed.filter((each) => each.kept === "storage").map((each) => each.id), ["snap_3"]);
 });
 
 test("a sandbox's sites are its public routes not taken away, added from a port and removed by their id", async () => {

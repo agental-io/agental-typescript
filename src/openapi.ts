@@ -4733,6 +4733,17 @@ export interface components {
              * @enum {string}
              */
             state: "ready" | "deleting" | "rolling_back";
+            /**
+             * @description Where it is kept. server_and_storage: on its server, and a whole copy is in storage. storage: in storage only, after its server was lost or emptied; rolling back to it or making a sandbox from it restores the copy, which takes minutes. With copiedAt null its copy cannot be restored, and both return 409 snapshot_in_storage_only. server: on its server only, with no whole copy in storage: not copied yet, or not copied because the account has never paid and its copies hold 20 GB, the account is closed, copies are off, its copy was lost or cannot be used, it is being deleted, or it is a copy of a folder. your_server: on a server your organization joined, which is never copied. A copy holds the disk, not the memory.
+             * @example server_and_storage
+             * @enum {string}
+             */
+            kept: "server_and_storage" | "storage" | "server" | "your_server";
+            /**
+             * @description When its whole copy in storage was made, for server_and_storage and storage. Null for every other.
+             * @example 2026-11-27T10:15:00.000Z
+             */
+            copiedAt: string | null;
             /** @description The size of the sandbox it was taken of. A sandbox made from it gets this size unless another, with no less disk, is asked for. */
             size: string | null;
             /** @description Whether the sandbox it was taken of has been deleted. The snapshot is kept either way, and a new sandbox can still be made from it. */
@@ -8401,7 +8412,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description capacity_exceeded: no server in the region has room for it now; try again later. name_taken: one of your sandboxes has that name. account_limit_reached: your account holds as many sandboxes as it may at a time; delete one first. idempotency_conflict: the Idempotency-Key was used before with a different body. box_of_another_organization: the box named, or the one the snapshot is kept on, is a server another account joined. too_many_addresses: the template's rule and network.allow come to more than 100 addresses. spot_capacity_exceeded: a spot sandbox, and no server in the region has spare room for one now; try again later. spot_needs_top_up: spot sandboxes come with the account's first top-up. spot_keeps_no_memory: onTimeout stop_with_memory on a spot sandbox, which never keeps its memory. under_way: the snapshot it is made from cannot be used for a moment, as it is being moved or discarded; try again in a minute. */
+            /** @description capacity_exceeded: no server in the region has room for it now; try again later. name_taken: one of your sandboxes has that name. account_limit_reached: your account holds as many sandboxes as it may at a time; delete one first. idempotency_conflict: the Idempotency-Key was used before with a different body. box_of_another_organization: the box named, or the one the snapshot is kept on, is a server another account joined. too_many_addresses: the template's rule and network.allow come to more than 100 addresses. spot_capacity_exceeded: a spot sandbox, and no server in the region has spare room for one now; try again later. spot_needs_top_up: spot sandboxes come with the account's first top-up. spot_keeps_no_memory: onTimeout stop_with_memory on a spot sandbox, which never keeps its memory. under_way: the snapshot it is made from cannot be used for a moment, as it is being moved or discarded; try again in a minute. snapshot_in_storage_only: the snapshot is kept in storage only (its kept is storage), and its copy cannot be restored now: no server in the region restores copies yet, or the copy was found gone. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -11967,7 +11978,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description restore_blocked: a sandbox forked from this one after the snapshot still exists, or is being made; or it keeps an earlier snapshot that this roll-back cannot keep. under_way: the snapshot's state is not ready, a later snapshot is being used to make a new sandbox, the sandbox is already being rolled back, or it was changed while it was being rolled back. capacity_exceeded: no server has room to roll it back now; try again later. idempotency_conflict: the Idempotency-Key was used before for another snapshot. invalid_state: the sandbox is neither running nor stopped. sandbox_archived: it is archived; start it first. sandbox_migrating: not returned now, since sandboxes are no longer moved between servers. Nothing was discarded. */
+            /** @description restore_blocked: a sandbox forked from this one after the snapshot still exists, or is being made; or it keeps an earlier snapshot that this roll-back cannot keep. under_way: the snapshot's state is not ready, a later snapshot is being used to make a new sandbox, the sandbox is already being rolled back, or it was changed while it was being rolled back. capacity_exceeded: no server has room to roll it back now; try again later. idempotency_conflict: the Idempotency-Key was used before for another snapshot. invalid_state: the sandbox is neither running nor stopped. sandbox_archived: it is archived; start it first. sandbox_migrating: not returned now, since sandboxes are no longer moved between servers. snapshot_in_storage_only: the snapshot is kept in storage only (its kept is storage), or its sandbox was lost with its server, and its copy cannot be restored now: no server in the region restores copies yet, the copy was found gone, or the sandbox is on a server your organization joined. Nothing was discarded. */
             409: {
                 headers: {
                     [name: string]: unknown;
